@@ -1,0 +1,24 @@
+<?php
+
+class Populater {
+  public static $instance;
+  public $state;
+
+  function __construct() {
+    self::$instance = $this;
+  }
+}
+
+new Populater;
+
+function populater() {
+  return Populater::$instance;
+}
+
+populater()->state = [
+  'version' => '20230806',
+  'url' => plugins_urls('/', __FILE__),
+  'cache' => [],
+];
+
+include __DIR__.'/generators/index.php';
