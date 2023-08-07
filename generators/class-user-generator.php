@@ -1,6 +1,7 @@
 <?php
 
 declare(strict_types=1);
+namespace Populater;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -34,15 +35,15 @@ class User_Generator implements AbstractGenerator {
    * function which generate users
    *
    * @param object $plugin
-   * @return bool|WP_Error 
+   * @return bool|\WP_Error 
    */
-  function generate( int $num_of_users_to_add ): bool|WP_Error {
+  function generate( int $num_of_users_to_add ): bool|\WP_Error {
     
     if( $num_of_users_to_add == 0 ) {
       return true;
     }
     if( $num_of_users_to_add < 0 ) {
-      return new WP_Error( 'user generation error', __( 'Input cannot be negative', 'tangible_populater' ) );
+      return new \WP_Error( 'user generation error', __( 'Input cannot be negative', 'tangible_populater' ) );
     }
     $fields = tangible_fields();
     $previous_num_of_users = $fields->fetch_value( 'num_of_users' );
@@ -56,7 +57,7 @@ class User_Generator implements AbstractGenerator {
             $previous_num_of_users + $num_of_users_removed + 1 
           );
         }
-        return new WP_Error( 'user generation error', __('User already exists, please change the prefix and try again.') );
+        return new \WP_Error( 'user generation error', __('User already exists, please change the prefix and try again.') );
       } else {
         $this->create_fake_user( $username );
       }
@@ -118,7 +119,7 @@ class User_Generator implements AbstractGenerator {
    * @return bool
    * True on success, false on failure
    */
-  function create_fake_user( string $username ): bool|WP_Error {
+  function create_fake_user( string $username ): bool|\WP_Error {
     $create_user_success = wp_create_user( $username, $this->password ); // returns int on success and WP_Error on failure
     if(is_wp_error( $create_user_success ) ) {
       return $create_user_success;
@@ -126,7 +127,7 @@ class User_Generator implements AbstractGenerator {
     $user = get_user_by( 'login', $username ); 
     $add_user_meta_success = add_user_meta($user->ID, 'fake_user', 'true' ); // returns meta ID on success and false on failure
     if(!$add_user_meta_success) {
-      return new WP_Error( 'add_user_meta_failed', __( 'Failed while trying to add user meta.', 'tangible_populater'));
+      return new \WP_Error( 'add_user_meta_failed', __( 'Failed while trying to add user meta.', 'tangible_populater'));
     }
     return true;
   }

@@ -1,8 +1,10 @@
 <?php
 
 declare(strict_types=1);
+namespace Populater;
 
 defined( 'ABSPATH' ) || exit;
+
 
 use Tangible\Populater\AbstractGenerator;
 
@@ -30,9 +32,9 @@ class Lesson_Generator implements AbstractGenerator {
    * function which generates lessons
    * 
    * @param object $plugin
-   * @return bool|WP_Error 
+   * @return bool|\WP_Error 
    */
-  function generate( int $num_of_lessons_to_add ): bool|WP_Error {
+  function generate( int $num_of_lessons_to_add ): bool|\WP_Error {
 
     $fields = tangible_fields();
     $num_of_courses = $fields->fetch_value( 'num_of_courses' );
@@ -41,13 +43,13 @@ class Lesson_Generator implements AbstractGenerator {
     $course_iteration_flag = 1;
 
     if( $num_of_courses == 0 ) {
-      return new WP_Error( 'lesson generation error', __( 'Must create at least 1 course before generating lessons', 'tangible_populater' ) );
+      return new \WP_Error( 'lesson generation error', __( 'Must create at least 1 course before generating lessons', 'tangible_populater' ) );
     }
     if( $num_of_lessons_to_add == 0 ) {
       return true;
     }
     if( $num_of_lessons_to_add < 0 ) {
-      return new WP_Error( 'lesson generation error', __( 'Input cannot be negative', 'tangible_populater' ) );
+      return new \WP_Error( 'lesson generation error', __( 'Input cannot be negative', 'tangible_populater' ) );
     }
     
     for( $added_lessons = 0; $added_lessons < $num_of_lessons_to_add; $added_lessons++ ) { 
@@ -56,7 +58,7 @@ class Lesson_Generator implements AbstractGenerator {
         for( $num_of_lessons_removed = 0; $num_of_lessons_removed < $added_lessons; $num_of_lessons_removed++ ) {
           $this->remove_lesson( $this->prefix . ( $previous_num_of_lessons + $num_of_lessons_removed + 1 ) );
         }
-        return new WP_Error( 'lesson generation error', __( 'Lesson already exists, please change the prefix and try again.', 'tangible_populater' ) );
+        return new \WP_Error( 'lesson generation error', __( 'Lesson already exists, please change the prefix and try again.', 'tangible_populater' ) );
       } else {
         $this->create_lesson( $lesson_name );
         $course_gen = Course_Generator::getInstance();

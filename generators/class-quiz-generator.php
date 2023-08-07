@@ -1,6 +1,7 @@
 <?php
 
 declare(strict_types=1);
+namespace Populater;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -30,9 +31,9 @@ class Quiz_Generator implements AbstractGenerator {
    * function which generates quizzes
    * 
    * @param int $num_of_quizzes_to_add
-   * @return bool|WP_Error 
+   * @return bool|\WP_Error 
    */
-  function generate( int $num_of_quizzes_to_add ): bool|WP_Error {
+  function generate( int $num_of_quizzes_to_add ): bool|\WP_Error {
 
     $fields = tangible_fields();
     $previous_num_of_quizzes = $fields->fetch_value( 'num_of_quizzes' );
@@ -42,7 +43,7 @@ class Quiz_Generator implements AbstractGenerator {
       return true;
     }
     if( $num_of_quizzes_to_add < 0 ) {
-      return new WP_Error( 'quiz generation error', __( 'Input cannot be negative', 'tangible_populater' ) );
+      return new \WP_Error( 'quiz generation error', __( 'Input cannot be negative', 'tangible_populater' ) );
     }
     
     for( $added_quizzes = 0; $added_quizzes < $num_of_quizzes_to_add; $added_quizzes++ ) { 
@@ -51,7 +52,7 @@ class Quiz_Generator implements AbstractGenerator {
         for( $num_of_quizzes_to_remove = 0; $num_of_quizzes_to_remove < $added_quizzes; $num_of_quizzes_to_remove++ ) {
           $this->remove_quiz( $this->prefix . ( $previous_num_of_quizzes + $num_of_quizzes_to_remove + 1 ) );
         }
-        return new WP_Error( 'lesson generation error', __( 'Lesson already exists, please change the prefix and try again.', 'tangible_populater' ) );
+        return new \WP_Error( 'lesson generation error', __( 'Lesson already exists, please change the prefix and try again.', 'tangible_populater' ) );
       } else {
         $quiz_success = $this->create_quiz( $quiz_name, ($previous_num_of_quizzes + $added_quizzes + 1) );
         if(is_wp_error( $quiz_success ) ) {
@@ -70,7 +71,7 @@ class Quiz_Generator implements AbstractGenerator {
   * @param string $quiz_name
   * @return bool|WP_Error 
   */
-  function create_quiz( $quiz_name ): bool|WP_Error {
+  function create_quiz( $quiz_name ): bool|\WP_Error {
     
     $faker = Faker\Factory::create();
       

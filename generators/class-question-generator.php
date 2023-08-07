@@ -1,8 +1,10 @@
 <?php
 
 declare(strict_types=1);
+namespace Populater;
 
 defined( 'ABSPATH' ) || exit;
+
 
 use Tangible\Populater\AbstractGenerator;
 
@@ -30,10 +32,10 @@ class Question_Generator implements AbstractGenerator {
    * Generate questions.
    *
    * @param object $plugin
-   * @return bool|WP_Error 
+   * @return bool|\WP_Error 
    * 
    */
-  public function generate( int $num_of_questions_to_add ): bool|WP_Error {
+  public function generate( int $num_of_questions_to_add ): bool|\WP_Error {
 
     $fields = tangible_fields();
     $num_of_quizzes = $fields->fetch_value( 'num_of_quizzes' );
@@ -45,7 +47,7 @@ class Question_Generator implements AbstractGenerator {
       return true;
     }
     if( $num_of_questions_to_add < 0 ) {
-      return new WP_Error('question generation error', __( 'Input cannot be negative', 'tangible_populater' ) );
+      return new \WP_Error('question generation error', __( 'Input cannot be negative', 'tangible_populater' ) );
     }
 
     for( $added_questions = 0; $added_questions < $num_of_questions_to_add; $added_questions++ ) {
@@ -54,7 +56,7 @@ class Question_Generator implements AbstractGenerator {
         for( $num_of_questions_to_remove = 0; $num_of_questions_to_remove < $added_questions; $num_of_questions_to_remove++ ) {
           $this->remove_question( $this->prefix . ( $previous_num_of_questions + $num_of_questions_to_remove + 1 ) );
         }
-        return new WP_Error( 'question generation error', __( 'Question already exists, please change the prefix and try again.', 'tangible_populater' ) );
+        return new \WP_Error( 'question generation error', __( 'Question already exists, please change the prefix and try again.', 'tangible_populater' ) );
       } else {
         if( $num_of_quizzes > 0 ) {
           $quiz_gen = Quiz_Generator::getInstance();
@@ -81,7 +83,7 @@ class Question_Generator implements AbstractGenerator {
   * @param string $question_name
   * @return void
   */
-  public function create_question( string $question_name ): bool|WP_Error {
+  public function create_question( string $question_name ): bool|\WP_Error {
     
     $faker = Faker\Factory::create();
     $post = [

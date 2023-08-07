@@ -1,6 +1,7 @@
 <?php
 
 declare(strict_types=1);
+namespace Populater;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -30,16 +31,16 @@ class Course_Generator implements AbstractGenerator {
    * Generate courses.
    *
    * @param object $plugin
-   * @return bool|WP_Error 
+   * @return bool|\WP_Error 
    * 
    */
-  public function generate( int $num_of_courses_to_add ): bool|WP_Error {
+  public function generate( int $num_of_courses_to_add ): bool|\WP_Error {
 
     if( $num_of_courses_to_add == 0 ) {
       return true;
     }
     if( $num_of_courses_to_add < 0 ) {
-      return new WP_Error('course generation error', __( 'Input cannot be negative', 'tangible_populater' ) );
+      return new \WP_Error('course generation error', __( 'Input cannot be negative', 'tangible_populater' ) );
     }
 
     $fields = tangible_fields();
@@ -52,7 +53,7 @@ class Course_Generator implements AbstractGenerator {
         for( $num_of_courses_to_remove = 0; $num_of_courses_to_remove < $added_courses; $num_of_courses_to_remove++ ) {
           $this->remove_course( $previous_num_of_courses + $num_of_courses_to_remove + 1 );
         }
-        return new WP_Error( 'course generation error', __( 'Course already exists, please change the prefix and try again.', 'tangible_populater' ) );
+        return new \WP_Error( 'course generation error', __( 'Course already exists, please change the prefix and try again.', 'tangible_populater' ) );
       } else {
         $this->create_course( $course_name );
       }

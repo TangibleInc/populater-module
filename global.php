@@ -11,13 +11,13 @@ class Populater {
 
 new Populater;
 
-function populater() {
+function popu() {
   return Populater::$instance;
 }
 
-populater()->state = [
+popu()->state = [
   'version' => '20230806',
-  'url' => plugins_urls('/', __FILE__),
+  'url' => plugins_url('/', __FILE__),
   'cache' => [],
 ];
 
