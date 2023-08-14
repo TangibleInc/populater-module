@@ -8,6 +8,8 @@ defined( 'ABSPATH' ) || exit;
 
 use Tangible\Populater\AbstractGenerator;
 
+use Faker\Factory as faker;
+
 /**
  * Class Lesson Generator
  */
@@ -78,7 +80,7 @@ class Lesson_Generator implements AbstractGenerator {
   // create single lesson
   function create_lesson( string $lesson_name ): void {
 
-    $faker = Faker\Factory::create();
+    $faker = faker::create();
 
     wp_insert_post (
       [

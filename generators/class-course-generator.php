@@ -6,6 +6,7 @@ namespace Populater;
 defined( 'ABSPATH' ) || exit;
 
 use Tangible\Populater\AbstractGenerator;
+use Faker\Factory as faker;
 
 /**
  * Class Course Generator
@@ -66,12 +67,12 @@ class Course_Generator implements AbstractGenerator {
   // create a single course
   public function create_course( string $course_name ): void {
 
-    $faker = Faker\Factory::create();
+    $faker = faker::create();
 
     wp_insert_post(
       [
-        'post_date'         => $faker->date( 'Y_m_d' ) . $faker->time(),
-        'post_date_gmt'     => $faker->date( 'Y_m_d' ) . $faker->time(),
+        'post_date'         => $faker->date( 'Y-m-d' ) . ' ' . $faker->time(),
+        'post_date_gmt'     => $faker->date( 'Y-m-d' ) . ' ' . $faker->time(),
         'post_content'      => $faker->randomHtml(),
         'post_title'        => $course_name,
         'post_excerpt'      => $faker->sentence(),
