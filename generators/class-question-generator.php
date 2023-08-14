@@ -7,6 +7,7 @@ defined( 'ABSPATH' ) || exit;
 
 
 use Tangible\Populater\AbstractGenerator;
+use Faker\Factory as faker;
 
 /**
  * Class Question Generator
@@ -85,7 +86,7 @@ class Question_Generator implements AbstractGenerator {
   */
   public function create_question( string $question_name ): bool|\WP_Error {
     
-    $faker = Faker\Factory::create();
+    $faker = faker::create();
     $post = [
       'post_date'         => $faker->date( 'Y_m_d' ) . $faker->time(),
       'post_date_gmt'     => $faker->date( 'Y_m_d' ) . $faker->time(),
