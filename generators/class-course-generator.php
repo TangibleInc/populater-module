@@ -125,6 +125,18 @@ class Course_Generator implements AbstractGenerator {
     }
   } 
 
+  function get_all_courses(){
+    global $wpdb;
+    $post_ids = $wpdb->get_results("SELECT post_title FROM $wpdb->posts WHERE post_type = 'sfwd-courses'");
+    return $post_ids;
+  }
+
+  function get_course_id( string $course_name ) {
+    global $wpdb;
+    $course_id = $wpdb->get_var( "SELECT ID FROM $wpdb->posts WHERE post_title = '" . $course_name . "'");
+    return $course_id;
+  }
+
   function get_prefix(): string {
     return $this->prefix;
   }

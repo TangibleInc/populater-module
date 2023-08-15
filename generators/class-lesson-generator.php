@@ -151,6 +151,18 @@ class Lesson_Generator implements AbstractGenerator {
     }
   }
 
+  function get_all_lessons(){
+    global $wpdb;
+    $post_ids = $wpdb->get_results("SELECT post_title FROM $wpdb->posts WHERE post_type = 'sfwd-lessons'");
+    return $post_ids;
+  }
+
+  function get_lesson_id( string $lesson_name ) {
+    global $wpdb;
+    $lesson_id = $wpdb->get_var( "SELECT ID FROM $wpdb->posts WHERE post_title = '" . $lesson_name . "'");
+    return $lesson_id;
+  }
+
   function get_prefix(): string {
     return $this->prefix;
   }
