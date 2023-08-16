@@ -148,4 +148,4 @@ class User_Generator implements AbstractGenerator {
   }
 }
 
-User_Generator::$plugin = $plugin;
+// User_Generator::$plugin = $plugin;

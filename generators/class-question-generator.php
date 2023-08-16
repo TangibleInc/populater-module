@@ -268,4 +268,4 @@ class Question_Generator implements AbstractGenerator {
   }
 } 
 
-Question_Generator::$plugin = $plugin; 
+// Question_Generator::$plugin = $plugin; 

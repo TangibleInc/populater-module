@@ -142,4 +142,4 @@ class Course_Generator implements AbstractGenerator {
   }
 } 
 
-Course_Generator::$plugin = $plugin; 
+//Course_Generator::$plugin = $plugin; 
