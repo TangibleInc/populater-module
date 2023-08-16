@@ -8,6 +8,9 @@ defined( 'ABSPATH' ) || exit;
 
 use Tangible\Populater\AbstractGenerator;
 use Faker\Factory as faker;
+use WpProQuiz_Model_AnswerTypes;
+use WpProQuiz_Model_Question;
+use WpProQuiz_Model_QuestionMapper;
 
 /**
  * Class Question Generator
@@ -98,8 +101,8 @@ class Question_Generator implements AbstractGenerator {
       'post_name'         => $question_name, 
     ];
     
-    $question_pro = new WpProQuiz_Model_Question(); 
-    $question_pro_mapper = new WpProQuiz_Model_QuestionMapper();
+    $question_pro = new WpProQuiz_Model_Question; 
+    $question_pro_mapper = new WpProQuiz_Model_QuestionMapper;
 
     $post_id = wp_insert_post( $post );
     $question_pro->setQuestion( $faker->sentence( 6 ) );
@@ -167,7 +170,6 @@ class Question_Generator implements AbstractGenerator {
        FROM $wpdb->posts 
        WHERE post_title = '" . $question_name . "'" 
     );
-    tangible()->log($postid);
 
     if( $postid ) {
       return true;
@@ -208,6 +210,18 @@ class Question_Generator implements AbstractGenerator {
     );
   } 
 
+  function get_all_questions( string $column_name = '*' ): array {
+    global $wpdb;
+    $question_info = $wpdb->get_results("SELECT $column_name FROM $wpdb->posts WHERE post_type='sfwd-question'", ARRAY_A);
+    return $question_info;
+  }
+
+  function get_question_id( string $question_name ): int {
+    global $wpdb;
+    $question_id = $wpdb->get_var("SELECT ID FROM $wpdb->posts WHERE post_title='$question_name' AND post_type='sfwd-question'");
+    return (int) $question_id ?? 0;
+  }
+
   function get_id_of_last_quiz_created(): int {
     global $wpdb;
 
@@ -234,7 +248,7 @@ class Question_Generator implements AbstractGenerator {
   }
 
   function createAnswers(): array {
-    $faker = Faker\Factory::create();
+    $faker = faker::create();
     $answers = [];
 
     $answer = new WpProQuiz_Model_AnswerTypes;

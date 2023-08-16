@@ -216,8 +216,19 @@ class Quiz_Generator implements AbstractGenerator {
       wp_delete_post($postid);
     }
   }
+
+  function get_all_quizes( string $column_name='*' ): array{
+    global $wpdb;
+    $quiz_ids = $wpdb->get_results("SELECT $column_name FROM $wpdb->posts WHERE post_type = 'sfwd-quiz'", ARRAY_A);
+    return $quiz_ids;
+  }
+
+  function get_quiz_id( string $quiz_name ): int {
+    global $wpdb;
+    $quiz_id = $wpdb->get_var("SELECT ID FROM $wpdb->posts WHERE post_title='$quiz_name' AND post_type='sfwd-quiz'");
+    return (int) $quiz_id ?? 0;
+  }
   
-    
   function get_id_of_last_quiz_created(): int {
     global $wpdb;
 
