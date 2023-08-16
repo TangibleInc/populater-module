@@ -112,6 +112,17 @@ class User_Generator implements AbstractGenerator {
     }
   }
 
+  function get_all_users( string $column_name = "*" ): array {
+    global $wpdb;
+    $users_info = $wpdb->get_results("SELECT $column_name FROM $wpdb->users", ARRAY_A);
+    return $users_info;
+  }
+
+  function get_user_id( string $username ) {
+    $user = get_user_by('login', $username);
+    return (int) $user->ID ?? 0;
+  }
+
   /**
    * Add user to database, adds user meta 'fake_user'
    *

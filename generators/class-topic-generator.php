@@ -160,6 +160,18 @@ class Topic_Generator implements AbstractGenerator {
     }
   }
 
+  function get_all_topics( string $column_name = '*' ): array{
+    global $wpdb;
+    $topic_info= $wpdb->get_results( "SELECT $column_name FROM $wpdb->posts WHERE post_type = 'sfwd-topic'", ARRAY_A );
+    return $topic_info;
+  }
+
+  function get_topic_id( string $topic_name ){
+    global $wpdb;
+    $topic_id = $wpdb->get_var( "SELECT ID FROM $wpdb->posts WHERE post_title = '$topic_name' AND post_type='sfwd-topic'" );
+    return (int) $topic_id ?? 0;
+  }
+
   function get_prefix(): string {
     return $this->prefix;
   }
