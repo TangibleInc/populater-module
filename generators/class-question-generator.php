@@ -5,8 +5,6 @@ namespace Populater;
 
 defined( 'ABSPATH' ) || exit;
 
-
-use Tangible\Populater\AbstractGenerator;
 use Faker\Factory as faker;
 use WpProQuiz_Model_AnswerTypes;
 use WpProQuiz_Model_Question;
@@ -15,7 +13,7 @@ use WpProQuiz_Model_QuestionMapper;
 /**
  * Class Question Generator
  */
-class Question_Generator implements AbstractGenerator {
+class Question_Generator {
   private static $instance = null;
   private $prefix = 'question-';
   static $plugin;
@@ -36,45 +34,23 @@ class Question_Generator implements AbstractGenerator {
    * Generate questions.
    *
    * @param object $plugin
-   * @return bool|\WP_Error 
+   * @return bool
    * 
    */
-  public function generate( int $num_of_questions_to_add ): bool|\WP_Error {
+  public function generate( int $num_of_questions_to_add, string $question_name, int $quiz_iteration_flag ): bool {
 
     $fields = tangible_fields();
-    $num_of_quizzes = $fields->fetch_value( 'num_of_quizzes' );
     $previous_num_of_questions = $fields->fetch_value( 'num_of_questions' );
     $total_num_of_questions = $previous_num_of_questions + $num_of_questions_to_add;
-    $quiz_iteration_flag = 1;
+    $num_of_quizzes = $fields->fetch_value( 'num_of_quizzes' );
 
-    if( $num_of_questions_to_add == 0 ) {
-      return true;
-    }
-    if( $num_of_questions_to_add < 0 ) {
-      return new \WP_Error('question generation error', __( 'Input cannot be negative', 'tangible_populater' ) );
-    }
-
-    for( $added_questions = 0; $added_questions < $num_of_questions_to_add; $added_questions++ ) {
-      $question_name = $this->prefix . ( $previous_num_of_questions + $added_questions + 1); 
-      if( $this->question_exists( $question_name ) ) {
-        for( $num_of_questions_to_remove = 0; $num_of_questions_to_remove < $added_questions; $num_of_questions_to_remove++ ) {
-          $this->remove_question( $this->prefix . ( $previous_num_of_questions + $num_of_questions_to_remove + 1 ) );
-        }
-        return new \WP_Error( 'question generation error', __( 'Question already exists, please change the prefix and try again.', 'tangible_populater' ) );
-      } else {
-        if( $num_of_quizzes > 0 ) {
-          $quiz_gen = Quiz_Generator::getInstance();
-          $quiz_name = $quiz_gen->get_prefix() . $quiz_iteration_flag;
-          $this->create_question( $question_name );
-          $this->add_question_to_quiz( $quiz_name, $question_name );
-          $quiz_iteration_flag++;
-          if( $quiz_iteration_flag > $num_of_quizzes ) {
-            $quiz_iteration_flag = 1;
-          }
-        } else {
-          $this->create_question( $question_name );
-        }
-      }
+    if( $num_of_quizzes > 0 ) {
+      $quiz_gen = Quiz_Generator::getInstance();
+      $quiz_name = $quiz_gen->get_prefix() . $quiz_iteration_flag;
+      $this->create_question( $question_name );
+      $this->add_question_to_quiz( $quiz_name, $question_name );
+    } else {
+      $this->create_question( $question_name );
     }
 
     $fields->store_value( 'num_of_questions', $total_num_of_questions );
@@ -87,7 +63,7 @@ class Question_Generator implements AbstractGenerator {
   * @param string $question_name
   * @return void
   */
-  public function create_question( string $question_name ): bool|\WP_Error {
+  public function create_question( string $question_name ): bool {
     
     $faker = faker::create();
     $post = [
@@ -159,22 +135,6 @@ class Question_Generator implements AbstractGenerator {
     }
 
     $fields->store_value( 'num_of_questions', 0 );
-  }
-
-
-  function question_exists( string $question_name ): bool {
-    global $wpdb;
-
-    $postid = $wpdb->get_var( 
-      "SELECT id 
-       FROM $wpdb->posts 
-       WHERE post_title = '" . $question_name . "'" 
-    );
-
-    if( $postid ) {
-      return true;
-    }
-    return false;
   }
   
   function remove_question( string $question_name ): void {

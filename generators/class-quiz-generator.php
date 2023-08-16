@@ -5,13 +5,12 @@ namespace Populater;
 
 defined( 'ABSPATH' ) || exit;
 
-use Tangible\Populater\AbstractGenerator;
 use Faker\Factory as faker;
 
 /**
  * Class Quiz Generator
  */
-class Quiz_Generator implements AbstractGenerator {
+class Quiz_Generator {
   private static $instance = null;
   private $prefix = 'quiz-';
   private static $step_name = 'course';
@@ -37,66 +36,29 @@ class Quiz_Generator implements AbstractGenerator {
    * function which generates quizzes
    * 
    * @param int $num_of_quizzes_to_add
-   * @return bool|\WP_Error 
+   * @return bool 
    */
-  function generate( int $num_of_quizzes_to_add ): bool|\WP_Error {
+  function generate( int $num_of_topics_to_add, string $topic_name, int $course_iteration_flag, int $lesson_iteration_flag ): bool {
 
-    $name_step_add_quiz = self::$step_name;
     $fields = tangible_fields();
-    $num_of_courses = $fields->fetch_value( 'num_of_courses' );
-    $num_of_lessons = $fields->fetch_value( 'num_of_lessons' );
-    $num_of_topics = $fields->fetch_value( 'num_of_topics' );
+    
     $previous_num_of_quizzes = $fields->fetch_value( 'num_of_quizzes' );
     $total_num_of_quizzes = $previous_num_of_quizzes + $num_of_quizzes_to_add;
-    $course_iteration_flag = 1;
-    $lesson_iteration_flag = 1;
-    $topic_iteration_flag = 1;
+    $course_gen = Course_Generator::getInstance();
+    $course_name = $course_gen->get_prefix() . $course_iteration_flag;
+    $lesson_gen = Lesson_Generator::getInstance();
+    $lesson_name = $lesson_gen->get_prefix() . $lesson_iteration_flag;
+    $topic_gen = Topic_Generator::getInstance();
+    $topic_name = $topic_gen->get_prefix() . $topic_iteration_flag;
 
-    if( $num_of_quizzes_to_add == 0 ) {
-      return true;
-    }
-    if( $num_of_quizzes_to_add < 0 ) {
-      return new \WP_Error( 'quiz generation error', __( 'Input cannot be negative', 'tangible_populater' ) );
-    }
+    $this->create_quiz( $quiz_name );
 
-    for( $added_quizzes = 0; $added_quizzes < $num_of_quizzes_to_add; $added_quizzes++ ) { 
-      $quiz_name = $this->prefix . ( $previous_num_of_quizzes + $added_quizzes + 1 ); 
-      if( $this->quiz_exists( $quiz_name ) ) {
-        for( $num_of_quizzes_to_remove = 0; $num_of_quizzes_to_remove < $added_quizzes; $num_of_quizzes_to_remove++ ) {
-          $this->remove_quiz( $this->prefix . ( $previous_num_of_quizzes + $num_of_quizzes_to_remove + 1 ) );
-        }
-        return new \WP_Error( 'lesson generation error', __( 'Lesson already exists, please change the prefix and try again.', 'tangible_populater' ) );
-      } else {
-        $quiz_success = $this->create_quiz( $quiz_name, ($previous_num_of_quizzes + $added_quizzes + 1) );
-        if(is_wp_error( $quiz_success ) ) {
-          return $quiz_success;
-        }
-        $course_gen = Course_Generator::getInstance();
-        $course_name = $course_gen->get_prefix() . $course_iteration_flag;
-        $lesson_gen = Lesson_Generator::getInstance();
-        $lesson_name = $lesson_gen->get_prefix() . $lesson_iteration_flag;
-        $topic_gen = Topic_Generator::getInstance();
-        $topic_name = $topic_gen->get_prefix() . $topic_iteration_flag;
-        if ( $name_step_add_quiz === 'topic' ) {
-          $this->add_quiz_to_step($quiz_name, $course_name, $lesson_name, $topic_name);
-        } else if ( $name_step_add_quiz === 'lesson' ) {
-          $this->add_quiz_to_step($quiz_name, $course_name, $lesson_name);
-        } else if ( $name_step_add_quiz === 'course' ) {
-          $this->add_quiz_to_step($quiz_name, $course_name);
-        }
-        $course_iteration_flag++;
-        $lesson_iteration_flag++;
-        $topic_iteration_flag++;
-        if($course_iteration_flag > $num_of_courses) {
-          $course_iteration_flag = 1;
-        }
-        if($lesson_iteration_flag > $num_of_lessons) {
-            $lesson_iteration_flag = 1;
-        }
-        if($topic_iteration_flag > $num_of_topics) {
-          $topic_iteration_flag = 1;
-      }
-      }
+    if ( $name_step_add_quiz === 'topic' ) {
+      $this->add_quiz_to_step($quiz_name, $course_name, $lesson_name, $topic_name);
+    } else if ( $name_step_add_quiz === 'lesson' ) {
+      $this->add_quiz_to_step($quiz_name, $course_name, $lesson_name);
+    } else if ( $name_step_add_quiz === 'course' ) {
+      $this->add_quiz_to_step($quiz_name, $course_name);
     }
 
     $fields->store_value( 'num_of_quizzes', $total_num_of_quizzes );
@@ -185,22 +147,6 @@ class Quiz_Generator implements AbstractGenerator {
     }
 
     $fields->store_value( 'num_of_quizzes', 0 );
-  }
-
-  // we can point a lesson to a course by using postmeta
-  
-  function quiz_exists( string $quiz_name ): bool {
-    global $wpdb;
-    $quizid = $wpdb->get_var( 
-      "SELECT id 
-       FROM $wpdb->posts 
-       WHERE post_title = '" . $quiz_name . "'"
-    );
-
-    if( $quizid ) {
-      return true;
-    }
-    return false;
   }
 
   function remove_quiz( string $quiz_name ): void {

@@ -5,15 +5,13 @@ namespace Populater;
 
 defined( 'ABSPATH' ) || exit;
 
-use Tangible\Populater\AbstractGenerator;
-
 // @link https://developer.wordpress.org/reference/functions/wp_delete_user/#more-information
 require_once( ABSPATH.'wp-admin/includes/user.php' );
 
 /**
 *  Class User Generator
 */
-class User_Generator implements AbstractGenerator { 
+class User_Generator { 
   private static $instance = null;
   private  $prefix = 'user-';
   private $password = 'password';
