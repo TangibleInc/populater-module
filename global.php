@@ -22,3 +22,4 @@ popu()->state = [
 ];
 
 include __DIR__.'/generators/index.php';
+include __DIR__.'/vendor/autoload.php';
