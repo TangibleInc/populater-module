@@ -1,6 +1,13 @@
 {
   "name": "tangible/populater",
+  "repositories": [
+    {
+      "type": "vcs",
+      "url": "git@bitbucket.org:/tangibleinc/tangible-fields-module.git"
+    }
+  ],
   "require": {
-    "fakerphp/faker": "^1.23"
+    "fakerphp/faker": "^1.23",
+    "tangible/fields": "dev-main"
   }
 }
