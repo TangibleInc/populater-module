@@ -9,8 +9,13 @@ if ( ! function_exists( 'populater' ) ) :
   }
 endif;
 
-require_once __DIR__ . '/vendor/autoload.php';
-require_once __DIR__ . '/vendor/tangible/fields/index.php';
+if( defined('POPULATER_IS_PLUGIN') ) {
+  require_once __DIR__ . '/vendor/autoload.php';
+  require_once __DIR__ . '/vendor/tangible/fields/index.php';
+} else {
+  require_once __DIR__ . '/../../autoload.php';
+  require_once __DIR__ . '/../fields/index.php';
+}
 
 new class extends stdClass {
 
