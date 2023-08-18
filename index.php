@@ -12,7 +12,7 @@ endif;
 require_once __DIR__ . '/vendor/autoload.php';
 require_once __DIR__ . '/vendor/tangible/fields/index.php';
 
-new class {
+new class extends stdClass {
 
   public $name = 'populater';
 

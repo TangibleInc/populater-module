@@ -28,10 +28,10 @@ function remove_user( int $number ): void {
       $user_id = $user->ID;
       if( get_user_meta( $user_id, 'fake_user' ) ) {
         delete_metadata( 
-          meta_type:'user', 
-          object_id: $user_id, 
-          meta_key: '', 
-          delete_all:true 
+          'user', 
+          $user_id, 
+          '', 
+          true 
         );
         wp_delete_user( $user_id );
       }

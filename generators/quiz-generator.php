@@ -94,10 +94,10 @@ function remove_quiz( $number ) {
   $postid = $wpdb->get_var("SELECT ID FROM $wpdb->posts WHERE post_title = '" . $quiz_name . "'");
   if($postid) {
     delete_metadata( 
-      meta_type:'post', 
-      object_id: $postid, 
-      meta_key: '', 
-      delete_all:true 
+      'post',
+      $postid, 
+      '', 
+      true 
     );
     wp_delete_post($postid);
   }
