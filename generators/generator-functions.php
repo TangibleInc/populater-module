@@ -1,0 +1,192 @@
+<?php 
+
+// This file concern every functions to generate posts. 
+
+function check_parent_posts_exist( $generate_type , $parent_post = '' ) {
+
+    if ( empty($generate_type) ) return false;
+    $fields = tangible_fields();
+
+    $check = true;
+    switch ( $generate_type ) {
+        case 'course':
+            $check = true;
+            break;
+
+        case 'lesson':
+            $num_of_courses = $fields->fetch_value( 'num_of_courses' );
+            if ( $num_of_courses == 0 ) $check = false;
+            break;
+
+        case 'topic':
+            $num_of_courses = $fields->fetch_value( 'num_of_courses' );
+            $num_of_lessons = $fields->fetch_value( 'num_of_lessons' );
+            if ( $num_of_courses == 0 || $num_of_lessons == 0 ) $check = false;
+            break;
+
+        case 'quiz': 
+            if ( $parent_post = 'course' ) {
+                $num_of_courses = $fields->fetch_value( 'num_of_courses' );
+                if ( $num_of_courses == 0 ) $check = false;
+            } else if ( $parent_post = 'lesson' ) {
+                $num_of_lessons = $fields->fetch_value( 'num_of_lessons' );
+                if ( $num_of_lessons == 0 ) $check = false;
+            } else if ( $parent_post = 'topic' ) {
+                $num_of_topics = $fields->fetch_value( 'num_of_topics' );
+                if ( $num_of_topics == 0 ) $check = false; 
+            } else {
+                $check = false;
+            }
+            break;
+
+        case 'question':
+            $num_of_quizzes = $fields->fetch_value( 'num_of_quizzes' );
+            if ( $num_of_quizzes == 0 ) $check = false;
+            break;
+        
+        default:
+            $check = false;
+            break;
+    };
+
+    return $check;
+};
+
+function generate_post( $generate_type, $name, $iteration_flag_array, $parent_post = '' ) {
+    
+    $populater = populater();
+    switch ( $generate_type ) {
+        case 'course':
+            generate_course( $name );
+            break;
+
+        case 'lesson': 
+            generate_lesson( $name, $iteration_flag_array['course'] );
+            break;
+
+        case 'topic':
+            generate_topic( $name, $iteration_flag_array['course'], $iteration_flag_array['lesson'] );
+            break;
+
+        case 'quiz':
+            generate_quiz( $name, $iteration_flag_array['course'], $iteration_flag_array['lesson'], $iteration_flag_array['topic'], $parent_post );
+            break;
+
+        case 'question':
+            generate_question( $name, $iteration_flag_array['quiz'] );
+            break;
+        
+        default:
+            break;
+    }
+
+};
+
+function generate_posts( $num_to_add, $generate_type, $fetch_value_name, $prefix, $parent_post = '' ) { 
+
+    if ( $num_to_add == 0 ) return true;
+    if ( $num_to_add < 0 ) return false;
+
+    $populater = populater();
+    $check_parent_posts_exist = check_parent_posts_exist($generate_type, $parent_post);
+    if ( !$check_parent_posts_exist ) return false;
+
+    $fields = tangible_fields();
+    $previous_num_added = $fields->fetch_value( $fetch_value_name );
+
+    $num_of_posts = [
+        'course'    => $fields->fetch_value( 'num_of_courses' ),
+        'lesson'    => $fields->fetch_value( 'num_of_lessons' ),
+        'topic'     => $fields->fetch_value( 'num_of_topics' ),
+        'quiz'      => $fields->fetch_value( 'num_of_quizzes' )
+    ];
+
+    $iteration_flag_array = [
+        'course'    => 1,
+        'lesson'    => 1,
+        'topic'     => 1,
+        'quiz'      => 1
+    ];
+
+    for ( $post_added = 0; $post_added < $num_to_add ; $post_added++ ) { 
+        $name = $prefix . ( $previous_num_added + $post_added + 1 );
+        if ( $populater->check_generated_name_exists( $name ) ) {
+            continue;
+        } else {
+            foreach ($iteration_flag_array as $key => $iteration_flag) {
+                if ( $iteration_flag > $num_of_posts[$key] ) $iteration_flag_array[$key] = 1;
+            }
+            generate_post( $generate_type, $name, $iteration_flag_array, $parent_post );
+            foreach ($iteration_flag_array as $key => $iteration_flag) {
+                $iteration_flag_array[$key] ++;
+            }
+        }
+    };
+
+    $total_num_added = $previous_num_added + $num_to_add;
+    $fields->store_value( $fetch_value_name, $total_num_added );
+};
+
+function generate_users( $num_to_add ) {
+
+    if( $num_to_add == 0 ) return true;
+    if( $num_to_add < 0 ) return false;
+
+    $fields = tangible_fields();
+    $previous_num_of_users = $fields->fetch_value( 'num_of_users' );
+
+    for( $added_users = 0; $added_users < $num_to_add; $added_users++ ) { 
+        $username = 'user-' . ( $previous_num_of_users + $added_users + 1 );
+        if( username_exists( $username  ) ) {
+          continue;
+        } else {
+            generate_user( ( $previous_num_of_users + $added_users + 1 ) );
+        }
+    }
+
+    $total_num_of_users = $previous_num_of_users + $num_to_add;
+    $fields->store_value( 'num_of_users', $total_num_of_users );
+};
+
+// parent_post is specific to Quiz, because we want to be able to add quiz to course or lesson or topic.
+$populater->generate = function ( $num_to_add, $generate_type, $parent_post = '' ) use ( $populater ) {
+
+    $fetch_value_name = '';
+    $prefix = '';
+
+    if ( $generate_type === 'user' ) {
+        generate_users( $num_to_add );
+    } else {
+        switch ($generate_type) {
+            case 'course':
+                $fetch_value_name = 'num_of_courses';
+                $prefix = 'course-';
+                break;
+    
+            case 'lesson':
+                $fetch_value_name = 'num_of_lessons';
+                $prefix = 'lesson-';
+                break;
+    
+            case 'topic':
+                $fetch_value_name = 'num_of_topics';
+                $prefix = 'topic-';
+                break;
+    
+            case 'quiz':
+                $fetch_value_name = 'num_of_quizzes';
+                $prefix = 'quiz-';
+                break;
+    
+            case 'question':
+                $fetch_value_name = 'num_of_questions';
+                $prefix = 'question-';
+                break;
+            
+            default:
+                break;
+        }
+    
+        generate_posts( $num_to_add, $generate_type, $fetch_value_name, $prefix, $parent_post );
+    }
+};
