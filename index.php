@@ -1,33 +1,51 @@
 <?php
 
-require __DIR__ . '/tangible-module.php';
+defined('ABSPATH') or die();
 
 if ( ! function_exists( 'populater' ) ) :
-
-function populater( $instance = null ) {
-  static $o;
-  if (is_a($instance, 'TangibleModule')) $o = $instance->latest;
-  return $o;
-}
-
+  function populater( $arg = false ) {
+    static $o;
+    return $arg === false ? $o : ( $o = $arg );
+  }
 endif;
 
-return populater(new class extends TangibleModule {
+require_once __DIR__ . '/vendor/autoload.php';
+require_once __DIR__ . '/vendor/tangible/fields/index.php';
 
-  public $name    = 'populater';
-  public $version = '20230806';
-  public $url     = '';
-  public $state   = [];
+new class {
 
-  function load_latest_version() {
+  public $name = 'populater';
+
+  // Remember to update the version - Expected format: YYYYMMDD
+  public $version = '20230818';
+
+  function __construct() {
+
+    $name     = $this->name;
+    $priority = 99999999 - absint( $this->version );
+
+    remove_all_filters( $name, $priority );
+    add_action( $name, [ $this, 'load' ], $priority );
+
+    $ensure_action = function() use ( $name ) {
+      if ( ! did_action( $name )) do_action( $name );
+    };
+
+    add_action('plugins_loaded', $ensure_action, 0);
+    add_action('after_setup_theme', $ensure_action, 0);
+  }
+
+  function load() {
+
+    remove_all_filters( $this->name ); // First one to load wins
+
+    populater( $this );
 
     $populater = $this;
 
-    /**
-     * Global namespace, functions, shortcodes
-     */
-    if ( ! class_exists('Populater') ) {
-      require_once __DIR__.'/global.php';
-    }
+    $fields = tangible_fields();
+
+    // Load module features
+    require_once __DIR__ . '/generators/index.php';
   }
-});
+};
