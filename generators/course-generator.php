@@ -5,12 +5,32 @@ function get_course_prefix() {
   return 'course-';
 };
 
+function initialize_course_steps( $course_id ) {
+  $course_steps =
+    [
+      'steps' => [
+        'h' => [
+          'sfwd-lessons' => [],
+          'sfwd-quiz'    => []
+        ]
+      ],
+      'course_id' => $course_id,
+      'version' => '4.7.0.2',
+      'empty' => '',
+      'course_builder_enabled' => 1,
+      'course_shared_steps_enabled' => '',
+      'steps_count' => 1,
+    ];
+
+  update_post_meta($course_id, 'ld_course_steps', $course_steps);
+}
+
 function generate_course( $course_name ) {
 
   $faker = Faker\Factory::create();
   $fields = tangible_fields();
 
-  wp_insert_post(
+  $course_id = wp_insert_post(
     [
       'post_date'         => $faker->date( 'Y-m-d' ) . ' ' . $faker->time(),
       'post_date_gmt'     => $faker->date( 'Y-m-d' ) . ' ' . $faker->time(),
@@ -23,6 +43,7 @@ function generate_course( $course_name ) {
     ]
   );
 
+  initialize_course_steps($course_id);
   return true;
 };
 

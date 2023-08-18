@@ -13,12 +13,28 @@ function add_lesson_to_course( $lesson_name, $course_name ) {
     update_post_meta( $lessonid, '_swfd-lessons', [0, "swfd-lessons_course" => $courseid] );
 };
 
+function add_lesson_to_course_steps( $lesson_id, $course_name ) {
+  global $wpdb;
+  $course_id = $wpdb->get_var( "SELECT ID FROM $wpdb->posts WHERE post_title = '" . $course_name . "'"  );
+
+  // Get the existing course steps
+  $course_steps = get_post_meta($course_id, 'ld_course_steps', true);
+  $course_steps['steps']['h']['sfwd-lessons'] += [
+    $lesson_id => [
+      'sfwd-topic' => [],
+      'sfwd-quiz' => []
+    ]
+  ];
+
+  update_post_meta($course_id, 'ld_course_steps', $course_steps);
+};
+
 function generate_lesson( $lesson_name, $course_iteration_flag ) {
 
     $fields = tangible_fields();
     $faker = Faker\Factory::create();
 
-    wp_insert_post (
+    $lesson_id = wp_insert_post (
       [
         'post_date'         => $faker->date( 'Y_m_d' ) . $faker->time(),
         'post_date_gmt'     => $faker->date( 'Y_m_d' ) . $faker->time(),
@@ -33,6 +49,7 @@ function generate_lesson( $lesson_name, $course_iteration_flag ) {
 
     $course_name = get_course_prefix() . $course_iteration_flag;
     add_lesson_to_course( $lesson_name, $course_name );
+    add_lesson_to_course_steps( $lesson_id, $course_name );
     return true;
 };
 
