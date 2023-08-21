@@ -40,6 +40,14 @@ new class extends stdClass {
     add_action('after_setup_theme', $ensure_action, 0);
   }
 
+  function __call( $method = '', $args = [] ) {
+    if ( isset( $this->$method ) ) {
+      return call_user_func_array( $this->$method, $args );
+    }
+    $caller = current( debug_backtrace() );
+    trigger_error("Undefined method \"$method\" for {$this->name}, called from <b>{$caller['file']}</b> in <b>{$caller['line']}</b><br>", E_USER_WARNING);
+  }
+
   function load() {
 
     remove_all_filters( $this->name ); // First one to load wins
