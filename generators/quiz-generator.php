@@ -7,31 +7,31 @@ function get_quiz_prefix() {
 
 function add_quiz_to_step($quiz_name, $course_name, $lesson_name = '', $topic_name = '') {
     global $wpdb;
-    $quizid = $wpdb->get_var( "SELECT ID FROM $wpdb->posts WHERE post_title = '" . $quiz_name . "'"  );
-    $topicid = empty($topic_name) ? 0 : $wpdb->get_var( "SELECT ID FROM $wpdb->posts WHERE post_title = '" . $topic_name . "'"  );
-    $lessonid = empty($lesson_name) ? 0 : $wpdb->get_var( "SELECT ID FROM $wpdb->posts WHERE post_title = '" . $lesson_name . "'"  );
-    $courseid = $wpdb->get_var( "SELECT ID FROM $wpdb->posts WHERE post_title = '" . $course_name . "'"  );
+    $quiz_id = $wpdb->get_var( "SELECT ID FROM $wpdb->posts WHERE post_title = '" . $quiz_name . "'"  );
+    $topic_id = empty($topic_name) ? 0 : $wpdb->get_var( "SELECT ID FROM $wpdb->posts WHERE post_title = '" . $topic_name . "'"  );
+    $lesson_id = empty($lesson_name) ? 0 : $wpdb->get_var( "SELECT ID FROM $wpdb->posts WHERE post_title = '" . $lesson_name . "'"  );
+    $course_id = $wpdb->get_var( "SELECT ID FROM $wpdb->posts WHERE post_title = '" . $course_name . "'"  );
 
-    update_post_meta( $quizid, 'course_id', $courseid  );
-    $quiz_pro_id = get_post_meta($quizid)["quiz_pro_id"];
+    update_post_meta( $quiz_id, 'course_id', $course_id  );
+    $quiz_pro_id = get_post_meta($quiz_id)["quiz_pro_id"];
 
     $course_steps = get_post_meta($course_id, 'ld_course_steps', true);
 
-    if ( $topicid === 0 && $lessonid === 0 ) {
-      update_post_meta( $quizid, '_sfwd-quiz', [0, "sfwd-quiz_course" => $courseid, "sfwd-quiz_quiz_pro" => $quiz_pro_id] );
+    if ( $topic_id === 0 && $lesson_id === 0 ) {
+      update_post_meta( $quiz_id, '_sfwd-quiz', [0, "sfwd-quiz_course" => $course_id, "sfwd-quiz_quiz_pro" => $quiz_pro_id] );
       $course_steps['steps']['h']['sfwd-quiz'] += [
         $quiz_id => []
       ];
     } else {
-      if ( $topicid === 0 ) {
-        update_post_meta( $quizid, 'lesson_id', $lessonid  );
-        update_post_meta( $quizid, '_sfwd-quiz', [0, "sfwd-quiz_course" => $courseid, "sfwd-quiz_lesson" => $lessonid, "sfwd-quiz_quiz_pro" => $quiz_pro_id, "sfwd-quiz_lesson_schedule" => 0] );
+      if ( $topic_id === 0 ) {
+        update_post_meta( $quiz_id, 'lesson_id', $lesson_id  );
+        update_post_meta( $quiz_id, '_sfwd-quiz', [0, "sfwd-quiz_course" => $course_id, "sfwd-quiz_lesson" => $lesson_id, "sfwd-quiz_quiz_pro" => $quiz_pro_id, "sfwd-quiz_lesson_schedule" => 0] );
         $course_steps['steps']['h']['sfwd-lessons'][$lesson_id]['sfwd-quiz'] += [
           $quiz_id => []
         ];
       } else {
-        update_post_meta( $quizid, 'lesson_id', $topicid  );
-        update_post_meta( $quizid, '_sfwd-quiz', [0, "sfwd-quiz_course" => $courseid, "sfwd-quiz_lesson" => $topicid, "sfwd-quiz_quiz_pro" => $quiz_pro_id, "sfwd-quiz_lesson_schedule" => 0] );
+        update_post_meta( $quiz_id, 'lesson_id', $topic_id  );
+        update_post_meta( $quiz_id, '_sfwd-quiz', [0, "sfwd-quiz_course" => $course_id, "sfwd-quiz_lesson" => $topic_id, "sfwd-quiz_quiz_pro" => $quiz_pro_id, "sfwd-quiz_lesson_schedule" => 0] );
         $course_steps['steps']['h']['sfwd-lessons'][$lesson_id]['sfwd-topic'][$topic_id]['sfwd-quiz'] += [
           $quiz_id => []
         ];
