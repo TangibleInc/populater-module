@@ -65,7 +65,7 @@ function create_quiz( $quiz_name ): bool {
 
   learndash_update_setting( $quiz_id, 'quiz_pro', $quiz_pro->getId() );
   update_post_meta($quiz_id, '_sfwd-quiz', [0, "sfwd-quiz_quiz_pro" => $quiz_pro->getId()] );
-  return true;
+  return get_post($quiz_id);
 };
 
 function generate_quiz( $quiz_name, $course_iteration_flag, $lesson_iteration_flag, $topic_iteration_flag, $name_step_add_quiz ) {

@@ -57,24 +57,19 @@ function generate_post( $generate_type, $name, $iteration_flag_array, $parent_po
     $populater = populater();
     switch ( $generate_type ) {
         case 'course':
-            generate_course( $name );
-            break;
+            return generate_course( $name );
 
         case 'lesson': 
-            generate_lesson( $name, $iteration_flag_array['course'] );
-            break;
+            return generate_lesson( $name, $iteration_flag_array['course'] );
 
         case 'topic':
-            generate_topic( $name, $iteration_flag_array['course'], $iteration_flag_array['lesson'] );
-            break;
+            return generate_topic( $name, $iteration_flag_array['course'], $iteration_flag_array['lesson'] );
 
         case 'quiz':
-            generate_quiz( $name, $iteration_flag_array['course'], $iteration_flag_array['lesson'], $iteration_flag_array['topic'], $parent_post );
-            break;
+            return generate_quiz( $name, $iteration_flag_array['course'], $iteration_flag_array['lesson'], $iteration_flag_array['topic'], $parent_post );
 
         case 'question':
-            generate_question( $name, $iteration_flag_array['quiz'] );
-            break;
+            return generate_question( $name, $iteration_flag_array['quiz'] );
         
         default:
             break;
@@ -84,7 +79,9 @@ function generate_post( $generate_type, $name, $iteration_flag_array, $parent_po
 
 function generate_posts( $num_to_add, $generate_type, $fetch_value_name, $prefix, $parent_post = '' ) { 
 
-    if ( $num_to_add == 0 ) return true;
+    $posts = [];
+
+    if ( $num_to_add == 0 ) return $posts;
     if ( $num_to_add < 0 ) return false;
 
     $populater = populater();
@@ -110,13 +107,14 @@ function generate_posts( $num_to_add, $generate_type, $fetch_value_name, $prefix
 
     for ( $post_added = 0; $post_added < $num_to_add ; $post_added++ ) { 
         $name = $prefix . ( $previous_num_added + $post_added + 1 );
+
         if ( $populater->check_generated_name_exists( $name ) ) {
             continue;
         } else {
             foreach ($iteration_flag_array as $key => $iteration_flag) {
                 if ( $iteration_flag > $num_of_posts[$key] ) $iteration_flag_array[$key] = 1;
             }
-            generate_post( $generate_type, $name, $iteration_flag_array, $parent_post );
+            $posts []= generate_post( $generate_type, $name, $iteration_flag_array, $parent_post );
             foreach ($iteration_flag_array as $key => $iteration_flag) {
                 $iteration_flag_array[$key] ++;
             }
@@ -125,11 +123,15 @@ function generate_posts( $num_to_add, $generate_type, $fetch_value_name, $prefix
 
     $total_num_added = $previous_num_added + $num_to_add;
     $fields->store_value( $fetch_value_name, $total_num_added );
+
+    return $posts;
 };
 
 function generate_users( $num_to_add ) {
 
-    if( $num_to_add == 0 ) return true;
+    $users = [];
+
+    if( $num_to_add == 0 ) return $users;
     if( $num_to_add < 0 ) return false;
 
     $fields = tangible_fields();
@@ -140,12 +142,14 @@ function generate_users( $num_to_add ) {
         if( username_exists( $username  ) ) {
           continue;
         } else {
-            generate_user( ( $previous_num_of_users + $added_users + 1 ) );
+          $users []= generate_user( ( $previous_num_of_users + $added_users + 1 ) );
         }
     }
 
     $total_num_of_users = $previous_num_of_users + $num_to_add;
     $fields->store_value( 'num_of_users', $total_num_of_users );
+
+    return $users; 
 };
 
 // parent_post is specific to Quiz, because we want to be able to add quiz to course or lesson or topic.
@@ -155,7 +159,7 @@ $populater->generate = function ( $num_to_add, $generate_type, $parent_post = ''
     $prefix = '';
 
     if ( $generate_type === 'user' ) {
-        generate_users( $num_to_add );
+        return generate_users( $num_to_add );
     } else {
         switch ($generate_type) {
             case 'course':
@@ -187,6 +191,6 @@ $populater->generate = function ( $num_to_add, $generate_type, $parent_post = ''
                 break;
         }
     
-        generate_posts( $num_to_add, $generate_type, $fetch_value_name, $prefix, $parent_post );
+        return generate_posts( $num_to_add, $generate_type, $fetch_value_name, $prefix, $parent_post );
     }
 };

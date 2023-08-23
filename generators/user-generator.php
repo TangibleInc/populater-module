@@ -17,7 +17,7 @@ function generate_user( $number ) {
     
     if(!$add_user_meta_success) return false;
 
-    return true;
+    return $user;
 };
 
 function remove_user( int $number ): void {

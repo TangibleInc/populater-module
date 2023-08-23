@@ -53,7 +53,7 @@ function generate_topic( $topic_name, $course_iteration_flag, $lesson_iteration_
 
     add_topic_to_lesson( $topic_name, $lesson_name, $course_name );
     add_topic_to_course_steps( $topic_id, $lesson_name, $course_name );
-    return true;
+    return get_post($topic_id);
 };
 
 function remove_topic( $number ): void {

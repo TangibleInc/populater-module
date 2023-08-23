@@ -50,7 +50,7 @@ function generate_lesson( $lesson_name, $course_iteration_flag ) {
     $course_name = get_course_prefix() . $course_iteration_flag;
     add_lesson_to_course( $lesson_name, $course_name );
     add_lesson_to_course_steps( $lesson_id, $course_name );
-    return true;
+    return get_post($lesson_id);
 };
 
 function remove_lesson( $number ) {
