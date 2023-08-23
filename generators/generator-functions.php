@@ -72,7 +72,7 @@ function generate_post( $generate_type, $name, $iteration_flag_array, $parent_po
             return generate_question( $name, $iteration_flag_array['quiz'] );
         
         default:
-            break;
+            return false;
     }
 
 };
