@@ -102,3 +102,61 @@ function remove_quiz( $number ) {
     wp_delete_post($postid);
   }
 };
+
+$populater->complete_quiz = function ( $quiz_id_or_name, $user_id, $course_id = 0, $lesson_id = 0, $topic_id = 0 ) {
+
+  if ( ! is_numeric( $quiz_id_or_name ) ) { 
+    global $wpdb;
+    $quiz_id = $wpdb->get_var( "SELECT ID FROM $wpdb->posts WHERE post_title = '" . $quiz_name . "'"  ); 
+  } else {
+    $quiz_id = $quiz_id_or_name;
+  }
+
+  $quiz_meta = get_post_meta($quiz_id, '_sfwd-quiz', true);
+
+  $quizdata = array(
+    'quiz'                => $quiz_id,
+    'score'               => 0,
+    'count'               => 0,
+    'question_show_count' => 0,
+    'pass'                => true,
+    'rank'                => '-',
+    'time'                => time(),
+    'pro_quizid'          => absint( $quiz_meta['sfwd-quiz_quiz_pro'] ),
+    'course'              => $course_id,
+    'lesson'              => $lesson_id,
+    'topic'               => $topic_id,
+    'points'              => 0,
+    'total_points'        => 0,
+    'percentage'          => 0,
+    'timespent'           => 0,
+    'has_graded'          => false,
+    'statistic_ref_id'    => 0,
+    'm_edit_by'           => $user_id, // Manual Edit By ID.
+    'm_edit_time'         => time(), // Manual Edit timestamp.
+  );
+
+  $quiz_progress []= $quizdata;
+
+  learndash_update_user_activity(
+    [
+      'course_id'          => $course_id,
+      'user_id'            => $user_id,
+      'post_id'            => $quiz_id,
+      'activity_type'      => 'quiz',
+      'activity_action'    => 'insert',
+      'activity_status'    => $quizdata['pass'],
+      'activity_started'   => $quizdata['time'],
+      'activity_completed' => $quizdata['time'],
+      'activity_meta'      => $quizdata,
+    ]
+  );
+
+  $quizdata['course'] = get_post($quizdata['course']);
+  $quizdata['lesson'] = get_post($quizdata['lesson']);
+  $quizdata['topic'] = get_post($quizdata['topic']);
+
+  do_action('learndash_quiz_completed', $quizdata, get_user_by('ID', $user_id));
+
+  update_user_meta( $user_id, '_sfwd-quizzes', $quiz_progress );
+};
