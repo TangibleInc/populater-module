@@ -44,7 +44,7 @@ function generate_course( $course_name ) {
   );
 
   initialize_course_steps($course_id);
-  return true;
+  return get_post($course_id);
 };
 
 function remove_course( $number ) {

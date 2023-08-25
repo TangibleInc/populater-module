@@ -65,7 +65,7 @@ function create_quiz( $quiz_name ): bool {
 
   learndash_update_setting( $quiz_id, 'quiz_pro', $quiz_pro->getId() );
   update_post_meta($quiz_id, '_sfwd-quiz', [0, "sfwd-quiz_quiz_pro" => $quiz_pro->getId()] );
-  return true;
+  return get_post($quiz_id);
 };
 
 function generate_quiz( $quiz_name, $course_iteration_flag, $lesson_iteration_flag, $topic_iteration_flag, $name_step_add_quiz ) {
@@ -75,7 +75,7 @@ function generate_quiz( $quiz_name, $course_iteration_flag, $lesson_iteration_fl
     $lesson_name = get_lesson_prefix() . $lesson_iteration_flag;
     $topic_name = get_topic_prefix() . $topic_iteration_flag;
 
-    create_quiz( $quiz_name );
+    $quiz = create_quiz( $quiz_name );
 
     if ( $name_step_add_quiz === 'topic' ) {
       add_quiz_to_step($quiz_name, $course_name, $lesson_name, $topic_name);
@@ -85,7 +85,7 @@ function generate_quiz( $quiz_name, $course_iteration_flag, $lesson_iteration_fl
       add_quiz_to_step($quiz_name, $course_name);
     }
 
-    return true;
+    return $quiz;
 };
 
 function remove_quiz( $number ) {
