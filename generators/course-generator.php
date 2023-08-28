@@ -53,3 +53,21 @@ function remove_course( $number ) {
   $postid = $wpdb->get_var( "SELECT ID FROM $wpdb->posts WHERE post_title = '" . $course_name . "'" );
   if( $postid ) wp_delete_post( $postid );
 };
+
+$populater->add_section = function ( $course_id, $order, $post_title ) {
+
+  $sections = json_decode(get_post_meta( $course_id, 'course_sections', true ));
+
+  array_push($sections, (object) [
+    'order'       => $order,
+    'ID'          => (int) time(),
+    'post_title'  => $post_title,
+    'url'         => '',
+    'edit_link'   => '',
+    'tree'        => [],
+    'expanded'    => '',
+    'type'        => 'section-heading'
+  ] );
+
+  update_post_meta( $course_id, 'course_sections', json_encode($sections) );
+};
