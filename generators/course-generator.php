@@ -57,10 +57,11 @@ function remove_course( $number ) {
 $populater->add_section = function ( $course_id, $order, $post_title ) {
 
   $sections = json_decode(get_post_meta( $course_id, 'course_sections', true ));
+  if ( empty($sections) ) $sections = [];
 
   array_push($sections, (object) [
     'order'       => $order,
-    'ID'          => (int) time(),
+    'ID'          => (int) round(microtime(true) * 1000),
     'post_title'  => $post_title,
     'url'         => '',
     'edit_link'   => '',
