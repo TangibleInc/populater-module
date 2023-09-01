@@ -39,7 +39,7 @@ function add_quiz_to_step($quiz_name, $course_name, $lesson_name = '', $topic_na
     }
 };
 
-function create_quiz( $quiz_name ): bool {
+function create_quiz( $quiz_name ): WP_Post {
     
   $faker = Faker\Factory::create();
     
