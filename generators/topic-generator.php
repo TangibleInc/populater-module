@@ -5,21 +5,13 @@ function get_topic_prefix() {
   return 'topic-';
 };
 
-function add_topic_to_lesson( $topic_name, $lesson_name, $course_name ) {
-    global $wpdb;
-    $topicid = $wpdb->get_var( "SELECT ID FROM $wpdb->posts WHERE post_title = '" . $topic_name . "'"  );
-    $lessonid = $wpdb->get_var( "SELECT ID FROM $wpdb->posts WHERE post_title = '" . $lesson_name . "'"  );
-    $courseid = $wpdb->get_var( "SELECT ID FROM $wpdb->posts WHERE post_title = '" . $course_name . "'"  );
-    update_post_meta( $topicid, 'course_id', $courseid  );
-    update_post_meta( $topicid, 'lesson_id', $lessonid  );
-    update_post_meta( $topicid, '_sfwd-topic', [0, "swfd-topic_course" => $courseid, "sfwd-topic_lesson" => $lessonid ] );
+function add_topic_to_lesson( $topic_id, $lesson_id, $course_id ) {
+    update_post_meta( $topic_id, 'course_id', $course_id  );
+    update_post_meta( $topic_id, 'lesson_id', $lesson_id  );
+    update_post_meta( $topic_id, '_sfwd-topic', [0, "swfd-topic_course" => $course_id, "sfwd-topic_lesson" => $lesson_id ] );
 };
 
-function add_topic_to_course_steps( $topic_id, $lesson_name, $course_name ) {
-  global $wpdb;
-  $lesson_id = $wpdb->get_var( "SELECT ID FROM $wpdb->posts WHERE post_title = '" . $lesson_name . "'"  );
-  $course_id = $wpdb->get_var( "SELECT ID FROM $wpdb->posts WHERE post_title = '" . $course_name . "'"  );
-
+function add_topic_to_course_steps( $topic_id, $lesson_id, $course_id ) {
   // Get the existing course steps
   $course_steps = get_post_meta($course_id, 'ld_course_steps', true);
   $course_steps['steps']['h']['sfwd-lessons'][$lesson_id]['sfwd-topic'] += [
@@ -31,7 +23,9 @@ function add_topic_to_course_steps( $topic_id, $lesson_name, $course_name ) {
   update_post_meta($course_id, 'ld_course_steps', $course_steps);
 };
 
-function generate_topic( $topic_name, $course_iteration_flag, $lesson_iteration_flag ) {
+function generate_topic( $topic_name, $course_iteration_flag, $lesson_iteration_flag, $parent_post ) {
+    
+    global $wpdb;
     $fields = tangible_fields();
     $faker = Faker\Factory::create();
     
@@ -48,11 +42,14 @@ function generate_topic( $topic_name, $course_iteration_flag, $lesson_iteration_
       ]
     );
 
-    $course_name = get_course_prefix() . $course_iteration_flag;
     $lesson_name = get_lesson_prefix() . $lesson_iteration_flag;
 
-    add_topic_to_lesson( $topic_name, $lesson_name, $course_name );
-    add_topic_to_course_steps( $topic_id, $lesson_name, $course_name );
+    if ( empty($parent_post) ) $parent_post = $lesson_name;
+    if ( !is_numeric($parent_post) ) $parent_post = $wpdb->get_var( "SELECT ID FROM $wpdb->posts WHERE post_title = '" . $parent_post . "'"  );
+    $course_id = get_post_meta( $parent_post, 'course_id',  true );
+
+    add_topic_to_lesson( $topic_id, $parent_post, $course_id );
+    add_topic_to_course_steps( $topic_id, $parent_post, $course_id );
     return get_post($topic_id);
 };
 

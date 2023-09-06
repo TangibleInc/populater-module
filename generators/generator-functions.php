@@ -9,6 +9,11 @@ function check_parent_posts_exist( $generate_type , $parent_post = '' ) {
 
     $check = true;
     switch ( $generate_type ) {
+        case 'certificate':
+            $num_of_courses = $fields->fetch_value( 'num_of_courses' );
+            if ( $num_of_courses == 0 ) $check = false;
+            break;
+
         case 'course':
             $check = true;
             break;
@@ -56,14 +61,18 @@ function generate_post( $generate_type, $name, $iteration_flag_array, $parent_po
     
     $populater = populater();
     switch ( $generate_type ) {
+        case 'certificate':
+            tgbl()->log('generate_certificate');
+            return generate_certificate( $name, $iteration_flag_array['course'], $parent_post );
+
         case 'course':
             return generate_course( $name );
 
         case 'lesson': 
-            return generate_lesson( $name, $iteration_flag_array['course'] );
+            return generate_lesson( $name, $iteration_flag_array['course'], $parent_post );
 
         case 'topic':
-            return generate_topic( $name, $iteration_flag_array['course'], $iteration_flag_array['lesson'] );
+            return generate_topic( $name, $iteration_flag_array['course'], $iteration_flag_array['lesson'], $parent_post );
 
         case 'quiz':
             return generate_quiz( $name, $iteration_flag_array['course'], $iteration_flag_array['lesson'], $iteration_flag_array['topic'], $parent_post );
@@ -89,20 +98,22 @@ function generate_posts( $num_to_add, $generate_type, $fetch_value_name, $prefix
     if ( !$check_parent_posts_exist ) return false;
 
     $fields = tangible_fields();
-    $previous_num_added = $fields->fetch_value( $fetch_value_name );
+    $previous_num_added = is_wp_error( $fields->fetch_value( $fetch_value_name ) ) ? 1 : $fields->fetch_value( $fetch_value_name );
 
     $num_of_posts = [
-        'course'    => $fields->fetch_value( 'num_of_courses' ),
-        'lesson'    => $fields->fetch_value( 'num_of_lessons' ),
-        'topic'     => $fields->fetch_value( 'num_of_topics' ),
-        'quiz'      => $fields->fetch_value( 'num_of_quizzes' )
+        'course'        => $fields->fetch_value( 'num_of_courses' ),
+        'lesson'        => $fields->fetch_value( 'num_of_lessons' ),
+        'topic'         => $fields->fetch_value( 'num_of_topics' ),
+        'quiz'          => $fields->fetch_value( 'num_of_quizzes' ),
+        'certificate'   => $fields->fetch_value( 'num_of_certificates' )
     ];
 
     $iteration_flag_array = [
-        'course'    => 1,
-        'lesson'    => 1,
-        'topic'     => 1,
-        'quiz'      => 1
+        'course'        => 1,
+        'lesson'        => 1,
+        'topic'         => 1,
+        'quiz'          => 1,
+        'certificate'   => 1
     ];
 
     for ( $post_added = 0; $post_added < $num_to_add ; $post_added++ ) { 
@@ -162,6 +173,12 @@ $populater->generate = function ( $num_to_add, $generate_type, $parent_post = ''
         return generate_users( $num_to_add );
     } else {
         switch ($generate_type) {
+
+            case 'certificate':
+                $fetch_value_name = 'num_of_certificates';
+                $prefix = 'certificate-';
+                break;
+
             case 'course':
                 $fetch_value_name = 'num_of_courses';
                 $prefix = 'course-';
