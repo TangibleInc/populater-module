@@ -62,7 +62,6 @@ function generate_post( $generate_type, $name, $iteration_flag_array, $parent_po
     $populater = populater();
     switch ( $generate_type ) {
         case 'certificate':
-            tgbl()->log('generate_certificate');
             return generate_certificate( $name, $iteration_flag_array['course'], $parent_post );
 
         case 'course':
