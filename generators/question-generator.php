@@ -52,7 +52,7 @@ function create_question( string $question_name ): bool {
 
     add_post_meta( $post_id, 'question_pro_id', $question_pro_id );
 
-    return true; 
+    return get_post($post); 
 };
 
 function add_question_to_quiz( string $quiz_name, string $question_name ) {
@@ -77,25 +77,21 @@ function add_question_to_quiz( string $quiz_name, string $question_name ) {
     ]); 
 };
 
-function generate_question( $question_name, $quiz_iteration_flag ) {
+function generate_question( $question_name, $quiz_iteration_flag, $parent_post ) {
 
     $fields = tangible_fields();
-    $num_of_quizzes = $fields->fetch_value( 'num_of_quizzes' );
 
-    if( $num_of_quizzes > 0 ) {
-      $quiz_name = get_quiz_prefix() . $quiz_iteration_flag;
-      create_question( $question_name );
-      add_question_to_quiz( $quiz_name, $question_name );
-    } else {
-      create_question( $question_name );
-    }
+    $quiz_name = get_quiz_prefix() . $quiz_iteration_flag;
+    $question = create_question( $question_name );
 
-    return true;
+    if ( $parent_post === false ) return $question;
+
+    add_question_to_quiz( $quiz_name, $question_name );
+
+    return $question;
 };
 
 function remove_question( $number ) {
-  // TODO: Add meta that these are fake during creation.
-  //       Confirm the fake meta is there before deletion.
   global $wpdb;
   $question_name = get_question_prefix() . $number;
 
