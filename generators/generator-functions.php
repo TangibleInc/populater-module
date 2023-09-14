@@ -8,7 +8,8 @@ function check_parent_posts_exist( $generate_type , $parent_post = '' ) {
     $fields = tangible_fields();
     global $wpdb;
 
-    if ( !empty($parent_post) ) {
+    if ( !empty($parent_post) && $parent_post !== false ) {
+        if ( isset($parent_post['name_or_id']) ) $parent_post = $parent_post['name_or_id'];
         if ( is_numeric($parent_post) ) {
             $post = get_post($parent_post);
             if ( empty($post) ) return false;
