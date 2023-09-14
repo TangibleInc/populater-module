@@ -74,6 +74,8 @@ function generate_quiz( $quiz_name, $course_iteration_flag, $lesson_iteration_fl
 
   $quiz = create_quiz( $quiz_name );
 
+  if ( $name_step_add_quiz === false ) return $quiz;
+
   if ( $name_step_add_quiz === 'topic' || ( isset($name_step_add_quiz['type']) && $name_step_add_quiz['type'] === 'topic' ) ){
     if ( isset( $name_step_add_quiz['name_or_id'] ) ){
       $topic_id = is_numeric( $name_step_add_quiz['name_or_id'] ) ? $name_step_add_quiz['name_or_id'] : $wpdb->get_var( "SELECT ID FROM $wpdb->posts WHERE post_title = '" . $name_step_add_quiz['name_or_id'] . "'"  );

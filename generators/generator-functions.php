@@ -6,12 +6,23 @@ function check_parent_posts_exist( $generate_type , $parent_post = '' ) {
 
     if ( empty($generate_type) ) return false;
     $fields = tangible_fields();
+    global $wpdb;
+
+    if ( !empty($parent_post) ) {
+        if ( is_numeric($parent_post) ) {
+            $post = get_post($parent_post);
+            if ( empty($post) ) return false;
+        } else {
+            $parent_id = $wpdb->get_var( "SELECT ID FROM $wpdb->posts WHERE post_title = '" . $parent_post . "'"  );
+            if ( empty($parent_id) ) return false;
+        }
+    }
 
     $check = true;
     switch ( $generate_type ) {
         case 'certificate':
             $num_of_courses = $fields->fetch_value( 'num_of_courses' );
-            if ( $num_of_courses == 0 ) $check = false;
+            if ( $num_of_courses == 0 && $parent_post !== false ) $check = false;
             break;
 
         case 'course':
@@ -20,13 +31,13 @@ function check_parent_posts_exist( $generate_type , $parent_post = '' ) {
 
         case 'lesson':
             $num_of_courses = $fields->fetch_value( 'num_of_courses' );
-            if ( $num_of_courses == 0 ) $check = false;
+            if ( $num_of_courses == 0 && $parent_post !== false ) $check = false;
             break;
 
         case 'topic':
             $num_of_courses = $fields->fetch_value( 'num_of_courses' );
             $num_of_lessons = $fields->fetch_value( 'num_of_lessons' );
-            if ( $num_of_courses == 0 || $num_of_lessons == 0 ) $check = false;
+            if ( ( $num_of_courses == 0 || $num_of_lessons == 0 ) && $parent_post !== false ) $check = false;
             break;
 
         case 'quiz': 
@@ -42,11 +53,12 @@ function check_parent_posts_exist( $generate_type , $parent_post = '' ) {
             } else {
                 $check = false;
             }
+            if ( $parent_post === false ) $check = true;
             break;
 
         case 'question':
             $num_of_quizzes = $fields->fetch_value( 'num_of_quizzes' );
-            if ( $num_of_quizzes == 0 ) $check = false;
+            if ( $num_of_quizzes == 0 && $parent_post !== false ) $check = false;
             break;
         
         default:
@@ -77,7 +89,7 @@ function generate_post( $generate_type, $name, $iteration_flag_array, $parent_po
             return generate_quiz( $name, $iteration_flag_array['course'], $iteration_flag_array['lesson'], $iteration_flag_array['topic'], $parent_post );
 
         case 'question':
-            return generate_question( $name, $iteration_flag_array['quiz'] );
+            return generate_question( $name, $iteration_flag_array['quiz'], $parent_post );
         
         default:
             return false;

@@ -42,6 +42,8 @@ function generate_topic( $topic_name, $course_iteration_flag, $lesson_iteration_
       ]
     );
 
+    if ( $parent_post === false ) return get_post($topic_id);
+
     $lesson_name = get_lesson_prefix() . $lesson_iteration_flag;
 
     if ( empty($parent_post) ) $parent_post = $lesson_name;
