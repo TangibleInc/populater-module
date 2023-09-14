@@ -8,8 +8,7 @@ function check_parent_posts_exist( $generate_type , $parent_post = '' ) {
     $fields = tangible_fields();
     global $wpdb;
 
-    if ( !empty($parent_post) && $parent_post !== false ) {
-        if ( isset($parent_post['name_or_id']) ) $parent_post = $parent_post['name_or_id'];
+    if ( !empty($parent_post) && $parent_post !== false && $generate_type !== 'quiz' ) {
         if ( is_numeric($parent_post) ) {
             $post = get_post($parent_post);
             if ( empty($post) ) return false;
@@ -55,6 +54,16 @@ function check_parent_posts_exist( $generate_type , $parent_post = '' ) {
                 $check = false;
             }
             if ( $parent_post === false ) $check = true;
+            if ( is_array($parent_post) ) {
+                $parent_post = $parent_post['name_or_id'];
+                if ( is_numeric($parent_post) ) {
+                    $post = get_post($parent_post);
+                    if ( empty($post) ) $check = false;
+                }   else {
+                    $parent_id = $wpdb->get_var( "SELECT ID FROM $wpdb->posts WHERE post_title = '" . $parent_post . "'"  );
+                    if ( empty($parent_id) ) $check = false;
+                }
+            }
             break;
 
         case 'question':
