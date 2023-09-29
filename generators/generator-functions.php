@@ -8,7 +8,7 @@ function check_parent_posts_exist( $generate_type , $parent_post = '' ) {
     $fields = tangible_fields();
     global $wpdb;
 
-    if ( !empty($parent_post) && $parent_post !== false && $generate_type !== 'quiz' ) {
+    if ( !empty($parent_post) && $parent_post !== false && $generate_type !== 'quiz' && $generate_type !== 'certificate' ) {
         if ( is_numeric($parent_post) ) {
             $post = get_post($parent_post);
             if ( empty($post) ) return false;
@@ -84,7 +84,7 @@ function generate_post( $generate_type, $name, $iteration_flag_array, $parent_po
     $populater = populater();
     switch ( $generate_type ) {
         case 'certificate':
-            return generate_certificate( $name, $iteration_flag_array['course'], $parent_post );
+            return generate_certificate( $name, $iteration_flag_array['course'], $iteration_flag_array['quiz'], $parent_post );
 
         case 'course':
             return generate_course( $name );
