@@ -27,7 +27,7 @@ function generate_certificate( $certificate_name, $course_iteration_flag, $quiz_
       } else {
         $parent_post = $parent_post['name_or_id'];
       }
-      add_certificate_to_parent( $parent_post, $certificate_id );
+      add_certificate_to_course( $parent_post, $certificate_id );
     }
 
     if ( isset($parent_post['type']) && $parent_post['type'] === 'quiz' ) {
