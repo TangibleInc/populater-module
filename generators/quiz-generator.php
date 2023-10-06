@@ -135,9 +135,9 @@ $populater->complete_quiz = function ( $quiz_id_or_name, $user_id, $course_id = 
 
   $quizdata = array(
     'quiz'                => $quiz_id,
-    'score'               => 0,
-    'count'               => 0,
-    'question_show_count' => 0,
+    'score'               => 1,
+    'count'               => 1,
+    'question_show_count' => 1,
     'pass'                => true,
     'rank'                => '-',
     'time'                => time(),
@@ -145,10 +145,10 @@ $populater->complete_quiz = function ( $quiz_id_or_name, $user_id, $course_id = 
     'course'              => $course_id,
     'lesson'              => $lesson_id,
     'topic'               => $topic_id,
-    'points'              => 0,
-    'total_points'        => 0,
-    'percentage'          => 0,
-    'timespent'           => 0,
+    'points'              => 1,
+    'total_points'        => 1,
+    'percentage'          => 100,
+    'timespent'           => 1,
     'has_graded'          => false,
     'statistic_ref_id'    => 0,
     'm_edit_by'           => $user_id, // Manual Edit By ID.
