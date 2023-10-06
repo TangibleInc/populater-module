@@ -126,7 +126,7 @@ $populater->complete_quiz = function ( $quiz_id_or_name, $user_id, $course_id = 
 
   if ( ! is_numeric( $quiz_id_or_name ) ) { 
     global $wpdb;
-    $quiz_id = $wpdb->get_var( "SELECT ID FROM $wpdb->posts WHERE post_title = '" . $quiz_name . "'"  ); 
+    $quiz_id = $wpdb->get_var( "SELECT ID FROM $wpdb->posts WHERE post_title = '" . $quiz_id_or_name . "'"  ); 
   } else {
     $quiz_id = $quiz_id_or_name;
   }
@@ -155,6 +155,8 @@ $populater->complete_quiz = function ( $quiz_id_or_name, $user_id, $course_id = 
     'm_edit_time'         => time(), // Manual Edit timestamp.
   );
 
+  $quiz_progress = get_user_meta($user_id, '_sfwd-quizzes', true);
+  if ( empty($quiz_progress) ) $quiz_progress = [];
   $quiz_progress []= $quizdata;
 
   learndash_update_user_activity(
