@@ -10,9 +10,9 @@ I can explain line by line what's going on, you'll need to discover by yourself 
 
 ## Improve Tangible Populater
 
-You are here because you want to add some codes to the module, you can understand how each file work here. 
+If you are here because you want to add some code to the module, you can understand how each file works here. 
 
-When you want to add something think : "Can my code be use by just one type of generator, multiple or all of them ?" "Is my function ( or some part of it ) unique for one case or can be a global function ?". 
+When you want to add something think : "Can my code be used by just one type of generator, multiple or all of them ?" "Is my function ( or some part of it ) unique for one case or can be a global function ?". 
 
 - **All files :** 
     - [generator-functions.php](#generator-functions)
