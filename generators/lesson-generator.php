@@ -8,7 +8,7 @@ function get_lesson_prefix() {
 function add_lesson_to_course( $lesson_id, $course_id_or_name ) {
   global $wpdb;
   if ( !is_numeric($course_id_or_name) ) $course_id_or_name = $wpdb->get_var( "SELECT ID FROM $wpdb->posts WHERE post_title = '" . $course_id_or_name . "'"  );
-  update_post_meta( $lesson_id, 'course_id', $course_id_or_name  );
+  add_post_meta( $lesson_id, 'course_id', $course_id_or_name  );
   update_post_meta( $lesson_id, '_swfd-lessons', [0, "swfd-lessons_course" => $course_id_or_name] );
 };
 
