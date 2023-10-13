@@ -77,3 +77,5 @@ You can also see there is a remove function. For each cases, you need to remove 
 Then we have the functions specific to add meta for example. Like quiz who need a quiz_pro_id, a course_id, lesson_id ( which is used for topic_id too ) depending the context. You can also see that we add the posts to the course steps. 
 
 We also have the functions specific for a context like in quiz we have complete_quiz. Because it needs a bunch of things to work, we created this function so it's more easy to use and do. 
+
+You can find the functions details on how to use them in the other doc. 
