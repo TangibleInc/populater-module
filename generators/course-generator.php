@@ -72,3 +72,41 @@ $populater->add_section = function ( $course_id, $order, $post_title ) {
 
   update_post_meta( $course_id, 'course_sections', json_encode($sections) );
 };
+
+$populater->set_course_status = function($course_status, $user_id, $course_id) {
+
+  switch ( $course_status ) {
+
+    case 'locked' :
+      update_post_meta( $course_id, '_sfwd-courses', ["sfwd-courses_course_price_type" => 'closed']);
+      break;
+
+    case 'open' :
+      update_post_meta( $course_id, '_sfwd-courses', ["sfwd-courses_course_price_type" => 'open']);
+      break;
+
+    case 'started' :
+      $lessons_list = learndash_get_course_lessons_list($course_id, $user_id);
+      learndash_activity_start_course($user_id, $course_id, time());
+      learndash_activity_start_lesson($user_id, $course_id, $lessons_list[1]['id'], time());
+      learndash_activity_complete_lesson($user_id, $course_id, $lessons_list[1]['id'], time());
+      learndash_process_mark_complete($user_id, $lessons_list[1]['id']);
+      learndash_activity_start_lesson($user_id, $course_id, $lessons_list[2]['id'], time());
+      break;
+
+    case 'completed' :
+      $lessons_list = learndash_get_course_lessons_list($course_id, $user_id);
+      learndash_activity_start_course($user_id, $course_id, time());
+      foreach ($lessons_list as $key => $lesson) {
+        learndash_activity_start_lesson($user_id, $course_id, $lesson['id'], time());
+        learndash_activity_complete_lesson($user_id, $course_id, $lesson['id'], time());
+        learndash_process_mark_complete($user_id, $lesson['id']);
+      }
+      learndash_process_mark_complete($user_id, $course_id);
+      break;
+
+    default : 
+      break;
+
+  }
+};

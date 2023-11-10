@@ -229,7 +229,18 @@ You can find functions in some of the generator files. I'll try to explain this 
 
 **<a id="populater-functions-course"></a>Course :**
 
-There is nothing for the courses, all the functions are not meant to be used outside of the populater. 
+```php
+set_course_status($course_status, $user_id, $course_id);
+```
+
+Set the course status for the choosen course. We have 4 possible status : 
+
+- locked.
+- open.
+- started.
+- completed.
+
+You need to add in the parameters the user_id and the course_id. 
 
 **<a id="populater-functions-lesson"></a>Lesson :**
 
