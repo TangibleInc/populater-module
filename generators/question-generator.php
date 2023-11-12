@@ -5,7 +5,7 @@ function get_question_prefix() {
   return 'question-';
 };
 
-function createAnswers(): array {
+function createAnswers() {
     $faker = Faker\Factory::create();
     $answers = [];
 
@@ -25,7 +25,7 @@ function createAnswers(): array {
     return $answers;
 };
 
-function create_question( string $question_name ): bool {
+function create_question( string $question_name ) {
     
     $faker = Faker\Factory::create();
     $post = [
@@ -52,7 +52,7 @@ function create_question( string $question_name ): bool {
 
     add_post_meta( $post_id, 'question_pro_id', $question_pro_id );
 
-    return get_post($post); 
+    return get_post($post_id); 
 };
 
 function add_question_to_quiz( string $quiz_name, string $question_name ) {

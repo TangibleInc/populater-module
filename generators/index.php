@@ -8,5 +8,6 @@ require_once __DIR__.'/quiz-generator.php';
 require_once __DIR__.'/question-generator.php';
 require_once __DIR__.'/certificate-generator.php';
 require_once __DIR__.'/user-generator.php';
+require_once __DIR__.'/assignment-generator.php';
 require_once __DIR__.'/global-functions.php';
 require_once __DIR__.'/generator-functions.php';

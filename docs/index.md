@@ -18,6 +18,7 @@ You can generate some stuffs with this module. Here a list of what can be genera
         - [Exception](#populater-quizzes-exception) 
     - [Questions](#populater-questions)
     - [Certificates](#populater-certificates)
+    - [Assignments](#populater-assignments)
     - [Functions](#populater-functions)
         - [Q&A](#populater-functions-qa)
         - [Course](#populater-functions-course)
@@ -26,6 +27,7 @@ You can generate some stuffs with this module. Here a list of what can be genera
         - [Quiz](#populater-functions-quiz)
         - [Question](#populater-functions-question)
         - [Certificate](#populater-functions-certificate)
+        - [Assignment](#populater-functions-assignment)
 
 ## How to use it ? 
 
@@ -217,6 +219,22 @@ generate(1, 'certificate', false);
 
 You can create a certificate without any course created. The certificate will be related to nothing. 
 
+#### <a id="populater-assignments"></a>Assignments :
+
+For now, assignment can be create only for lessons. 
+
+```php
+generate(1, 'assignment');
+```
+
+By default , it's gonna create an assignment to the first lesson created and the author of this assignment gonna be the last user created. 
+
+```php
+generate(1, 'assignment', $parent_name_or_id);
+```
+
+It's the same as before but it's gonna create the assignment for a specify lesson. **parent_name_or_id** can be a string like 'lesson-1' or a number like 4. The user can't be specify for now, it will only use the last one created. 
+
 #### <a id="populater-functions"></a>Functions : 
 
 You can find functions in some of the generator files. I'll try to explain this functions, how to use them, what they're doing, type by type. 
@@ -229,7 +247,11 @@ You can find functions in some of the generator files. I'll try to explain this 
 
 **<a id="populater-functions-course"></a>Course :**
 
-There is nothing for the courses, all the functions are not meant to be used outside of the populater. 
+```php
+add_section($course_id, $order, $post_title);
+```
+
+This function can add section to a specific course. Each step is in an order in the course. So when you want to add your section, you need to know where you want to add it, because if you add your section at the end, it'll not work. That's why we have the **order** parameter. And the **post_title** parameter is here because each section have a title. 
 
 **<a id="populater-functions-lesson"></a>Lesson :**
 
@@ -256,3 +278,11 @@ There is nothing for the questions, all the functions are not meant to be used o
 **<a id="populater-functions-certificate"></a>Certificate :**
 
 There is nothing for the certificates, all the functions are not meant to be used outside of the populater.
+
+**<a id="populater-functions-assignment"></a>Assignment :**
+
+```php
+create_custom_image_locally($assignment_post_title, $file_path);
+```
+
+You'll maybe need to create some custom image in your test when you're working with assignments. This function is something that can be edited to add more content in an image if we need. Right now, it's only creating a black background image. 
