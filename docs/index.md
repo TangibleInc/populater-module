@@ -252,6 +252,17 @@ add_section($course_id, $order, $post_title);
 ```
 
 This function can add section to a specific course. Each step is in an order in the course. So when you want to add your section, you need to know where you want to add it, because if you add your section at the end, it'll not work. That's why we have the **order** parameter. And the **post_title** parameter is here because each section have a title. 
+set_course_status($course_status, $user_id, $course_id);
+```
+
+Set the course status for the choosen course. We have 4 possible status : 
+
+- locked.
+- open.
+- started.
+- completed.
+
+You need to add in the parameters the user_id and the course_id. 
 
 **<a id="populater-functions-lesson"></a>Lesson :**
 
