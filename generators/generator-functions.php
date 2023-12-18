@@ -8,7 +8,7 @@ function check_parent_posts_exist( $generate_type , $parent_post = '' ) {
     $fields = tangible_fields();
     global $wpdb;
 
-    if ( !empty($parent_post) && $parent_post !== false && $generate_type !== 'quiz' && $generate_type !== 'certificate' ) {
+    if ( !empty($parent_post) && $parent_post !== false && $generate_type !== 'quiz' && $generate_type !== 'certificate' && $generate_type !== 'group' ) {
         if ( is_numeric($parent_post) ) {
             $post = get_post($parent_post);
             if ( empty($post) ) return false;
@@ -33,6 +33,10 @@ function check_parent_posts_exist( $generate_type , $parent_post = '' ) {
             break;
 
         case 'course':
+            $check = true;
+            break;
+
+        case 'group':
             $check = true;
             break;
 
@@ -100,6 +104,9 @@ function generate_post( $generate_type, $name, $iteration_flag_array, $parent_po
         case 'course':
             return generate_course( $name );
 
+        case 'group':
+            return generate_group( $name );
+
         case 'lesson': 
             return generate_lesson( $name, $iteration_flag_array['course'], $parent_post );
 
@@ -138,7 +145,8 @@ function generate_posts( $num_to_add, $generate_type, $fetch_value_name, $prefix
         'topic'         => $fields->fetch_value( 'num_of_topics' ),
         'quiz'          => $fields->fetch_value( 'num_of_quizzes' ),
         'certificate'   => $fields->fetch_value( 'num_of_certificates' ),
-        'assignment'    => $fields->fetch_value( 'num_of_assignments' )
+        'assignment'    => $fields->fetch_value( 'num_of_assignments' ),
+        'group'         => $fields->fetch_value( 'num_of_groups' )
     ];
 
     $iteration_flag_array = [
@@ -147,7 +155,8 @@ function generate_posts( $num_to_add, $generate_type, $fetch_value_name, $prefix
         'topic'         => 1,
         'quiz'          => 1,
         'certificate'   => 1,
-        'assignment'    => 1
+        'assignment'    => 1,
+        'group'         => 1,
     ];
 
     for ( $post_added = 0; $post_added < $num_to_add ; $post_added++ ) { 
@@ -221,6 +230,11 @@ $populater->generate = function ( $num_to_add, $generate_type, $parent_post = ''
             case 'course':
                 $fetch_value_name = 'num_of_courses';
                 $prefix = 'course-';
+                break;
+
+            case 'group':
+                $fetch_value_name = 'num_of_groups';
+                $prefix = 'group-';
                 break;
     
             case 'lesson':
