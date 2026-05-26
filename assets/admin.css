@@ -1,0 +1,25 @@
+/* Tangible Populator — Admin styles */
+
+#tangible-populater-app .card {
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 3px;
+    padding: 16px 20px;
+}
+
+#tp-progress-bar {
+    width: 100%;
+    height: 20px;
+    border-radius: 3px;
+}
+
+#tp-log-output {
+    max-height: 300px;
+    overflow-y: auto;
+    background: #f6f7f7;
+    padding: 8px 12px;
+    font-size: 12px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-all;
+}

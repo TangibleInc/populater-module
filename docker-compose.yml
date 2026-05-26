@@ -1,0 +1,77 @@
+services:
+  # WordPress service - this container starts a wp local website at the given port
+  wp:
+    image: ghcr.io/tangibleinc/docker-factory/wp:${TAG:-php8.2}
+    hostname: tangible-wp
+    # For shell access use: docker compose exec wp bash
+    ports:
+      - "${PORT:-8888}:80"
+    environment:
+      WORDPRESS_URL: http://localhost:${PORT:-8888}
+      WORDPRESS_TITLE: "WP Dev"
+      WORDPRESS_DEVELOP_DIR: /var/www/html/
+      WORDPRESS_DB_HOST: db
+      WORDPRESS_DB_NAME: ${MARIADB_DATABASE:-wordpress}
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: wordpress
+      WORDPRESS_DB_ROOT_PASSWORD: rootpassword
+    # Add bind mounts here when developing a plugin, for example:
+    working_dir: /var/www/html/src/wp-content/plugins/tangible-populater
+    volumes:
+      - .:/var/www/html/src/wp-content/plugins/tangible-populater
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - tangible-wp-network
+
+  # WordPress test service - isolated site backed by wordpress_test
+  wp-test:
+    image: ghcr.io/tangibleinc/docker-factory/wp:${TAG:-php8.2}
+    hostname: tangible-wp-test
+    ports:
+      - "${TESTPORT:-8889}:80"
+    environment:
+      WORDPRESS_URL: http://localhost:${TESTPORT:-8889}
+      WORDPRESS_TITLE: "WP Test"
+      WORDPRESS_DEVELOP_DIR: /var/www/html/
+      WORDPRESS_DB_HOST: db
+      WORDPRESS_DB_NAME: ${WORDPRESS_TEST_DB_NAME:-wordpress_test}
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: wordpress
+      WORDPRESS_DB_ROOT_PASSWORD: rootpassword
+    working_dir: /var/www/html/src/wp-content/plugins/tangible-populater
+    volumes:
+      - .:/var/www/html/src/wp-content/plugins/tangible-populater
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - tangible-wp-network
+      
+  # Database service - MariaDB container for WordPress database
+  db:
+    image: mariadb:11
+    # Resource allocation for database
+    environment:
+      MARIADB_DATABASE: ${MARIADB_DATABASE:-wordpress}
+      MARIADB_USER: wordpress
+      MARIADB_PASSWORD: wordpress
+      MARIADB_ROOT_PASSWORD: rootpassword
+    volumes:
+      - db-data:/var/lib/mysql
+    networks:
+      - tangible-wp-network
+    command: --innodb-buffer-pool-size=512M --max-connections=200
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 60s
+
+volumes:
+  db-data:
+
+networks:
+  tangible-wp-network:
