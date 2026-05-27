@@ -1,12 +1,13 @@
 services:
   # WordPress service - this container starts a wp local website at the given port
   wp:
-    image: ghcr.io/tangibleinc/docker-factory/wp:${TAG:-php8.2}
+    image: ghcr.io/tangibleinc/docker-factory/populater:${TAG:-php8.2}
     hostname: tangible-wp
     # For shell access use: docker compose exec wp bash
     ports:
       - "${PORT:-8888}:80"
     environment:
+      PORT: ${PORT:-8888}
       WORDPRESS_URL: http://localhost:${PORT:-8888}
       WORDPRESS_TITLE: "WP Dev"
       WORDPRESS_DEVELOP_DIR: /var/www/html/
@@ -27,11 +28,12 @@ services:
 
   # WordPress test service - isolated site backed by wordpress_test
   wp-test:
-    image: ghcr.io/tangibleinc/docker-factory/wp:${TAG:-php8.2}
+    image: ghcr.io/tangibleinc/docker-factory/populater:${TAG:-php8.2}
     hostname: tangible-wp-test
     ports:
       - "${TESTPORT:-8889}:80"
     environment:
+      PORT: ${TESTPORT:-8889}
       WORDPRESS_URL: http://localhost:${TESTPORT:-8889}
       WORDPRESS_TITLE: "WP Test"
       WORDPRESS_DEVELOP_DIR: /var/www/html/
