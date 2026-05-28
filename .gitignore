@@ -6,6 +6,10 @@
 # Composer
 vendor/
 
+# Release artifact
+tangible-populater.zip
+build/
+
 # PHPUnit
 .phpunit.cache/
 .phpunit.result.cache

@@ -26,9 +26,12 @@
   },
   "scripts": {
     "test": "phpunit",
+    "test:coverage": "phpunit --coverage-text",
     "test:integration": "phpunit -c phpunit.integration.xml",
     "docker:test": "docker compose exec wp-test bash -c 'composer test'",
-    "docker:test:integration": "docker compose exec wp-test bash -c 'composer test:integration'"
+    "docker:test:coverage": "docker compose exec -e XDEBUG_MODE=coverage wp-test bash -c 'composer test:coverage'",
+    "docker:test:integration": "docker compose exec wp-test bash -c 'composer test:integration'",
+    "zip": "bash scripts/zip.sh"
   },
   "config": {
     "optimize-autoloader": true,

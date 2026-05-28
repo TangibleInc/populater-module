@@ -15,12 +15,24 @@ Uses Brain Monkey mocks — no real background processing.
 
 ## Integration tests
 
+WordPress REST integration tests load the real `wp-test` site, call REST
+endpoints, process the seeding queue synchronously, and verify entity counts
+and LMS-specific structure in the database.
+
 ```bash
-composer docker:test:integration
+composer docker:tests:integration
 ```
 
-Loads WordPress from the `wp-test` environment and exercises seeding with real
-options/posts. Requires active LMS plugins in that container.
+Each LMS seed test uses fixed counts (`2` courses, `3` lessons/course,
+`2` quizzes/lesson, `4` users) and asserts:
+
+- REST status/logs report `completed` with the expected queue total
+- DB deltas match expected course/lesson/quiz/user counts
+- LearnDash: `ld_course_steps` with `sfwd-topic` slots and lesson-attached quizzes
+- LifterLMS: `llms_section` per course, lessons parented to sections
+- Tangible LMS: `_tgl_course_id` / `_tgl_lesson_id` meta on lessons/quizzes
+
+Reset integration tests seed content via REST, then verify `POST /reset` clears it.
 
 ## Manual dev testing
 

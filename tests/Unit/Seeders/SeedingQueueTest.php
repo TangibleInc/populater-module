@@ -2,18 +2,16 @@
 
 declare(strict_types=1);
 
-namespace Tangible\Populater\Tests\Integration;
+namespace Tangible\Populater\Tests\Unit\Seeders;
 
 use Tangible\Populater\Registry\LmsPluginRegistry;
 use Tangible\Populater\Registry\LmsPlugins;
 use Tangible\Populater\Seeding\SeedConfig;
 
 /**
- * Cross-component tests (registry + seeder + queue) without LMS-specific mocks.
- *
- * @group integration
+ * Cross-component queue tests (registry + seeder + queue) without LMS-specific mocks.
  */
-class SeedingQueueIntegrationTest extends \WPTestCase
+class SeedingQueueTest extends \WPTestCase
 {
     protected function setUp(): void
     {
