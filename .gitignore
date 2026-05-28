@@ -8,6 +8,7 @@ vendor/
 
 # PHPUnit
 .phpunit.cache/
+.phpunit.result.cache
 
 # Node artifact files
 node_modules/
