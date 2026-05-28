@@ -17,12 +17,13 @@ class LDSeedUsers extends AbstractSeedingStep
         return 'user';
     }
 
-    protected function run(array $data, Logger $logger): void
+    protected function run(array $data, Logger $logger): array
     {
         $ids = $this->seeder->seedUsers(1, $data);
 
         foreach ($ids as $id) {
             $logger->info(sprintf('Created LearnDash user ID: %d', $id));
         }
+        return $ids;
     }
 }

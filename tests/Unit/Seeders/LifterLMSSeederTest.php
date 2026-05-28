@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tangible\Populater\Tests\Unit\Seeders;
 
-use Tangible\Populater\Seeders\LifterLMSSeeder;
+use Tangible\Populater\LMS\LifterLMS\LifterLMSSeeder;
 use Brain\Monkey\Functions;
 
 class LifterLMSSeederTest extends \WPTestCase

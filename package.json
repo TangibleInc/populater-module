@@ -1,0 +1,12 @@
+{
+  "name": "tangible-populater-module",
+  "private": true,
+  "devDependencies": {
+    "@playwright/mcp": "^0.0.75",
+    "playwright": "^1.52.0"
+  },
+  "scripts": {
+    "mcp:playwright": "playwright-mcp --config .cursor/playwright-mcp.json --port 8931 --headless",
+    "mcp:playwright:install": "playwright install chromium"
+  }
+}

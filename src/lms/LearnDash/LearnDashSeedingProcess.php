@@ -9,7 +9,7 @@ use Tangible\Populater\LMS\LearnDash\Steps\LDSeedCourses;
 use Tangible\Populater\LMS\LearnDash\Steps\LDSeedLessons;
 use Tangible\Populater\LMS\LearnDash\Steps\LDSeedQuizzes;
 use Tangible\Populater\LMS\LearnDash\Steps\LDSeedUsers;
-use Tangible\Populater\Seeding\SeedingProcess;
+use Tangible\Populater\Seeding\AbstractSeeding;
 use Tangible\Populater\Steps\AbstractSeedingStep;
 use Tangible\Populater\Support\Logger;
 
@@ -20,8 +20,10 @@ use Tangible\Populater\Support\Logger;
  * Override processItem() in a further subclass if additional LearnDash-
  * specific behaviour is required (e.g. group enrolment, certificate triggers).
  */
-class LearnDashSeedingProcess extends SeedingProcess
+class LearnDashSeedingProcess extends AbstractSeeding
 {
+    protected $action = 'seed_learndash';
+
     /** @var array<string, AbstractSeedingStep>|null */
     private ?array $steps = null;
 
@@ -51,6 +53,8 @@ class LearnDashSeedingProcess extends SeedingProcess
             return;
         }
 
-        $step->execute($item['data'], $logger);
+        $data = $item['data'];
+        $data['process_id'] = $processId;
+        $step->execute($data, $logger);
     }
 }

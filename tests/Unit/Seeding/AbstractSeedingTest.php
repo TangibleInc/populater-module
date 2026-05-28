@@ -7,7 +7,6 @@ namespace Tangible\Populater\Tests\Unit\Seeding;
 use Tangible\Populater\Seeding\AbstractSeeding;
 use Tangible\Populater\Seeding\SeedingStatus;
 use Tangible\Populater\Seeders\AbstractSeeder;
-use Tangible\Populater\Support\Logger;
 use Brain\Monkey\Functions;
 
 class AbstractSeedingTest extends \WPTestCase
@@ -37,15 +36,17 @@ class AbstractSeedingTest extends \WPTestCase
             ['type' => 'user', 'data' => ['email' => 'user@test.com']],
         ]);
 
-        $this->seeding = $this->getMockForAbstractClass(
-            AbstractSeeding::class,
-            [$this->seeder]
-        );
+        $this->seeding = $this->getMockBuilder(AbstractSeeding::class)
+            ->setConstructorArgs([$this->seeder])
+            ->onlyMethods(['push_to_queue', 'save', 'dispatch', 'cancelBackgroundQueue'])
+            ->getMockForAbstractClass();
     }
 
     public function test_start_returns_process_id(): void
     {
-        Functions\when('wp_schedule_single_event')->justReturn(true);
+        $this->seeding->expects($this->exactly(2))->method('push_to_queue')->willReturnSelf();
+        $this->seeding->expects($this->once())->method('save')->willReturnSelf();
+        $this->seeding->expects($this->once())->method('dispatch');
 
         $processId = $this->seeding->start([]);
 
@@ -73,12 +74,15 @@ class AbstractSeedingTest extends \WPTestCase
     {
         Functions\when('get_option')->justReturn([
             'status' => SeedingStatus::STATUS_RUNNING,
+            'plugin' => 'test-lms',
             'total' => 10,
             'processed' => 3,
         ]);
         Functions\expect('update_option')->andReturn(true);
 
-        $result = $this->seeding->cancel('test-process-id');
+        $this->seeding->expects($this->once())->method('cancelBackgroundQueue');
+
+        $result = $this->seeding->cancelProcess('test-process-id');
 
         $this->assertTrue($result);
     }
@@ -91,7 +95,7 @@ class AbstractSeedingTest extends \WPTestCase
             'processed' => 10,
         ]);
 
-        $result = $this->seeding->cancel('test-process-id');
+        $result = $this->seeding->cancelProcess('test-process-id');
 
         $this->assertFalse($result);
     }
@@ -111,5 +115,10 @@ class AbstractSeedingTest extends \WPTestCase
     {
         $reflection = new \ReflectionClass(AbstractSeeding::class);
         $this->assertTrue($reflection->isAbstract());
+    }
+
+    public function test_extends_wp_background_process(): void
+    {
+        $this->assertInstanceOf(\WP_Background_Process::class, $this->seeding);
     }
 }

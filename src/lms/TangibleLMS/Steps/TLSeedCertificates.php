@@ -17,12 +17,13 @@ class TLSeedCertificates extends AbstractSeedingStep
         return 'certificate';
     }
 
-    protected function run(array $data, Logger $logger): void
+    protected function run(array $data, Logger $logger): array
     {
         $ids = $this->seeder->seedCertificates(1, $data);
 
         foreach ($ids as $id) {
             $logger->info(sprintf('Created Tangible LMS certificate ID: %d', $id));
         }
+        return $ids;
     }
 }

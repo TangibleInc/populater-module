@@ -9,7 +9,7 @@ use Tangible\Populater\LMS\LifterLMS\Steps\LLSeedCourses;
 use Tangible\Populater\LMS\LifterLMS\Steps\LLSeedLessons;
 use Tangible\Populater\LMS\LifterLMS\Steps\LLSeedQuizzes;
 use Tangible\Populater\LMS\LifterLMS\Steps\LLSeedUsers;
-use Tangible\Populater\Seeding\SeedingProcess;
+use Tangible\Populater\Seeding\AbstractSeeding;
 use Tangible\Populater\Steps\AbstractSeedingStep;
 use Tangible\Populater\Support\Logger;
 
@@ -20,8 +20,10 @@ use Tangible\Populater\Support\Logger;
  * Override processItem() in a further subclass if additional LifterLMS-
  * specific behaviour is required (e.g. membership assignments, section grouping).
  */
-class LifterLMSSeedingProcess extends SeedingProcess
+class LifterLMSSeedingProcess extends AbstractSeeding
 {
+    protected $action = 'seed_lifterlms';
+
     /** @var array<string, AbstractSeedingStep>|null */
     private ?array $steps = null;
 
@@ -51,6 +53,8 @@ class LifterLMSSeedingProcess extends SeedingProcess
             return;
         }
 
-        $step->execute($item['data'], $logger);
+        $data = $item['data'];
+        $data['process_id'] = $processId;
+        $step->execute($data, $logger);
     }
 }

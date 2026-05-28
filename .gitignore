@@ -6,9 +6,19 @@
 # Composer
 vendor/
 
+# PHPUnit
+.phpunit.cache/
+
 # Node artifact files
 node_modules/
 dist/
+
+# Playwright / MCP browser artifacts
+.playwright-mcp/
+test-results/
+
+# Cursor IDE (local MCP / editor config)
+.cursor/
 
 # Compiled Java class files
 *.class

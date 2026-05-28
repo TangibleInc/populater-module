@@ -4,25 +4,29 @@ declare(strict_types=1);
 
 namespace Tangible\Populater\Seeding;
 
+use Tangible\Populater\LMS\LearnDash\LearnDashSeedingProcess;
+use Tangible\Populater\LMS\LifterLMS\LifterLMSSeedingProcess;
+use Tangible\Populater\LMS\TangibleLMS\TangibleLMSSeedingProcess;
 use Tangible\Populater\PluginDetector;
+use Tangible\Populater\LMS\LearnDash\LearnDashSeeder;
+use Tangible\Populater\LMS\LifterLMS\LifterLMSSeeder;
+use Tangible\Populater\LMS\TangibleLMS\TangibleLMSSeeder;
 use Tangible\Populater\Seeders\AbstractSeeder;
-use Tangible\Populater\Seeders\LearnDashSeeder;
-use Tangible\Populater\Seeders\LifterLMSSeeder;
-use Tangible\Populater\Seeders\TangibleLMSSeeder;
 
 /**
  * Orchestrates seeding across multiple supported LMS plugins.
  *
- * Uses composition rather than inheritance: it instantiates a SeedingProcess
- * (concrete AbstractSeeding) with the correct seeder per request.
- *
- * For status / cancel / logs operations the seeder is irrelevant because those
- * only read and write WP options keyed by process ID.
+ * Instantiates the LMS-specific AbstractSeeding subclass with the correct
+ * seeder per request. Background-process hooks are registered when each
+ * process is constructed during registerBackgroundProcesses().
  */
 class SeedingManager
 {
     /** @var array<string, AbstractSeeder> */
     private array $seeders;
+
+    /** @var array<string, AbstractSeeding> */
+    private array $processes;
 
     public function __construct(private readonly PluginDetector $detector)
     {
@@ -30,6 +34,19 @@ class SeedingManager
             'learndash'    => new LearnDashSeeder(),
             'lifterlms'    => new LifterLMSSeeder(),
             'tangible-lms' => new TangibleLMSSeeder(),
+        ];
+    }
+
+    /**
+     * Constructs LMS seeding processes so WP_Background_Process ajax/cron hooks
+     * are registered for the lifetime of the request.
+     */
+    public function registerBackgroundProcesses(): void
+    {
+        $this->processes = [
+            'learndash'    => new LearnDashSeedingProcess($this->seeders['learndash']),
+            'lifterlms'    => new LifterLMSSeedingProcess($this->seeders['lifterlms']),
+            'tangible-lms' => new TangibleLMSSeedingProcess($this->seeders['tangible-lms']),
         ];
     }
 
@@ -46,7 +63,7 @@ class SeedingManager
         $slug   = (string) ($config['plugin'] ?? '');
         $seeder = $this->resolveSeeder($slug);
 
-        return (new SeedingProcess($seeder))->start($config);
+        return $this->getProcess($seeder->getSlug())->start($config);
     }
 
     /**
@@ -54,7 +71,13 @@ class SeedingManager
      */
     public function cancel(string $processId): bool
     {
-        return $this->makeAnyProcess()->cancel($processId);
+        $slug = $this->resolvePluginSlugForProcess($processId);
+
+        if ($slug === null) {
+            return false;
+        }
+
+        return $this->getProcess($slug)->cancelProcess($processId);
     }
 
     /**
@@ -62,7 +85,7 @@ class SeedingManager
      */
     public function getStatus(string $processId): SeedingStatus
     {
-        return $this->makeAnyProcess()->getStatus($processId);
+        return $this->getAnyProcess()->getStatus($processId);
     }
 
     /**
@@ -72,16 +95,7 @@ class SeedingManager
      */
     public function getLogs(string $processId): array
     {
-        return $this->makeAnyProcess()->getLogs($processId);
-    }
-
-    /**
-     * Forwards a cron batch-processing call to the correct process.
-     * Registered as the handler for the tangible_populater_process_batch hook.
-     */
-    public function processBatch(string $processId): void
-    {
-        $this->makeAnyProcess()->processBatch($processId);
+        return $this->getAnyProcess()->getLogs($processId);
     }
 
     /**
@@ -124,12 +138,45 @@ class SeedingManager
         return $seeder;
     }
 
-    /**
-     * Creates a SeedingProcess with any seeder for operations that do not
-     * actually use the seeder (cancel, getStatus, getLogs).
-     */
-    private function makeAnyProcess(): SeedingProcess
+    private function getProcess(string $slug): AbstractSeeding
     {
-        return new SeedingProcess(reset($this->seeders));
+        $this->ensureProcessesRegistered();
+
+        if (!isset($this->processes[$slug])) {
+            throw new \InvalidArgumentException(
+                sprintf('No seeding process for plugin "%s".', $slug)
+            );
+        }
+
+        return $this->processes[$slug];
+    }
+
+    private function getAnyProcess(): AbstractSeeding
+    {
+        $this->ensureProcessesRegistered();
+
+        return reset($this->processes);
+    }
+
+    private function ensureProcessesRegistered(): void
+    {
+        if (!isset($this->processes)) {
+            $this->registerBackgroundProcesses();
+        }
+    }
+
+    private function resolvePluginSlugForProcess(string $processId): ?string
+    {
+        $this->ensureProcessesRegistered();
+
+        $data = get_option('tangible_populater_status_' . $processId, null);
+
+        if (!is_array($data)) {
+            return null;
+        }
+
+        $slug = $data['plugin'] ?? null;
+
+        return is_string($slug) && isset($this->processes[$slug]) ? $slug : null;
     }
 }

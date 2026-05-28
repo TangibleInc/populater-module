@@ -17,7 +17,7 @@ class TLSeedLessons extends AbstractSeedingStep
         return 'lesson';
     }
 
-    protected function run(array $data, Logger $logger): void
+    protected function run(array $data, Logger $logger): array
     {
         $courseId = (int) ($data['course_id'] ?? 0);
         $ids      = $this->seeder->seedLessons(1, $courseId, $data);
@@ -25,5 +25,6 @@ class TLSeedLessons extends AbstractSeedingStep
         foreach ($ids as $id) {
             $logger->info(sprintf('Created Tangible LMS lesson ID: %d (course: %d)', $id, $courseId));
         }
+        return $ids;
     }
 }

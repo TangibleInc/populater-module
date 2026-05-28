@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Tangible\Populater\Seeders;
+namespace Tangible\Populater\LMS\LearnDash;
+
+use Tangible\Populater\Seeders\AbstractSeeder;
 
 /**
  * Seeder for the LearnDash LMS plugin.

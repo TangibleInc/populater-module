@@ -17,7 +17,7 @@ class LLSeedQuizzes extends AbstractSeedingStep
         return 'quiz';
     }
 
-    protected function run(array $data, Logger $logger): void
+    protected function run(array $data, Logger $logger): array
     {
         $lessonId = (int) ($data['lesson_id'] ?? 0);
         $ids      = $this->seeder->seedQuizzes(1, $lessonId, $data);
@@ -25,5 +25,6 @@ class LLSeedQuizzes extends AbstractSeedingStep
         foreach ($ids as $id) {
             $logger->info(sprintf('Created LifterLMS quiz ID: %d (lesson: %d)', $id, $lessonId));
         }
+        return $ids;
     }
 }

@@ -107,7 +107,7 @@ abstract class AbstractSeeder
                 $queue[] = ['type' => 'lesson', 'data' => ['course_index' => $c, 'index' => $l]];
 
                 for ($q = 1; $q <= $quizzesPerLesson; $q++) {
-                    $queue[] = ['type' => 'quiz', 'data' => ['lesson_index' => $l, 'index' => $q]];
+                    $queue[] = ['type' => 'quiz', 'data' => ['course_index' => $c, 'lesson_index' => $l, 'index' => $q]];
                 }
             }
         }

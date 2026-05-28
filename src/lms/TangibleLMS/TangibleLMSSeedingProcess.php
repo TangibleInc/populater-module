@@ -9,7 +9,7 @@ use Tangible\Populater\LMS\TangibleLMS\Steps\TLSeedCourses;
 use Tangible\Populater\LMS\TangibleLMS\Steps\TLSeedLessons;
 use Tangible\Populater\LMS\TangibleLMS\Steps\TLSeedQuizzes;
 use Tangible\Populater\LMS\TangibleLMS\Steps\TLSeedUsers;
-use Tangible\Populater\Seeding\SeedingProcess;
+use Tangible\Populater\Seeding\AbstractSeeding;
 use Tangible\Populater\Steps\AbstractSeedingStep;
 use Tangible\Populater\Support\Logger;
 
@@ -20,8 +20,10 @@ use Tangible\Populater\Support\Logger;
  * Override processItem() in a further subclass if additional Tangible LMS-
  * specific behaviour is required once the plugin's public API is stable.
  */
-class TangibleLMSSeedingProcess extends SeedingProcess
+class TangibleLMSSeedingProcess extends AbstractSeeding
 {
+    protected $action = 'seed_tangible_lms';
+
     /** @var array<string, AbstractSeedingStep>|null */
     private ?array $steps = null;
 
@@ -51,6 +53,8 @@ class TangibleLMSSeedingProcess extends SeedingProcess
             return;
         }
 
-        $step->execute($item['data'], $logger);
+        $data = $item['data'];
+        $data['process_id'] = $processId;
+        $step->execute($data, $logger);
     }
 }

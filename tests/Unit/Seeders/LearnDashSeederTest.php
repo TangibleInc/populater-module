@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tangible\Populater\Tests\Unit\Seeders;
 
-use Tangible\Populater\Seeders\LearnDashSeeder;
+use Tangible\Populater\LMS\LearnDash\LearnDashSeeder;
 use Brain\Monkey\Functions;
 
 class LearnDashSeederTest extends \WPTestCase

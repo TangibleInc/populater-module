@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tangible\Populater\Steps;
 
+use Tangible\Populater\Seeding\SeedingIdMap;
 use Tangible\Populater\Support\Logger;
 
 /**
@@ -35,8 +36,9 @@ abstract class AbstractSeedingStep
      *
      * @param array<string, mixed> $data    Item payload from the seed queue.
      * @param Logger               $logger  Process-scoped logger.
+     * @return list<int>  Created post/user IDs.
      */
-    abstract protected function run(array $data, Logger $logger): void;
+    abstract protected function run(array $data, Logger $logger): array;
 
     // -------------------------------------------------------------------------
     // Execution shell (logging + error handling)
@@ -58,7 +60,12 @@ abstract class AbstractSeedingStep
         $logger->info(sprintf('Starting step: %s', $type));
 
         try {
-            $this->run($data, $logger);
+            $ids = $this->run($data, $logger);
+
+            if (isset($data['process_id']) && is_string($data['process_id'])) {
+                SeedingIdMap::record($data['process_id'], $type, $data, $ids);
+            }
+
             $logger->info(sprintf('Completed step: %s', $type));
         } catch (\Throwable $e) {
             $logger->error(sprintf(

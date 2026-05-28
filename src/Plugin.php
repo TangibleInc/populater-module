@@ -40,9 +40,10 @@ class Plugin
 
     public function init(): void
     {
+        $this->seedingManager->registerBackgroundProcesses();
+
         add_action('admin_menu', [$this, 'registerAdminMenu']);
         add_action('rest_api_init', [$this, 'registerRestRoutes']);
-        add_action('tangible_populater_process_batch', [$this->seedingManager, 'processBatch']);
 
         if (defined('WP_CLI') && WP_CLI) {
             $this->registerCliCommands();
