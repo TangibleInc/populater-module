@@ -4,130 +4,119 @@ declare(strict_types=1);
 
 namespace Tangible\Populater\LMS\LifterLMS;
 
+use Tangible\Populater\Registry\LmsPluginDefinition;
 use Tangible\Populater\Seeders\AbstractSeeder;
 
 /**
  * Seeder for the LifterLMS plugin.
  *
- * Post types used by LifterLMS:
- *  - course
- *  - lesson
- *  - llms_quiz
- *  - llms_section (groups lessons inside a course)
+ * Creates an llms_section per course so lessons attach to valid course structure.
  */
 class LifterLMSSeeder extends AbstractSeeder
 {
-    private const PLUGIN_FILE = 'lifterlms/lifterlms.php';
-
-    public function getName(): string
+    public function __construct(?LmsPluginDefinition $definition = null)
     {
-        return 'LifterLMS';
+        parent::__construct($definition ?? new LmsPluginDefinition(
+            slug: 'lifterlms',
+            name: 'LifterLMS',
+            pluginFile: 'lifterlms/lifterlms.php',
+            seederClass: self::class,
+            processClass: LifterLMSSeedingProcess::class,
+            backgroundAction: 'seed_lifterlms',
+        ));
     }
 
-    public function getSlug(): string
+    protected function getPostType(string $entity): string
     {
-        return 'lifterlms';
+        return match ($entity) {
+            'courses'      => 'course',
+            'lessons'      => 'lesson',
+            'quizzes'      => 'llms_quiz',
+            'certificates' => 'llms_certificate',
+            default        => 'post',
+        };
     }
 
-    public function isActive(): bool
+    protected function getTitlePrefix(string $entity): string
     {
-        return is_plugin_active(self::PLUGIN_FILE);
+        return match ($entity) {
+            'courses'      => 'LifterLMS Course',
+            'lessons'      => 'LifterLMS Lesson',
+            'quizzes'      => 'LifterLMS Quiz',
+            'certificates' => 'LifterLMS Certificate',
+            default        => parent::getTitlePrefix($entity),
+        };
     }
 
-    public function seedCourses(int $count, array $options = []): array
+    protected function getMetaFor(string $entity, array $context): array
     {
-        $ids = [];
-        for ($i = 1; $i <= $count; $i++) {
-            $title  = $options['title_prefix'] ?? 'LifterLMS Course';
-            $postId = wp_insert_post([
-                'post_title'   => "$title $i",
-                'post_type'    => 'course',
-                'post_status'  => 'publish',
-                'post_content' => "Sample LifterLMS course $i content.",
-            ]);
-
-            if (!is_wp_error($postId)) {
-                $ids[] = $postId;
-            }
-        }
-        return $ids;
+        return match ($entity) {
+            'lessons' => ['_llms_parent_course' => (int) ($context['courseId'] ?? 0)],
+            'quizzes' => ['_llms_lesson_id' => (int) ($context['lessonId'] ?? 0)],
+            default   => parent::getMetaFor($entity, $context),
+        };
     }
 
+    /**
+     * @param array<string, mixed> $options
+     * @return list<int>
+     */
     public function seedLessons(int $count, int $courseId, array $options = []): array
     {
+        $sectionId = $this->ensureSectionForCourse($courseId, $options);
+        $options['section_id'] = $sectionId;
+
         $ids = [];
         for ($i = 1; $i <= $count; $i++) {
-            $title  = $options['title_prefix'] ?? 'LifterLMS Lesson';
-            $postId = wp_insert_post([
-                'post_title'   => "$title $i",
-                'post_type'    => 'lesson',
+            $postId = $this->insertPost([
+                'post_title'   => $this->defaultTitle($options['title_prefix'] ?? $this->getTitlePrefix('lessons'), $i),
+                'post_type'    => $this->getPostType('lessons'),
                 'post_status'  => 'publish',
-                'post_content' => "Sample LifterLMS lesson $i content.",
-                'post_parent'  => $courseId,
+                'post_content' => sprintf('Sample LifterLMS lesson %d content.', $i),
+                'post_parent'  => $sectionId > 0 ? $sectionId : $courseId,
             ]);
 
-            if (!is_wp_error($postId)) {
-                update_post_meta($postId, '_llms_parent_course', $courseId);
+            if ($postId > 0) {
+                $this->applyMeta($postId, $this->getMetaFor('lessons', ['courseId' => $courseId]));
+                if ($sectionId > 0) {
+                    update_post_meta($postId, '_llms_parent_section', $sectionId);
+                }
                 $ids[] = $postId;
             }
         }
+
         return $ids;
     }
 
-    public function seedQuizzes(int $count, int $lessonId, array $options = []): array
+    /**
+     * @param array<string, mixed> $options
+     */
+    private function ensureSectionForCourse(int $courseId, array $options): int
     {
-        $ids = [];
-        for ($i = 1; $i <= $count; $i++) {
-            $title  = $options['title_prefix'] ?? 'LifterLMS Quiz';
-            $postId = wp_insert_post([
-                'post_title'   => "$title $i",
-                'post_type'    => 'llms_quiz',
-                'post_status'  => 'publish',
-                'post_content' => "Sample LifterLMS quiz $i.",
-            ]);
+        $existing = (int) ($options['section_id'] ?? 0);
 
-            if (!is_wp_error($postId)) {
-                update_post_meta($postId, '_llms_lesson_id', $lessonId);
-                $ids[] = $postId;
-            }
+        if ($existing > 0) {
+            return $existing;
         }
-        return $ids;
-    }
 
-    public function seedUsers(int $count, array $options = []): array
-    {
-        $ids = [];
-        for ($i = 1; $i <= $count; $i++) {
-            $unique   = uniqid((string) $i, true);
-            $username = 'llms_user_' . $unique;
-            $email    = 'llms_user_' . $unique . '@example.com';
-            $password = wp_generate_password();
+        $cached = (int) get_post_meta($courseId, '_populater_llms_section_id', true);
 
-            $userId = wp_create_user($username, $password, $email);
-
-            if (!is_wp_error($userId)) {
-                $ids[] = $userId;
-            }
+        if ($cached > 0) {
+            return $cached;
         }
-        return $ids;
-    }
 
-    public function seedCertificates(int $count, array $options = []): array
-    {
-        $ids = [];
-        for ($i = 1; $i <= $count; $i++) {
-            $title  = $options['title_prefix'] ?? 'LifterLMS Certificate';
-            $postId = wp_insert_post([
-                'post_title'   => "$title $i",
-                'post_type'    => 'llms_certificate',
-                'post_status'  => 'publish',
-                'post_content' => "Sample LifterLMS certificate $i.",
-            ]);
+        $sectionId = $this->insertPost([
+            'post_title'  => 'Section 1',
+            'post_type'   => 'llms_section',
+            'post_status' => 'publish',
+            'post_parent' => $courseId,
+        ]);
 
-            if (!is_wp_error($postId)) {
-                $ids[] = $postId;
-            }
+        if ($sectionId > 0) {
+            update_post_meta($sectionId, '_llms_parent_course', $courseId);
+            update_post_meta($courseId, '_populater_llms_section_id', $sectionId);
         }
-        return $ids;
+
+        return $sectionId;
     }
 }

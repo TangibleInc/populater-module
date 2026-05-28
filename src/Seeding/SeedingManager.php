@@ -4,37 +4,34 @@ declare(strict_types=1);
 
 namespace Tangible\Populater\Seeding;
 
-use Tangible\Populater\LMS\LearnDash\LearnDashSeedingProcess;
-use Tangible\Populater\LMS\LifterLMS\LifterLMSSeedingProcess;
-use Tangible\Populater\LMS\TangibleLMS\TangibleLMSSeedingProcess;
 use Tangible\Populater\PluginDetector;
-use Tangible\Populater\LMS\LearnDash\LearnDashSeeder;
-use Tangible\Populater\LMS\LifterLMS\LifterLMSSeeder;
-use Tangible\Populater\LMS\TangibleLMS\TangibleLMSSeeder;
+use Tangible\Populater\Registry\LmsPluginRegistry;
 use Tangible\Populater\Seeders\AbstractSeeder;
 
 /**
  * Orchestrates seeding across multiple supported LMS plugins.
- *
- * Instantiates the LMS-specific AbstractSeeding subclass with the correct
- * seeder per request. Background-process hooks are registered when each
- * process is constructed during registerBackgroundProcesses().
  */
 class SeedingManager
 {
     /** @var array<string, AbstractSeeder> */
     private array $seeders;
 
-    /** @var array<string, AbstractSeeding> */
-    private array $processes;
+    /** @var array<string, SeedingJobRunner> */
+    private array $runners;
 
-    public function __construct(private readonly PluginDetector $detector)
-    {
-        $this->seeders = [
-            'learndash'    => new LearnDashSeeder(),
-            'lifterlms'    => new LifterLMSSeeder(),
-            'tangible-lms' => new TangibleLMSSeeder(),
-        ];
+    private readonly ProcessRepository $repository;
+
+    public function __construct(
+        private readonly PluginDetector $detector,
+        private readonly LmsPluginRegistry $registry = new LmsPluginRegistry(),
+        ?ProcessRepository $repository = null,
+    ) {
+        $this->repository = $repository ?? new ProcessRepository();
+        $this->seeders    = [];
+
+        foreach ($this->registry->all() as $slug => $definition) {
+            $this->seeders[$slug] = $this->registry->createSeeder($slug);
+        }
     }
 
     /**
@@ -43,32 +40,26 @@ class SeedingManager
      */
     public function registerBackgroundProcesses(): void
     {
-        $this->processes = [
-            'learndash'    => new LearnDashSeedingProcess($this->seeders['learndash']),
-            'lifterlms'    => new LifterLMSSeedingProcess($this->seeders['lifterlms']),
-            'tangible-lms' => new TangibleLMSSeedingProcess($this->seeders['tangible-lms']),
-        ];
+        $this->runners = [];
+
+        foreach ($this->registry->all() as $slug => $definition) {
+            $seeder            = $this->seeders[$slug];
+            $process           = $this->registry->createProcess($slug, $seeder);
+            $this->runners[$slug] = new WpBackgroundSeedingRunner($process);
+        }
     }
 
     /**
-     * Starts a seeding process for the given plugin.
-     *
-     * @param  array<string, mixed> $config  Keys: plugin (slug), courses, lessons_per_course, quizzes_per_lesson, users.
-     * @return string  Process ID.
-     * @throws \InvalidArgumentException When the plugin slug is not supported.
-     * @throws \RuntimeException         When the plugin is not active.
+     * @param array<string, mixed> $config
      */
     public function start(array $config): string
     {
-        $slug   = (string) ($config['plugin'] ?? '');
-        $seeder = $this->resolveSeeder($slug);
+        $seedConfig = SeedConfig::fromArray($config);
+        $seeder     = $this->resolveSeeder($seedConfig->plugin);
 
-        return $this->getProcess($seeder->getSlug())->start($config);
+        return $this->getRunner($seeder->getSlug())->start($seedConfig->toArray());
     }
 
-    /**
-     * Attempts to cancel a running or pending process.
-     */
     public function cancel(string $processId): bool
     {
         $slug = $this->resolvePluginSlugForProcess($processId);
@@ -77,30 +68,25 @@ class SeedingManager
             return false;
         }
 
-        return $this->getProcess($slug)->cancelProcess($processId);
+        return $this->getRunner($slug)->cancel($processId);
     }
 
-    /**
-     * Returns the current status of a process.
-     */
     public function getStatus(string $processId): SeedingStatus
     {
-        return $this->getAnyProcess()->getStatus($processId);
+        $data = $this->repository->getStatus($processId);
+
+        return SeedingStatus::fromArray($processId, $data);
     }
 
     /**
-     * Returns the log entries for a process.
-     *
      * @return list<array{level: string, message: string, timestamp: int}>
      */
     public function getLogs(string $processId): array
     {
-        return $this->getAnyProcess()->getLogs($processId);
+        return $this->repository->getLogs($processId);
     }
 
     /**
-     * Returns metadata about all supported plugins and whether they are active.
-     *
      * @return list<array{slug: string, name: string, active: bool}>
      */
     public function getSupportedPlugins(): array
@@ -114,10 +100,6 @@ class SeedingManager
             $this->seeders
         ));
     }
-
-    // -------------------------------------------------------------------------
-    // Helpers
-    // -------------------------------------------------------------------------
 
     private function resolveSeeder(string $slug): AbstractSeeder
     {
@@ -138,45 +120,31 @@ class SeedingManager
         return $seeder;
     }
 
-    private function getProcess(string $slug): AbstractSeeding
+    private function getRunner(string $slug): SeedingJobRunner
     {
-        $this->ensureProcessesRegistered();
+        $this->ensureRunnersRegistered();
 
-        if (!isset($this->processes[$slug])) {
+        if (!isset($this->runners[$slug])) {
             throw new \InvalidArgumentException(
                 sprintf('No seeding process for plugin "%s".', $slug)
             );
         }
 
-        return $this->processes[$slug];
+        return $this->runners[$slug];
     }
 
-    private function getAnyProcess(): AbstractSeeding
+    private function ensureRunnersRegistered(): void
     {
-        $this->ensureProcessesRegistered();
-
-        return reset($this->processes);
-    }
-
-    private function ensureProcessesRegistered(): void
-    {
-        if (!isset($this->processes)) {
+        if (!isset($this->runners)) {
             $this->registerBackgroundProcesses();
         }
     }
 
     private function resolvePluginSlugForProcess(string $processId): ?string
     {
-        $this->ensureProcessesRegistered();
-
-        $data = get_option('tangible_populater_status_' . $processId, null);
-
-        if (!is_array($data)) {
-            return null;
-        }
-
+        $data = $this->repository->getStatus($processId);
         $slug = $data['plugin'] ?? null;
 
-        return is_string($slug) && isset($this->processes[$slug]) ? $slug : null;
+        return is_string($slug) && $this->registry->has($slug) ? $slug : null;
     }
 }

@@ -4,130 +4,164 @@ declare(strict_types=1);
 
 namespace Tangible\Populater\LMS\LearnDash;
 
+use Tangible\Populater\Registry\LmsPluginDefinition;
 use Tangible\Populater\Seeders\AbstractSeeder;
 
 /**
  * Seeder for the LearnDash LMS plugin.
  *
- * Post types used by LearnDash:
- *  - sfwd-courses
- *  - sfwd-lessons
- *  - sfwd-quiz
- *  - sfwd-topic
+ * Overrides course/quiz seeding to maintain ld_course_steps and quiz_pro_id meta.
  */
 class LearnDashSeeder extends AbstractSeeder
 {
-    private const PLUGIN_FILE = 'sfwd-lms/sfwd_lms.php';
-
-    public function getName(): string
+    public function __construct(?LmsPluginDefinition $definition = null)
     {
-        return 'LearnDash LMS';
+        parent::__construct($definition ?? new LmsPluginDefinition(
+            slug: 'learndash',
+            name: 'LearnDash LMS',
+            pluginFile: 'sfwd-lms/sfwd_lms.php',
+            seederClass: self::class,
+            processClass: LearnDashSeedingProcess::class,
+            backgroundAction: 'seed_learndash',
+        ));
     }
 
-    public function getSlug(): string
+    protected function getPostType(string $entity): string
     {
-        return 'learndash';
+        return match ($entity) {
+            'courses'      => 'sfwd-courses',
+            'lessons'      => 'sfwd-lessons',
+            'quizzes'      => 'sfwd-quiz',
+            'certificates' => 'sfwd-certificates',
+            default        => 'post',
+        };
     }
 
-    public function isActive(): bool
+    protected function getTitlePrefix(string $entity): string
     {
-        return is_plugin_active(self::PLUGIN_FILE);
+        return match ($entity) {
+            'courses'      => 'LearnDash Course',
+            'lessons'      => 'LearnDash Lesson',
+            'quizzes'      => 'LearnDash Quiz',
+            'certificates' => 'LearnDash Certificate',
+            default        => parent::getTitlePrefix($entity),
+        };
     }
 
-    public function seedCourses(int $count, array $options = []): array
+    protected function afterCourseCreated(int $postId, int $index, array $options = []): void
     {
-        $ids = [];
-        for ($i = 1; $i <= $count; $i++) {
-            $title  = $options['title_prefix'] ?? 'LearnDash Course';
-            $postId = wp_insert_post([
-                'post_title'   => "$title $i",
-                'post_type'    => 'sfwd-courses',
-                'post_status'  => 'publish',
-                'post_content' => "Sample course $i content.",
-            ]);
+        $this->initializeCourseSteps($postId);
+    }
 
-            if (!is_wp_error($postId)) {
-                $ids[] = $postId;
-            }
+    protected function afterLessonCreated(int $postId, int $courseId, int $index, array $options = []): void
+    {
+        if ($courseId > 0) {
+            $this->addLessonToCourseSteps($courseId, $postId);
         }
-        return $ids;
     }
 
-    public function seedLessons(int $count, int $courseId, array $options = []): array
+    protected function afterQuizCreated(int $postId, int $lessonId, int $index, array $options = []): void
     {
-        $ids = [];
-        for ($i = 1; $i <= $count; $i++) {
-            $title  = $options['title_prefix'] ?? 'LearnDash Lesson';
-            $postId = wp_insert_post([
-                'post_title'   => "$title $i",
-                'post_type'    => 'sfwd-lessons',
-                'post_status'  => 'publish',
-                'post_content' => "Sample lesson $i content.",
-                'post_parent'  => $courseId,
-            ]);
+        $this->assignQuizProId($postId);
 
-            if (!is_wp_error($postId)) {
-                update_post_meta($postId, 'course_id', $courseId);
-                $ids[] = $postId;
-            }
+        $courseId = (int) ($options['course_id'] ?? 0);
+
+        if ($courseId <= 0 && $lessonId > 0) {
+            $courseId = (int) get_post_meta($lessonId, 'course_id', true);
         }
-        return $ids;
+
+        if ($courseId > 0 && $lessonId > 0) {
+            $this->addQuizToCourseSteps($courseId, $lessonId, $postId);
+        }
     }
 
+    /**
+     * @param array<string, mixed> $options
+     * @return list<int>
+     */
     public function seedQuizzes(int $count, int $lessonId, array $options = []): array
     {
-        $ids = [];
-        for ($i = 1; $i <= $count; $i++) {
-            $title  = $options['title_prefix'] ?? 'LearnDash Quiz';
-            $postId = wp_insert_post([
-                'post_title'   => "$title $i",
-                'post_type'    => 'sfwd-quiz',
-                'post_status'  => 'publish',
-                'post_content' => "Sample quiz $i.",
-            ]);
-
-            if (!is_wp_error($postId)) {
-                update_post_meta($postId, 'lesson_id', $lessonId);
-                $ids[] = $postId;
-            }
+        if (!isset($options['course_id']) && $lessonId > 0) {
+            $options['course_id'] = (int) get_post_meta($lessonId, 'course_id', true);
         }
-        return $ids;
+
+        return parent::seedQuizzes($count, $lessonId, $options);
     }
 
-    public function seedUsers(int $count, array $options = []): array
+    private function initializeCourseSteps(int $courseId): void
     {
-        $ids = [];
-        for ($i = 1; $i <= $count; $i++) {
-            $unique   = uniqid((string) $i, true);
-            $username = 'ld_user_' . $unique;
-            $email    = 'ld_user_' . $unique . '@example.com';
-            $password = wp_generate_password();
+        $steps = [
+            'steps' => [
+                'h' => [
+                    'sfwd-lessons' => [],
+                ],
+            ],
+            'versions' => [],
+            'empty'  => [],
+        ];
 
-            $userId = wp_create_user($username, $password, $email);
-
-            if (!is_wp_error($userId)) {
-                $ids[] = $userId;
-            }
-        }
-        return $ids;
+        update_post_meta($courseId, 'ld_course_steps', $steps);
     }
 
-    public function seedCertificates(int $count, array $options = []): array
+    private function addLessonToCourseSteps(int $courseId, int $lessonId): void
     {
-        $ids = [];
-        for ($i = 1; $i <= $count; $i++) {
-            $title  = $options['title_prefix'] ?? 'LearnDash Certificate';
-            $postId = wp_insert_post([
-                'post_title'   => "$title $i",
-                'post_type'    => 'sfwd-certificates',
-                'post_status'  => 'publish',
-                'post_content' => "Sample certificate $i.",
-            ]);
+        $steps = get_post_meta($courseId, 'ld_course_steps', true);
 
-            if (!is_wp_error($postId)) {
-                $ids[] = $postId;
-            }
+        if (!is_array($steps)) {
+            $this->initializeCourseSteps($courseId);
+            $steps = get_post_meta($courseId, 'ld_course_steps', true);
         }
-        return $ids;
+
+        if (!is_array($steps)) {
+            return;
+        }
+
+        if (!isset($steps['steps']['h']['sfwd-lessons']) || !is_array($steps['steps']['h']['sfwd-lessons'])) {
+            $steps['steps']['h']['sfwd-lessons'] = [];
+        }
+
+        $steps['steps']['h']['sfwd-lessons'][$lessonId] = [
+            'sfwd-topic' => [],
+            'sfwd-quiz'  => [],
+        ];
+
+        update_post_meta($courseId, 'ld_course_steps', $steps);
+    }
+
+    private function addQuizToCourseSteps(int $courseId, int $lessonId, int $quizId): void
+    {
+        $steps = get_post_meta($courseId, 'ld_course_steps', true);
+
+        if (!is_array($steps)) {
+            return;
+        }
+
+        if (!isset($steps['steps']['h']['sfwd-lessons'][$lessonId])) {
+            $this->addLessonToCourseSteps($courseId, $lessonId);
+            $steps = get_post_meta($courseId, 'ld_course_steps', true);
+        }
+
+        if (!is_array($steps)) {
+            return;
+        }
+
+        if (!isset($steps['steps']['h']['sfwd-lessons'][$lessonId]['sfwd-quiz']) || !is_array($steps['steps']['h']['sfwd-lessons'][$lessonId]['sfwd-quiz'])) {
+            $steps['steps']['h']['sfwd-lessons'][$lessonId]['sfwd-quiz'] = [];
+        }
+
+        $steps['steps']['h']['sfwd-lessons'][$lessonId]['sfwd-quiz'][$quizId] = [];
+
+        update_post_meta($courseId, 'ld_course_steps', $steps);
+    }
+
+    private function assignQuizProId(int $quizPostId): void
+    {
+        // LearnDash links the quiz post to Pro Quiz storage via quiz_pro_id.
+        // When Pro Quiz APIs are unavailable, a stable placeholder keeps LD admin coherent.
+        $proId = (int) get_post_meta($quizPostId, 'quiz_pro_id', true);
+
+        if ($proId <= 0) {
+            update_post_meta($quizPostId, 'quiz_pro_id', $quizPostId);
+        }
     }
 }

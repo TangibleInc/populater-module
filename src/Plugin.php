@@ -64,7 +64,7 @@ class Plugin
 
     private function registerCliCommands(): void
     {
-        \WP_CLI::add_command('tangible-populater seed',   new SeedCommand($this->seedingManager));
+        \WP_CLI::add_command('tangible-populater', new SeedCommand($this->seedingManager));
         \WP_CLI::add_command('tangible-populater reset',  new ResetCommand($this->databaseReset));
     }
 }

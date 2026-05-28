@@ -9,17 +9,6 @@ use Tangible\Populater\Support\Logger;
 
 /**
  * Abstract base for the seeding process.
- *
- * Extends WP Background Processing so each run is queued and processed
- * asynchronously. Concrete subclasses may override processItem() to add custom
- * logic (e.g. LMS-specific step classes).
- *
- * Lifecycle
- * ---------
- * 1. start()  — enqueues items and dispatches the background process.
- * 2. task()   — processes each queued item within server time/memory limits.
- * 3. cancelProcess() — marks the process cancelled and clears the background queue.
- * 4. getStatus() / getLogs() — read persisted state at any time.
  */
 abstract class AbstractSeeding extends \WP_Background_Process
 {
@@ -30,42 +19,41 @@ abstract class AbstractSeeding extends \WP_Background_Process
     /** @var bool|array */
     protected $allowed_batch_data_classes = false;
 
-    private const OPTION_PREFIX_STATUS = 'tangible_populater_status_';
+    private const ERROR_THRESHOLD = 3;
+
+    protected readonly ProcessRepository $repository;
 
     public function __construct(
         protected readonly AbstractSeeder $seeder,
+        ?ProcessRepository $repository = null,
     ) {
+        $this->repository = $repository ?? new ProcessRepository();
         parent::__construct(false);
     }
 
-    // -------------------------------------------------------------------------
-    // Public API
-    // -------------------------------------------------------------------------
-
     /**
-     * Starts a new seeding process.
-     *
-     * @param  array<string, mixed> $config  Keys: courses, lessons_per_course, quizzes_per_lesson, users.
-     * @return string  Process ID (UUID).
+     * @param array<string, mixed> $config
      */
     public function start(array $config): string
     {
-        $processId = wp_generate_uuid4();
-        $queue     = $this->seeder->buildSeedQueue($config);
+        $processId  = wp_generate_uuid4();
+        $seedConfig = SeedConfig::fromArray(array_merge($config, ['plugin' => $this->seeder->getSlug()]));
+        $queue      = $this->seeder->buildSeedQueue($seedConfig);
 
         $this->saveStatusForProcess($processId, [
             'status'    => SeedingStatus::STATUS_PENDING,
             'plugin'    => $this->seeder->getSlug(),
             'total'     => count($queue),
             'processed' => 0,
+            'errors'    => 0,
             'error'     => null,
         ]);
 
         foreach ($queue as $item) {
             $this->push_to_queue([
                 'process_id' => $processId,
-                'type'       => $item['type'],
-                'data'       => $item['data'],
+                'type'       => $item->type,
+                'data'       => $item->data,
             ]);
         }
 
@@ -74,9 +62,6 @@ abstract class AbstractSeeding extends \WP_Background_Process
         return $processId;
     }
 
-    /**
-     * Attempts to cancel a running or pending process.
-     */
     public function cancelProcess(string $processId): bool
     {
         $statusData = $this->loadStatusForProcess($processId);
@@ -86,34 +71,27 @@ abstract class AbstractSeeding extends \WP_Background_Process
             return false;
         }
 
-        $this->saveStatusForProcess($processId, array_merge($statusData, ['status' => SeedingStatus::STATUS_CANCELLED]));
-        $this->cancelBackgroundQueue();
-        SeedingIdMap::delete($processId);
+        // Per-process cancel: mark status only; do not cancel the entire LMS queue.
+        $this->saveStatusForProcess($processId, array_merge($statusData, [
+            'status' => SeedingStatus::STATUS_CANCELLED,
+        ]));
+        $this->repository->deleteIdMap($processId);
 
         return true;
     }
 
-    /**
-     * Returns the current status of a process.
-     */
     public function getStatus(string $processId): SeedingStatus
     {
         return SeedingStatus::fromArray($processId, $this->loadStatusForProcess($processId));
     }
 
     /**
-     * Returns the log entries for a process.
-     *
      * @return list<array{level: string, message: string, timestamp: int}>
      */
     public function getLogs(string $processId): array
     {
-        return (new Logger($processId))->getEntries();
+        return $this->repository->getLogs($processId);
     }
-
-    // -------------------------------------------------------------------------
-    // WP_Background_Process
-    // -------------------------------------------------------------------------
 
     /**
      * @param array{process_id: string, type: string, data: array<string, mixed>} $item
@@ -129,22 +107,30 @@ abstract class AbstractSeeding extends \WP_Background_Process
         }
 
         $statusData = $this->loadStatusForProcess($processId);
+        $status     = $statusData['status'] ?? '';
 
-        if (($statusData['status'] ?? '') === SeedingStatus::STATUS_CANCELLED) {
+        if ($status === SeedingStatus::STATUS_CANCELLED) {
             return false;
         }
 
-        if (($statusData['status'] ?? '') === SeedingStatus::STATUS_PENDING) {
+        if ($status === SeedingStatus::STATUS_FAILED) {
+            return false;
+        }
+
+        if ($status === SeedingStatus::STATUS_PENDING) {
             $this->saveStatusForProcess($processId, array_merge($statusData, [
                 'status' => SeedingStatus::STATUS_RUNNING,
             ]));
+            $statusData = $this->loadStatusForProcess($processId);
         }
 
         $logger    = new Logger($processId);
         $queueItem = [
             'type' => $item['type'],
-            'data' => SeedingIdMap::enrich($processId, $item['type'], $item['data']),
+            'data' => SeedingIdMap::enrich($processId, $item['type'], $item['data'], $this->repository),
         ];
+
+        $errorsBefore = $this->countLogErrors($logger);
 
         try {
             $this->processItem($queueItem, $processId, $logger);
@@ -153,18 +139,32 @@ abstract class AbstractSeeding extends \WP_Background_Process
         }
 
         $statusData = $this->loadStatusForProcess($processId);
-        $processed  = ($statusData['processed'] ?? 0) + 1;
-        $total      = (int) ($statusData['total'] ?? 0);
+
+        if ($statusData['status'] === SeedingStatus::STATUS_CANCELLED) {
+            return false;
+        }
+
+        $errors = (int) ($statusData['errors'] ?? 0) + max(0, $this->countLogErrors($logger) - $errorsBefore);
+
+        $processed = ($statusData['processed'] ?? 0) + 1;
+        $total     = (int) ($statusData['total'] ?? 0);
 
         $statusData['processed'] = $processed;
-        $statusData['status']    = $processed >= $total && $total > 0
-            ? SeedingStatus::STATUS_COMPLETED
-            : SeedingStatus::STATUS_RUNNING;
+        $statusData['errors']    = $errors;
+
+        if ($errors >= self::ERROR_THRESHOLD) {
+            $statusData['status'] = SeedingStatus::STATUS_FAILED;
+            $statusData['error']  = $statusData['error'] ?? 'Too many errors during seeding.';
+        } elseif ($processed >= $total && $total > 0) {
+            $statusData['status'] = SeedingStatus::STATUS_COMPLETED;
+        } else {
+            $statusData['status'] = SeedingStatus::STATUS_RUNNING;
+        }
 
         $this->saveStatusForProcess($processId, $statusData);
 
         if ($statusData['status'] === SeedingStatus::STATUS_COMPLETED) {
-            SeedingIdMap::delete($processId);
+            $this->repository->deleteIdMap($processId);
             $logger->info('Seeding completed.');
         }
 
@@ -181,15 +181,7 @@ abstract class AbstractSeeding extends \WP_Background_Process
         parent::cancelled();
     }
 
-    // -------------------------------------------------------------------------
-    // Extension point
-    // -------------------------------------------------------------------------
-
     /**
-     * Processes a single queued item.
-     *
-     * Override in a subclass to add custom behaviour.
-     *
      * @param array{type: string, data: array<string, mixed>} $item
      */
     protected function processItem(array $item, string $processId, Logger $logger): void
@@ -200,8 +192,8 @@ abstract class AbstractSeeding extends \WP_Background_Process
         $logger->info(sprintf('Processing %s (process: %s)', $type, $processId));
 
         match ($type) {
-            'course'      => SeedingIdMap::record($processId, $type, $data, $this->seeder->seedCourses(1, $data)),
-            'lesson'      => SeedingIdMap::record($processId, $type, $data, $this->seeder->seedLessons(1, (int) ($data['course_id'] ?? 0), $data)),
+            'course'      => SeedingIdMap::record($processId, $type, $data, $this->seeder->seedCourses(1, $data), $this->repository),
+            'lesson'      => SeedingIdMap::record($processId, $type, $data, $this->seeder->seedLessons(1, (int) ($data['course_id'] ?? 0), $data), $this->repository),
             'quiz'        => $this->seeder->seedQuizzes(1, (int) ($data['lesson_id'] ?? 0), $data),
             'user'        => $this->seeder->seedUsers(1, $data),
             'certificate' => $this->seeder->seedCertificates(1, $data),
@@ -209,26 +201,23 @@ abstract class AbstractSeeding extends \WP_Background_Process
         };
     }
 
-    // -------------------------------------------------------------------------
-    // Helpers
-    // -------------------------------------------------------------------------
-
-    protected function cancelBackgroundQueue(): void
-    {
-        parent::cancel();
-    }
-
     /** @param array<string, mixed> $data */
     protected function saveStatusForProcess(string $processId, array $data): void
     {
-        update_option(self::OPTION_PREFIX_STATUS . $processId, $data, false);
+        $this->repository->saveStatus($processId, $data);
     }
 
     /** @return array<string, mixed> */
     protected function loadStatusForProcess(string $processId): array
     {
-        $data = get_option(self::OPTION_PREFIX_STATUS . $processId, null);
+        return $this->repository->getStatus($processId);
+    }
 
-        return is_array($data) ? $data : [];
+    private function countLogErrors(Logger $logger): int
+    {
+        return count(array_filter(
+            $logger->getEntries(),
+            static fn(array $entry) => ($entry['level'] ?? '') === 'error',
+        ));
     }
 }

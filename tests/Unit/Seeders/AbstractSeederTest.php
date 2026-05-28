@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Tangible\Populater\Tests\Unit\Seeders;
 
+use Tangible\Populater\Registry\LmsPluginDefinition;
+use Tangible\Populater\Seeding\SeedConfig;
+use Tangible\Populater\Seeding\SeedQueueItem;
 use Tangible\Populater\Seeders\AbstractSeeder;
 use Brain\Monkey\Functions;
 
@@ -15,10 +18,42 @@ class AbstractSeederTest extends \WPTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->seeder = $this->getMockForAbstractClass(AbstractSeeder::class);
-        $this->seeder->method('getName')->willReturn('Test LMS');
-        $this->seeder->method('getSlug')->willReturn('test-lms');
-        $this->seeder->method('isActive')->willReturn(true);
+
+        $definition = new LmsPluginDefinition(
+            slug: 'test-lms',
+            name: 'Test LMS',
+            pluginFile: 'test/test.php',
+            seederClass: AbstractSeeder::class,
+            processClass: \Tangible\Populater\Seeding\AbstractSeeding::class,
+            backgroundAction: 'seed_test',
+        );
+
+        $this->seeder = $this->getMockBuilder(AbstractSeeder::class)
+            ->setConstructorArgs([$definition])
+            ->onlyMethods(['getPostType'])
+            ->getMockForAbstractClass();
+        $this->seeder->method('getPostType')->willReturnCallback(
+            static fn(string $entity) => match ($entity) {
+                'courses' => 'test_course',
+                'lessons' => 'test_lesson',
+                'quizzes' => 'test_quiz',
+                default   => 'post',
+            }
+        );
+    }
+
+    public function test_identity_from_definition(): void
+    {
+        $this->assertSame('Test LMS', $this->seeder->getName());
+        $this->assertSame('test-lms', $this->seeder->getSlug());
+    }
+
+    public function test_get_post_type_must_be_implemented(): void
+    {
+        $reflection = new \ReflectionClass(AbstractSeeder::class);
+        $method = $reflection->getMethod('getPostType');
+
+        $this->assertTrue($method->isAbstract());
     }
 
     public function test_get_seedable_types_returns_default_set(): void
@@ -31,93 +66,38 @@ class AbstractSeederTest extends \WPTestCase
         $this->assertContains('users', $types);
     }
 
-    public function test_seed_courses_abstract_method_must_be_implemented(): void
+    public function test_build_seed_queue_returns_seed_queue_items(): void
     {
-        $reflection = new \ReflectionClass(AbstractSeeder::class);
-        $method = $reflection->getMethod('seedCourses');
-
-        $this->assertTrue($method->isAbstract());
-    }
-
-    public function test_seed_lessons_abstract_method_must_be_implemented(): void
-    {
-        $reflection = new \ReflectionClass(AbstractSeeder::class);
-        $method = $reflection->getMethod('seedLessons');
-
-        $this->assertTrue($method->isAbstract());
-    }
-
-    public function test_seed_quizzes_abstract_method_must_be_implemented(): void
-    {
-        $reflection = new \ReflectionClass(AbstractSeeder::class);
-        $method = $reflection->getMethod('seedQuizzes');
-
-        $this->assertTrue($method->isAbstract());
-    }
-
-    public function test_seed_users_abstract_method_must_be_implemented(): void
-    {
-        $reflection = new \ReflectionClass(AbstractSeeder::class);
-        $method = $reflection->getMethod('seedUsers');
-
-        $this->assertTrue($method->isAbstract());
-    }
-
-    public function test_get_name_abstract_method_must_be_implemented(): void
-    {
-        $reflection = new \ReflectionClass(AbstractSeeder::class);
-        $method = $reflection->getMethod('getName');
-
-        $this->assertTrue($method->isAbstract());
-    }
-
-    public function test_get_slug_abstract_method_must_be_implemented(): void
-    {
-        $reflection = new \ReflectionClass(AbstractSeeder::class);
-        $method = $reflection->getMethod('getSlug');
-
-        $this->assertTrue($method->isAbstract());
-    }
-
-    public function test_is_active_abstract_method_must_be_implemented(): void
-    {
-        $reflection = new \ReflectionClass(AbstractSeeder::class);
-        $method = $reflection->getMethod('isActive');
-
-        $this->assertTrue($method->isAbstract());
-    }
-
-    public function test_build_seed_queue_returns_array_of_items(): void
-    {
-        $config = ['courses' => 2, 'lessons_per_course' => 3, 'users' => 5];
+        $config = ['plugin' => 'test-lms', 'courses' => 2, 'lessons_per_course' => 3, 'users' => 5];
 
         $queue = $this->seeder->buildSeedQueue($config);
 
-        $this->assertIsArray($queue);
         $this->assertNotEmpty($queue);
-        foreach ($queue as $item) {
-            $this->assertArrayHasKey('type', $item);
-            $this->assertArrayHasKey('data', $item);
-        }
+        $this->assertContainsOnlyInstancesOf(SeedQueueItem::class, $queue);
     }
 
-    public function test_build_seed_queue_respects_courses_count(): void
+    public function test_build_seed_queue_accepts_seed_config(): void
     {
-        $config = ['courses' => 3, 'lessons_per_course' => 0, 'users' => 0];
+        $config = new SeedConfig('test-lms', 3, 0, 0, 4);
+        $queue  = $this->seeder->buildSeedQueue($config);
 
-        $queue = $this->seeder->buildSeedQueue($config);
+        $courseItems = array_filter($queue, static fn(SeedQueueItem $item) => $item->type === 'course');
+        $userItems   = array_filter($queue, static fn(SeedQueueItem $item) => $item->type === 'user');
 
-        $courseItems = array_filter($queue, fn($item) => $item['type'] === 'course');
         $this->assertCount(3, $courseItems);
+        $this->assertCount(4, $userItems);
     }
 
-    public function test_build_seed_queue_respects_users_count(): void
+    public function test_seed_courses_uses_post_type_from_get_post_type(): void
     {
-        $config = ['courses' => 0, 'lessons_per_course' => 0, 'users' => 4];
+        Functions\expect('wp_insert_post')
+            ->once()
+            ->with(\Mockery::on(fn($args) => ($args['post_type'] ?? '') === 'test_course'))
+            ->andReturn(1);
+        Functions\when('is_wp_error')->justReturn(false);
 
-        $queue = $this->seeder->buildSeedQueue($config);
+        $ids = $this->seeder->seedCourses(1);
 
-        $userItems = array_filter($queue, fn($item) => $item['type'] === 'user');
-        $this->assertCount(4, $userItems);
+        $this->assertSame([1], $ids);
     }
 }

@@ -4,32 +4,16 @@ declare(strict_types=1);
 
 namespace Tangible\Populater;
 
+use Tangible\Populater\Registry\LmsPluginRegistry;
+
 /**
  * Detects which supported LMS plugins are active.
  */
 class PluginDetector
 {
-    /**
-     * Map of plugin slugs to their main plugin files.
-     *
-     * @var array<string, string>
-     */
-    private const PLUGIN_FILES = [
-        'learndash'   => 'sfwd-lms/sfwd_lms.php',
-        'lifterlms'   => 'lifterlms/lifterlms.php',
-        'tangible-lms' => 'tangible-lms/tangible-lms.php',
-    ];
-
-    /**
-     * Map of plugin slugs to human-readable names.
-     *
-     * @var array<string, string>
-     */
-    private const PLUGIN_NAMES = [
-        'learndash'   => 'LearnDash LMS',
-        'lifterlms'   => 'LifterLMS',
-        'tangible-lms' => 'Tangible LMS',
-    ];
+    public function __construct(
+        private readonly LmsPluginRegistry $registry = new LmsPluginRegistry(),
+    ) {}
 
     /**
      * Returns all supported plugin slugs and their metadata.
@@ -38,14 +22,7 @@ class PluginDetector
      */
     public function getSupportedPlugins(): array
     {
-        $plugins = [];
-        foreach (self::PLUGIN_FILES as $slug => $file) {
-            $plugins[$slug] = [
-                'name' => self::PLUGIN_NAMES[$slug],
-                'file' => $file,
-            ];
-        }
-        return $plugins;
+        return $this->registry->getSupportedPluginsMetadata();
     }
 
     /**
@@ -69,13 +46,7 @@ class PluginDetector
      */
     public function isPluginActive(string $slug): bool
     {
-        if (!isset(self::PLUGIN_FILES[$slug])) {
-            throw new \InvalidArgumentException(
-                sprintf('Unknown plugin slug "%s". Supported: %s', $slug, implode(', ', array_keys(self::PLUGIN_FILES)))
-            );
-        }
-
-        return is_plugin_active(self::PLUGIN_FILES[$slug]);
+        return $this->registry->isPluginActive($slug);
     }
 
     /**
@@ -83,11 +54,6 @@ class PluginDetector
      */
     public function hasAnyActivePlugin(): bool
     {
-        foreach (array_keys(self::PLUGIN_FILES) as $slug) {
-            if ($this->isPluginActive($slug)) {
-                return true;
-            }
-        }
-        return false;
+        return $this->registry->hasAnyActivePlugin();
     }
 }

@@ -4,20 +4,23 @@ declare(strict_types=1);
 
 namespace Tangible\Populater\Support;
 
+use Tangible\Populater\Seeding\ProcessRepository;
+
 /**
  * Persists log entries for a seeding process in a WP option.
  */
 class Logger
 {
-    private const OPTION_PREFIX = 'tangible_populater_logs_';
-    private const MAX_ENTRIES   = 500;
+    private const MAX_ENTRIES = 500;
 
     /** @var list<array{level: string, message: string, timestamp: int}> */
     private array $entries = [];
 
-    public function __construct(private readonly string $processId)
-    {
-        $stored = get_option(self::OPTION_PREFIX . $processId, []);
+    public function __construct(
+        private readonly string $processId,
+        private readonly ProcessRepository $repository = new ProcessRepository(),
+    ) {
+        $stored = get_option(ProcessRepository::PREFIX_LOGS . $processId, []);
         $this->entries = is_array($stored) ? $stored : [];
     }
 
@@ -34,12 +37,11 @@ class Logger
             'timestamp' => time(),
         ];
 
-        // Keep the log from growing unbounded in the option.
         if (count($this->entries) > self::MAX_ENTRIES) {
             $this->entries = array_slice($this->entries, -self::MAX_ENTRIES);
         }
 
-        update_option(self::OPTION_PREFIX . $this->processId, $this->entries, false);
+        update_option(ProcessRepository::PREFIX_LOGS . $this->processId, $this->entries, false);
     }
 
     public function info(string $message): void
@@ -68,6 +70,6 @@ class Logger
     public function clear(): void
     {
         $this->entries = [];
-        delete_option(self::OPTION_PREFIX . $this->processId);
+        delete_option(ProcessRepository::PREFIX_LOGS . $this->processId);
     }
 }

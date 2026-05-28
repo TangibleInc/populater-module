@@ -21,6 +21,7 @@ final class SeedingStatus
         private readonly int     $total     = 0,
         private readonly int     $processed = 0,
         private readonly ?string $error     = null,
+        private readonly ?string $plugin    = null,
     ) {}
 
     // -------------------------------------------------------------------------
@@ -50,6 +51,11 @@ final class SeedingStatus
     public function getError(): ?string
     {
         return $this->error;
+    }
+
+    public function getPlugin(): ?string
+    {
+        return $this->plugin;
     }
 
     public function getProgress(): float
@@ -96,14 +102,15 @@ final class SeedingStatus
     /** @return array<string, mixed> */
     public function toArray(): array
     {
-        return [
+        return array_filter([
             'id'        => $this->id,
             'status'    => $this->status,
             'total'     => $this->total,
             'processed' => $this->processed,
             'progress'  => $this->getProgress(),
             'error'     => $this->error,
-        ];
+            'plugin'    => $this->plugin,
+        ], static fn(mixed $value) => $value !== null);
     }
 
     /** @param array<string, mixed> $data */
@@ -114,7 +121,8 @@ final class SeedingStatus
             status:    $data['status']    ?? self::STATUS_PENDING,
             total:     (int) ($data['total']     ?? 0),
             processed: (int) ($data['processed'] ?? 0),
-            error:     $data['error']     ?? null,
+            error:     isset($data['error']) ? (string) $data['error'] : null,
+            plugin:    isset($data['plugin']) ? (string) $data['plugin'] : null,
         );
     }
 }

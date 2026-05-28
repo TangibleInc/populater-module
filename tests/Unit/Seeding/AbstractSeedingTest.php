@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Tangible\Populater\Tests\Unit\Seeding;
 
+use Tangible\Populater\Registry\LmsPluginDefinition;
 use Tangible\Populater\Seeding\AbstractSeeding;
+use Tangible\Populater\Seeding\SeedQueueItem;
 use Tangible\Populater\Seeding\SeedingStatus;
 use Tangible\Populater\Seeders\AbstractSeeder;
 use Brain\Monkey\Functions;
@@ -25,20 +27,28 @@ class AbstractSeedingTest extends \WPTestCase
         Functions\when('delete_option')->justReturn(true);
         Functions\when('wp_generate_uuid4')->justReturn('test-uuid-1234');
 
+        $definition = new LmsPluginDefinition(
+            slug: 'test-lms',
+            name: 'Test LMS',
+            pluginFile: 'test/test.php',
+            seederClass: AbstractSeeder::class,
+            processClass: AbstractSeeding::class,
+            backgroundAction: 'seed_test',
+        );
+
         $this->seeder = $this->getMockBuilder(AbstractSeeder::class)
-            ->onlyMethods(['buildSeedQueue'])
+            ->setConstructorArgs([$definition])
+            ->onlyMethods(['buildSeedQueue', 'getPostType'])
             ->getMockForAbstractClass();
-        $this->seeder->method('getName')->willReturn('Test LMS');
-        $this->seeder->method('getSlug')->willReturn('test-lms');
-        $this->seeder->method('isActive')->willReturn(true);
+        $this->seeder->method('getPostType')->willReturn('post');
         $this->seeder->method('buildSeedQueue')->willReturn([
-            ['type' => 'course', 'data' => ['title' => 'Course 1']],
-            ['type' => 'user', 'data' => ['email' => 'user@test.com']],
+            new SeedQueueItem('course', ['index' => 1]),
+            new SeedQueueItem('user', ['index' => 1]),
         ]);
 
         $this->seeding = $this->getMockBuilder(AbstractSeeding::class)
             ->setConstructorArgs([$this->seeder])
-            ->onlyMethods(['push_to_queue', 'save', 'dispatch', 'cancelBackgroundQueue'])
+            ->onlyMethods(['push_to_queue', 'save', 'dispatch'])
             ->getMockForAbstractClass();
     }
 
@@ -70,7 +80,7 @@ class AbstractSeedingTest extends \WPTestCase
         $this->assertSame(SeedingStatus::STATUS_PENDING, $status->getStatus());
     }
 
-    public function test_cancel_sets_status_to_cancelled(): void
+    public function test_cancel_sets_status_without_global_queue_cancel(): void
     {
         Functions\when('get_option')->justReturn([
             'status' => SeedingStatus::STATUS_RUNNING,
@@ -79,8 +89,7 @@ class AbstractSeedingTest extends \WPTestCase
             'processed' => 3,
         ]);
         Functions\expect('update_option')->andReturn(true);
-
-        $this->seeding->expects($this->once())->method('cancelBackgroundQueue');
+        Functions\when('delete_option')->justReturn(true);
 
         $result = $this->seeding->cancelProcess('test-process-id');
 

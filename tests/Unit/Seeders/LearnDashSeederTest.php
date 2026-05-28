@@ -124,4 +124,47 @@ class LearnDashSeederTest extends \WPTestCase
 
         $this->assertSame([7], $ids);
     }
+
+    public function test_seed_courses_initializes_ld_course_steps(): void
+    {
+        /** @var list<array{0: int, 1: string, 2: mixed}> $metaCalls */
+        $metaCalls = [];
+
+        Functions\expect('wp_insert_post')->once()->andReturn(100);
+        Functions\when('is_wp_error')->justReturn(false);
+        Functions\when('update_post_meta')->alias(
+            static function (int $postId, string $key, mixed $value) use (&$metaCalls): bool {
+                $metaCalls[] = [$postId, $key, $value];
+                return true;
+            }
+        );
+
+        $ids = $this->seeder->seedCourses(1);
+
+        $this->assertSame([100], $ids);
+        $this->assertTrue(
+            (bool) array_filter($metaCalls, static fn(array $call) => $call[1] === 'ld_course_steps'),
+        );
+    }
+
+    public function test_seed_quizzes_sets_quiz_pro_id(): void
+    {
+        /** @var list<string> $metaKeys */
+        $metaKeys = [];
+
+        Functions\expect('wp_insert_post')->once()->andReturn(50);
+        Functions\when('is_wp_error')->justReturn(false);
+        Functions\when('get_post_meta')->justReturn('');
+        Functions\when('update_post_meta')->alias(
+            static function (int $postId, string $key, mixed $value) use (&$metaKeys): bool {
+                $metaKeys[] = $key;
+                return true;
+            }
+        );
+
+        $ids = $this->seeder->seedQuizzes(1, lessonId: 10, options: ['course_id' => 5]);
+
+        $this->assertSame([50], $ids);
+        $this->assertContains('quiz_pro_id', $metaKeys);
+    }
 }

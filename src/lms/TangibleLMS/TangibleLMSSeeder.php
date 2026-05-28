@@ -4,132 +4,59 @@ declare(strict_types=1);
 
 namespace Tangible\Populater\LMS\TangibleLMS;
 
+use Tangible\Populater\Registry\LmsPluginDefinition;
 use Tangible\Populater\Seeders\AbstractSeeder;
 
 /**
  * Seeder for the Tangible LMS plugin.
- *
- * Post types are assumed to follow Tangible LMS conventions.
- * Adjust post type slugs once the plugin's public API is stable.
  */
 class TangibleLMSSeeder extends AbstractSeeder
 {
-    private const PLUGIN_FILE = 'tangible-lms/tangible-lms.php';
+    private const PT_COURSE      = 'tgl_course';
+    private const PT_LESSON      = 'tgl_lesson';
+    private const PT_QUIZ        = 'tgl_quiz';
+    private const PT_CERTIFICATE = 'tgl_certificate';
 
-    // Post type slugs — update these to match the actual plugin's registered types.
-    private const PT_COURSE = 'tgl_course';
-    private const PT_LESSON = 'tgl_lesson';
-    private const PT_QUIZ   = 'tgl_quiz';
-
-    public function getName(): string
+    public function __construct(?LmsPluginDefinition $definition = null)
     {
-        return 'Tangible LMS';
+        parent::__construct($definition ?? new LmsPluginDefinition(
+            slug: 'tangible-lms',
+            name: 'Tangible LMS',
+            pluginFile: 'tangible-lms/tangible-lms.php',
+            seederClass: self::class,
+            processClass: TangibleLMSSeedingProcess::class,
+            backgroundAction: 'seed_tangible_lms',
+        ));
     }
 
-    public function getSlug(): string
+    protected function getPostType(string $entity): string
     {
-        return 'tangible-lms';
+        return match ($entity) {
+            'courses'      => self::PT_COURSE,
+            'lessons'      => self::PT_LESSON,
+            'quizzes'      => self::PT_QUIZ,
+            'certificates' => self::PT_CERTIFICATE,
+            default        => 'post',
+        };
     }
 
-    public function isActive(): bool
+    protected function getTitlePrefix(string $entity): string
     {
-        return is_plugin_active(self::PLUGIN_FILE);
+        return match ($entity) {
+            'courses'      => 'Tangible Course',
+            'lessons'      => 'Tangible Lesson',
+            'quizzes'      => 'Tangible Quiz',
+            'certificates' => 'Tangible Certificate',
+            default        => parent::getTitlePrefix($entity),
+        };
     }
 
-    public function seedCourses(int $count, array $options = []): array
+    protected function getMetaFor(string $entity, array $context): array
     {
-        $ids = [];
-        for ($i = 1; $i <= $count; $i++) {
-            $title  = $options['title_prefix'] ?? 'Tangible Course';
-            $postId = wp_insert_post([
-                'post_title'   => "$title $i",
-                'post_type'    => self::PT_COURSE,
-                'post_status'  => 'publish',
-                'post_content' => "Sample Tangible LMS course $i content.",
-            ]);
-
-            if (!is_wp_error($postId)) {
-                $ids[] = $postId;
-            }
-        }
-        return $ids;
-    }
-
-    public function seedLessons(int $count, int $courseId, array $options = []): array
-    {
-        $ids = [];
-        for ($i = 1; $i <= $count; $i++) {
-            $title  = $options['title_prefix'] ?? 'Tangible Lesson';
-            $postId = wp_insert_post([
-                'post_title'   => "$title $i",
-                'post_type'    => self::PT_LESSON,
-                'post_status'  => 'publish',
-                'post_content' => "Sample Tangible LMS lesson $i content.",
-                'post_parent'  => $courseId,
-            ]);
-
-            if (!is_wp_error($postId)) {
-                update_post_meta($postId, '_tgl_course_id', $courseId);
-                $ids[] = $postId;
-            }
-        }
-        return $ids;
-    }
-
-    public function seedQuizzes(int $count, int $lessonId, array $options = []): array
-    {
-        $ids = [];
-        for ($i = 1; $i <= $count; $i++) {
-            $title  = $options['title_prefix'] ?? 'Tangible Quiz';
-            $postId = wp_insert_post([
-                'post_title'   => "$title $i",
-                'post_type'    => self::PT_QUIZ,
-                'post_status'  => 'publish',
-                'post_content' => "Sample Tangible LMS quiz $i.",
-            ]);
-
-            if (!is_wp_error($postId)) {
-                update_post_meta($postId, '_tgl_lesson_id', $lessonId);
-                $ids[] = $postId;
-            }
-        }
-        return $ids;
-    }
-
-    public function seedUsers(int $count, array $options = []): array
-    {
-        $ids = [];
-        for ($i = 1; $i <= $count; $i++) {
-            $unique   = uniqid((string) $i, true);
-            $username = 'tgl_user_' . $unique;
-            $email    = 'tgl_user_' . $unique . '@example.com';
-            $password = wp_generate_password();
-
-            $userId = wp_create_user($username, $password, $email);
-
-            if (!is_wp_error($userId)) {
-                $ids[] = $userId;
-            }
-        }
-        return $ids;
-    }
-
-    public function seedCertificates(int $count, array $options = []): array
-    {
-        $ids = [];
-        for ($i = 1; $i <= $count; $i++) {
-            $title  = $options['title_prefix'] ?? 'Tangible Certificate';
-            $postId = wp_insert_post([
-                'post_title'   => "$title $i",
-                'post_type'    => 'tgl_certificate',
-                'post_status'  => 'publish',
-                'post_content' => "Sample Tangible LMS certificate $i.",
-            ]);
-
-            if (!is_wp_error($postId)) {
-                $ids[] = $postId;
-            }
-        }
-        return $ids;
+        return match ($entity) {
+            'lessons' => ['_tgl_course_id' => (int) ($context['courseId'] ?? 0)],
+            'quizzes' => ['_tgl_lesson_id' => (int) ($context['lessonId'] ?? 0)],
+            default   => parent::getMetaFor($entity, $context),
+        };
     }
 }

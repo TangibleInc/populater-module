@@ -12,9 +12,9 @@ use Tangible\Populater\Seeding\SeedingStatus;
  *
  * Usage:
  *   wp tangible-populater seed <plugin> [--courses=<n>] [--lessons=<n>] [--quizzes=<n>] [--users=<n>] [--wait]
- *   wp tangible-populater seed status <process-id>
- *   wp tangible-populater seed logs   <process-id>
- *   wp tangible-populater seed cancel <process-id>
+ *   wp tangible-populater status <process-id>
+ *   wp tangible-populater logs   <process-id>
+ *   wp tangible-populater cancel <process-id>
  */
 class SeedCommand
 {
@@ -74,7 +74,7 @@ class SeedCommand
         $shouldWait = isset($assocArgs['wait']) && $assocArgs['wait'] !== false;
 
         if (!$shouldWait) {
-            \WP_CLI::line('Run `wp tangible-populater seed status ' . $processId . '` to check progress.');
+            \WP_CLI::line('Run `wp tangible-populater status ' . $processId . '` to check progress.');
             return;
         }
 

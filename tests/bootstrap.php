@@ -142,7 +142,15 @@ abstract class WPTestCase extends \PHPUnit\Framework\TestCase
             'wp_unslash',
             'sanitize_text_field',
             'absint',
+            'wp_generate_password',
+            'get_post_meta',
+            'update_post_meta',
+            'is_plugin_active',
         ]);
+        Monkey\Functions\when('wp_generate_password')->justReturn('test-password');
+        Monkey\Functions\when('get_post_meta')->justReturn('');
+        Monkey\Functions\when('update_post_meta')->justReturn(true);
+        Monkey\Functions\when('is_plugin_active')->justReturn(false);
     }
 
     protected function tearDown(): void

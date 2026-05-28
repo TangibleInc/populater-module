@@ -4,78 +4,191 @@ declare(strict_types=1);
 
 namespace Tangible\Populater\Seeders;
 
+use Tangible\Populater\Registry\LmsPluginDefinition;
+use Tangible\Populater\Seeding\SeedConfig;
+use Tangible\Populater\Seeding\SeedQueueItem;
+
 /**
  * Base contract for all LMS seeders.
  *
- * Each LMS plugin requires its own concrete implementation that knows how to
- * create the right post types, meta, and taxonomy terms.
+ * Default {@see seedCourses()}, {@see seedLessons()}, etc. assume WordPress posts
+ * and post meta. LMS plugins that use custom tables, wp_options, or vendor APIs
+ * should override the relevant methods and keep the shared queue via
+ * {@see buildSeedQueue()}.
+ *
+ * @see docs/LMS-EXTENSION.md
  */
 abstract class AbstractSeeder
 {
-    // -------------------------------------------------------------------------
-    // Identity
-    // -------------------------------------------------------------------------
+    public function __construct(
+        protected readonly LmsPluginDefinition $definition,
+    ) {}
 
-    /** Human-readable plugin name shown in the UI. */
-    abstract public function getName(): string;
+    public function getName(): string
+    {
+        return $this->definition->name;
+    }
 
-    /** Machine-readable slug used as array keys / option names. */
-    abstract public function getSlug(): string;
+    public function getSlug(): string
+    {
+        return $this->definition->slug;
+    }
 
-    /** Returns true when the plugin is currently active in WordPress. */
-    abstract public function isActive(): bool;
-
-    // -------------------------------------------------------------------------
-    // Content creation
-    // -------------------------------------------------------------------------
+    public function isActive(): bool
+    {
+        return is_plugin_active($this->definition->pluginFile);
+    }
 
     /**
-     * Creates $count courses and returns their post IDs.
+     * Post type for an entity key: courses, lessons, quizzes, certificates.
+     */
+    abstract protected function getPostType(string $entity): string;
+
+    /**
+     * Meta to set after a post is created.
      *
-     * @param  array<string, mixed> $options  Extra configuration (e.g. title prefix).
+     * @param array<string, mixed> $context  e.g. courseId, lessonId, index
+     * @return array<string, mixed>
+     */
+    protected function getMetaFor(string $entity, array $context): array
+    {
+        return match ($entity) {
+            'lessons' => ['course_id' => (int) ($context['courseId'] ?? 0)],
+            'quizzes' => ['lesson_id' => (int) ($context['lessonId'] ?? 0)],
+            default   => [],
+        };
+    }
+
+    /**
+     * Title prefix for generated content.
+     */
+    protected function getTitlePrefix(string $entity): string
+    {
+        return $this->getName() . ' ' . ucfirst(rtrim($entity, 's'));
+    }
+
+    /**
+     * @param array<string, mixed> $options
      * @return list<int>
      */
-    abstract public function seedCourses(int $count, array $options = []): array;
+    public function seedCourses(int $count, array $options = []): array
+    {
+        $ids = [];
+        for ($i = 1; $i <= $count; $i++) {
+            $postId = $this->insertPost([
+                'post_title'   => $this->defaultTitle($options['title_prefix'] ?? $this->getTitlePrefix('courses'), $i),
+                'post_type'    => $this->getPostType('courses'),
+                'post_status'  => 'publish',
+                'post_content' => sprintf('Sample course %d content.', $i),
+            ]);
+
+            if ($postId > 0) {
+                $this->afterCourseCreated($postId, $i, $options);
+                $ids[] = $postId;
+            }
+        }
+
+        return $ids;
+    }
 
     /**
-     * Creates $count lessons attached to $courseId and returns their post IDs.
-     *
-     * @param  array<string, mixed> $options
+     * @param array<string, mixed> $options
      * @return list<int>
      */
-    abstract public function seedLessons(int $count, int $courseId, array $options = []): array;
+    public function seedLessons(int $count, int $courseId, array $options = []): array
+    {
+        $ids = [];
+        for ($i = 1; $i <= $count; $i++) {
+            $postId = $this->insertPost([
+                'post_title'   => $this->defaultTitle($options['title_prefix'] ?? $this->getTitlePrefix('lessons'), $i),
+                'post_type'    => $this->getPostType('lessons'),
+                'post_status'  => 'publish',
+                'post_content' => sprintf('Sample lesson %d content.', $i),
+                'post_parent'  => $courseId,
+            ]);
+
+            if ($postId > 0) {
+                $this->applyMeta($postId, $this->getMetaFor('lessons', ['courseId' => $courseId]));
+                $this->afterLessonCreated($postId, $courseId, $i, $options);
+                $ids[] = $postId;
+            }
+        }
+
+        return $ids;
+    }
 
     /**
-     * Creates $count quizzes attached to $lessonId and returns their post IDs.
-     *
-     * @param  array<string, mixed> $options
+     * @param array<string, mixed> $options
      * @return list<int>
      */
-    abstract public function seedQuizzes(int $count, int $lessonId, array $options = []): array;
+    public function seedQuizzes(int $count, int $lessonId, array $options = []): array
+    {
+        $ids = [];
+        for ($i = 1; $i <= $count; $i++) {
+            $postId = $this->insertPost([
+                'post_title'   => $this->defaultTitle($options['title_prefix'] ?? $this->getTitlePrefix('quizzes'), $i),
+                'post_type'    => $this->getPostType('quizzes'),
+                'post_status'  => 'publish',
+                'post_content' => sprintf('Sample quiz %d.', $i),
+            ]);
+
+            if ($postId > 0) {
+                $this->applyMeta($postId, $this->getMetaFor('quizzes', ['lessonId' => $lessonId]));
+                $this->afterQuizCreated($postId, $lessonId, $i, $options);
+                $ids[] = $postId;
+            }
+        }
+
+        return $ids;
+    }
 
     /**
-     * Creates $count users and returns their user IDs.
-     *
-     * @param  array<string, mixed> $options
+     * @param array<string, mixed> $options
      * @return list<int>
      */
-    abstract public function seedUsers(int $count, array $options = []): array;
+    public function seedUsers(int $count, array $options = []): array
+    {
+        $ids = [];
+        $prefix = (string) ($options['user_prefix'] ?? strtolower(str_replace('-', '_', $this->getSlug())) . '_user');
+
+        for ($i = 1; $i <= $count; $i++) {
+            $userId = $this->createWpUser([
+                'prefix' => $prefix,
+                'index'  => $i,
+            ]);
+
+            if ($userId > 0) {
+                $ids[] = $userId;
+            }
+        }
+
+        return $ids;
+    }
 
     /**
-     * Creates $count certificates and returns their post IDs.
-     *
-     * @param  array<string, mixed> $options
+     * @param array<string, mixed> $options
      * @return list<int>
      */
-    abstract public function seedCertificates(int $count, array $options = []): array;
+    public function seedCertificates(int $count, array $options = []): array
+    {
+        $ids = [];
+        for ($i = 1; $i <= $count; $i++) {
+            $postId = $this->insertPost([
+                'post_title'   => $this->defaultTitle($options['title_prefix'] ?? $this->getTitlePrefix('certificates'), $i),
+                'post_type'    => $this->getPostType('certificates'),
+                'post_status'  => 'publish',
+                'post_content' => sprintf('Sample certificate %d.', $i),
+            ]);
 
-    // -------------------------------------------------------------------------
-    // Queue building (shared logic)
-    // -------------------------------------------------------------------------
+            if ($postId > 0) {
+                $ids[] = $postId;
+            }
+        }
+
+        return $ids;
+    }
 
     /**
-     * Returns the content types this seeder can create.
-     *
      * @return list<string>
      */
     public function getSeedableTypes(): array
@@ -84,38 +197,98 @@ abstract class AbstractSeeder
     }
 
     /**
-     * Builds a flat queue of seed items derived from $config so the background
-     * process can iterate over them one-by-one.
-     *
-     * Each item: ['type' => string, 'data' => array<string, mixed>]
-     *
-     * @param  array<string, mixed> $config  Keys: courses, lessons_per_course, quizzes_per_lesson, users.
-     * @return list<array{type: string, data: array<string, mixed>}>
+     * @param array<string, mixed>|SeedConfig $config
+     * @return list<SeedQueueItem>
      */
-    public function buildSeedQueue(array $config): array
+    public function buildSeedQueue(array|SeedConfig $config): array
     {
-        $queue            = [];
-        $courses          = max(0, (int) ($config['courses']           ?? 0));
-        $lessonsPerCourse = max(0, (int) ($config['lessons_per_course'] ?? 0));
-        $quizzesPerLesson = max(0, (int) ($config['quizzes_per_lesson'] ?? 0));
-        $users            = max(0, (int) ($config['users']             ?? 0));
+        $seedConfig = $config instanceof SeedConfig ? $config : SeedConfig::fromArray($config);
+        $queue      = [];
 
-        for ($c = 1; $c <= $courses; $c++) {
-            $queue[] = ['type' => 'course', 'data' => ['index' => $c]];
+        for ($c = 1; $c <= $seedConfig->courses; $c++) {
+            $queue[] = new SeedQueueItem('course', ['index' => $c]);
 
-            for ($l = 1; $l <= $lessonsPerCourse; $l++) {
-                $queue[] = ['type' => 'lesson', 'data' => ['course_index' => $c, 'index' => $l]];
+            for ($l = 1; $l <= $seedConfig->lessonsPerCourse; $l++) {
+                $queue[] = new SeedQueueItem('lesson', ['course_index' => $c, 'index' => $l]);
 
-                for ($q = 1; $q <= $quizzesPerLesson; $q++) {
-                    $queue[] = ['type' => 'quiz', 'data' => ['course_index' => $c, 'lesson_index' => $l, 'index' => $q]];
+                for ($q = 1; $q <= $seedConfig->quizzesPerLesson; $q++) {
+                    $queue[] = new SeedQueueItem('quiz', [
+                        'course_index' => $c,
+                        'lesson_index' => $l,
+                        'index'        => $q,
+                    ]);
                 }
             }
         }
 
-        for ($u = 1; $u <= $users; $u++) {
-            $queue[] = ['type' => 'user', 'data' => ['index' => $u]];
+        for ($u = 1; $u <= $seedConfig->users; $u++) {
+            $queue[] = new SeedQueueItem('user', ['index' => $u]);
         }
 
         return $queue;
     }
+
+    // -------------------------------------------------------------------------
+    // Protected helpers
+    // -------------------------------------------------------------------------
+
+    /**
+     * @param array<string, mixed> $args
+     */
+    protected function insertPost(array $args): int
+    {
+        $postId = wp_insert_post($args);
+
+        if (is_wp_error($postId) || !is_int($postId)) {
+            return 0;
+        }
+
+        return $postId;
+    }
+
+    /**
+     * @param array<string, mixed> $options  Keys: prefix, index
+     */
+    protected function createWpUser(array $options): int
+    {
+        $index    = (int) ($options['index'] ?? 1);
+        $prefix   = (string) ($options['prefix'] ?? 'populater_user');
+        $unique   = uniqid((string) $index, true);
+        $username = $prefix . '_' . $unique;
+        $email    = $username . '@example.com';
+        $password = wp_generate_password();
+        $userId   = wp_create_user($username, $password, $email);
+
+        if (is_wp_error($userId) || !is_int($userId)) {
+            return 0;
+        }
+
+        return $userId;
+    }
+
+    protected function defaultTitle(string $prefix, int $index): string
+    {
+        return "$prefix $index";
+    }
+
+    /**
+     * @param array<string, mixed> $meta
+     */
+    protected function applyMeta(int $postId, array $meta): void
+    {
+        foreach ($meta as $key => $value) {
+            if ($value !== 0 && $value !== '') {
+                update_post_meta($postId, (string) $key, $value);
+            }
+        }
+    }
+
+    /** @param array<string, mixed> $options */
+    protected function afterCourseCreated(int $postId, int $index, array $options = []): void {}
+
+    /** @param array<string, mixed> $options */
+    protected function afterLessonCreated(int $postId, int $courseId, int $index, array $options = []): void {}
+
+    /** @param array<string, mixed> $options */
+    protected function afterQuizCreated(int $postId, int $lessonId, int $index, array $options = []): void {}
 }
