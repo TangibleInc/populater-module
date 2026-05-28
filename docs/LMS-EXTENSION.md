@@ -31,7 +31,7 @@ class MyLmsPlugin extends AbstractLmsPlugin
 new MyLmsPlugin();
 ```
 
-Built-in LMS classes live under `src/lms/*/` (e.g. `LearnDashLmsPlugin`).
+Built-in LMS classes live under `src/LMS/*/` (e.g. `LearnDashLmsPlugin`).
 `LmsPlugins::registerBuiltIn()` boots them from `Plugin` construction.
 
 `LmsPluginRegistry` only reads from the filter — no central hardcoded list.

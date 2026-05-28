@@ -8,7 +8,7 @@ This directory was removed from the codebase. It was **never loaded** by the cur
 
 | Legacy capability | Current location | Status |
 |-------------------|------------------|--------|
-| Courses, lessons, quizzes, users | `src/lms/*/ *Seeder.php` + seeding queue | Partial (post-based only) |
+| Courses, lessons, quizzes, users | `src/LMS/*/ *Seeder.php` + seeding queue | Partial (post-based only) |
 | Topics | — | Not ported |
 | Questions | — | Not ported |
 | Groups | — | Not ported |
@@ -23,7 +23,7 @@ This directory was removed from the codebase. It was **never loaded** by the cur
 
 - Hard dependency on `tangible_fields()` and global `$populater`
 - No autoloading, no tests, SQL string concatenation
-- Superseded by the multi-LMS architecture under `src/lms/`
+- Superseded by the multi-LMS architecture under `src/LMS/`
 
 ## If you need old behaviour
 
