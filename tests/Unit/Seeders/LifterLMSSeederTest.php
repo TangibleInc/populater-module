@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tangible\Populater\Tests\Unit\Seeders;
 
+use Tangible\Populater\LMS\LifterLMS\LifterLmsPlugin;
 use Tangible\Populater\LMS\LifterLMS\LifterLMSSeeder;
 use Brain\Monkey\Functions;
 
@@ -14,7 +15,7 @@ class LifterLMSSeederTest extends \WPTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->seeder = new LifterLMSSeeder();
+        $this->seeder = new LifterLMSSeeder(new LifterLmsPlugin());
     }
 
     public function test_get_name_returns_lifterlms(): void

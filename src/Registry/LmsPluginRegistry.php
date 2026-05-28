@@ -4,35 +4,27 @@ declare(strict_types=1);
 
 namespace Tangible\Populater\Registry;
 
-use Tangible\Populater\LMS\LearnDash\LearnDashSeeder;
-use Tangible\Populater\LMS\LearnDash\LearnDashSeedingProcess;
-use Tangible\Populater\LMS\LifterLMS\LifterLMSSeeder;
-use Tangible\Populater\LMS\LifterLMS\LifterLMSSeedingProcess;
-use Tangible\Populater\LMS\TangibleLMS\TangibleLMSSeeder;
-use Tangible\Populater\LMS\TangibleLMS\TangibleLMSSeedingProcess;
 use Tangible\Populater\Seeders\AbstractSeeder;
 use Tangible\Populater\Seeding\AbstractSeeding;
 
 /**
- * Single source of truth for supported LMS plugins.
- *
- * Adding a fourth LMS requires one entry here plus seeder/process classes.
+ * Resolves registered LMS plugins from the {@see AbstractLmsPlugin::FILTER} hook.
  */
 class LmsPluginRegistry
 {
-    /** @var array<string, LmsPluginDefinition>|null */
-    private ?array $definitions = null;
-
     /**
-     * @return array<string, LmsPluginDefinition>
+     * @return array<string, AbstractLmsPlugin>
      */
     public function all(): array
     {
-        if ($this->definitions === null) {
-            $this->definitions = $this->buildDefinitions();
+        /** @var array<string, AbstractLmsPlugin> $plugins */
+        $plugins = apply_filters(AbstractLmsPlugin::FILTER, []);
+
+        if ($plugins !== []) {
+            return $plugins;
         }
 
-        return $this->definitions;
+        return AbstractLmsPlugin::getRegistered();
     }
 
     /**
@@ -43,17 +35,17 @@ class LmsPluginRegistry
         return array_keys($this->all());
     }
 
-    public function get(string $slug): LmsPluginDefinition
+    public function get(string $slug): AbstractLmsPlugin
     {
-        $definitions = $this->all();
+        $plugins = $this->all();
 
-        if (!isset($definitions[$slug])) {
+        if (!isset($plugins[$slug])) {
             throw new \InvalidArgumentException(
-                sprintf('Unknown plugin slug "%s". Supported: %s', $slug, implode(', ', array_keys($definitions)))
+                sprintf('Unknown plugin slug "%s". Supported: %s', $slug, implode(', ', array_keys($plugins)))
             );
         }
 
-        return $definitions[$slug];
+        return $plugins[$slug];
     }
 
     public function has(string $slug): bool
@@ -68,10 +60,10 @@ class LmsPluginRegistry
     {
         $plugins = [];
 
-        foreach ($this->all() as $slug => $definition) {
+        foreach ($this->all() as $slug => $plugin) {
             $plugins[$slug] = [
-                'name' => $definition->name,
-                'file' => $definition->pluginFile,
+                'name' => $plugin->getName(),
+                'file' => $plugin->getPluginFile(),
             ];
         }
 
@@ -80,7 +72,7 @@ class LmsPluginRegistry
 
     public function isPluginActive(string $slug): bool
     {
-        return is_plugin_active($this->get($slug)->pluginFile);
+        return $this->get($slug)->isActive();
     }
 
     public function hasAnyActivePlugin(): bool
@@ -96,50 +88,11 @@ class LmsPluginRegistry
 
     public function createSeeder(string $slug): AbstractSeeder
     {
-        $definition = $this->get($slug);
-        $class      = $definition->seederClass;
-
-        return new $class($definition);
+        return $this->get($slug)->createSeeder();
     }
 
     public function createProcess(string $slug, AbstractSeeder $seeder): AbstractSeeding
     {
-        $definition = $this->get($slug);
-        $class      = $definition->processClass;
-
-        return new $class($seeder);
-    }
-
-    /**
-     * @return array<string, LmsPluginDefinition>
-     */
-    private function buildDefinitions(): array
-    {
-        return [
-            'learndash' => new LmsPluginDefinition(
-                slug: 'learndash',
-                name: 'LearnDash LMS',
-                pluginFile: 'sfwd-lms/sfwd_lms.php',
-                seederClass: LearnDashSeeder::class,
-                processClass: LearnDashSeedingProcess::class,
-                backgroundAction: 'seed_learndash',
-            ),
-            'lifterlms' => new LmsPluginDefinition(
-                slug: 'lifterlms',
-                name: 'LifterLMS',
-                pluginFile: 'lifterlms/lifterlms.php',
-                seederClass: LifterLMSSeeder::class,
-                processClass: LifterLMSSeedingProcess::class,
-                backgroundAction: 'seed_lifterlms',
-            ),
-            'tangible-lms' => new LmsPluginDefinition(
-                slug: 'tangible-lms',
-                name: 'Tangible LMS',
-                pluginFile: 'tangible-lms/tangible-lms.php',
-                seederClass: TangibleLMSSeeder::class,
-                processClass: TangibleLMSSeedingProcess::class,
-                backgroundAction: 'seed_tangible_lms',
-            ),
-        ];
+        return $this->get($slug)->createProcess($seeder);
     }
 }

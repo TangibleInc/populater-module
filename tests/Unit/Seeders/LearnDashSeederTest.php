@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tangible\Populater\Tests\Unit\Seeders;
 
+use Tangible\Populater\LMS\LearnDash\LearnDashLmsPlugin;
 use Tangible\Populater\LMS\LearnDash\LearnDashSeeder;
 use Brain\Monkey\Functions;
 
@@ -14,7 +15,7 @@ class LearnDashSeederTest extends \WPTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->seeder = new LearnDashSeeder();
+        $this->seeder = new LearnDashSeeder(new LearnDashLmsPlugin());
     }
 
     public function test_get_name_returns_learndash(): void

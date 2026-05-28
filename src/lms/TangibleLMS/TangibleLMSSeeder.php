@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tangible\Populater\LMS\TangibleLMS;
 
-use Tangible\Populater\Registry\LmsPluginDefinition;
 use Tangible\Populater\Seeders\AbstractSeeder;
 
 /**
@@ -16,18 +15,6 @@ class TangibleLMSSeeder extends AbstractSeeder
     private const PT_LESSON      = 'tgl_lesson';
     private const PT_QUIZ        = 'tgl_quiz';
     private const PT_CERTIFICATE = 'tgl_certificate';
-
-    public function __construct(?LmsPluginDefinition $definition = null)
-    {
-        parent::__construct($definition ?? new LmsPluginDefinition(
-            slug: 'tangible-lms',
-            name: 'Tangible LMS',
-            pluginFile: 'tangible-lms/tangible-lms.php',
-            seederClass: self::class,
-            processClass: TangibleLMSSeedingProcess::class,
-            backgroundAction: 'seed_tangible_lms',
-        ));
-    }
 
     protected function getPostType(string $entity): string
     {

@@ -190,7 +190,7 @@
         if (resetBtn) {
             resetBtn.addEventListener('click', () => {
                 const confirmed = window.confirm(
-                    'WARNING: This will permanently delete ALL database tables and re-install WordPress.\n\nAre you absolutely sure?'
+                    'WARNING: This will delete all posts, non-admin users, plugin/LMS data, and non-core options.\n\nAdministrator accounts, active plugins, and the active theme will be kept.\n\nContinue?'
                 );
                 if (!confirmed) return;
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tangible\Populater\Tests\Unit;
 
 use Tangible\Populater\PluginDetector;
+use Tangible\Populater\Registry\LmsPlugins;
 use Brain\Monkey\Functions;
 
 class PluginDetectorTest extends \WPTestCase
@@ -14,6 +15,7 @@ class PluginDetectorTest extends \WPTestCase
     protected function setUp(): void
     {
         parent::setUp();
+        LmsPlugins::registerBuiltIn();
         $this->detector = new PluginDetector();
     }
 

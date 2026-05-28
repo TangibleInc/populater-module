@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Tangible\Populater\Tests\Unit\Seeders;
 
-use Tangible\Populater\Registry\LmsPluginDefinition;
 use Tangible\Populater\Seeding\SeedConfig;
 use Tangible\Populater\Seeding\SeedQueueItem;
 use Tangible\Populater\Seeders\AbstractSeeder;
+use Tangible\Populater\Tests\Support\TestLmsPlugin;
 use Brain\Monkey\Functions;
 
 class AbstractSeederTest extends \WPTestCase
@@ -19,17 +19,10 @@ class AbstractSeederTest extends \WPTestCase
     {
         parent::setUp();
 
-        $definition = new LmsPluginDefinition(
-            slug: 'test-lms',
-            name: 'Test LMS',
-            pluginFile: 'test/test.php',
-            seederClass: AbstractSeeder::class,
-            processClass: \Tangible\Populater\Seeding\AbstractSeeding::class,
-            backgroundAction: 'seed_test',
-        );
+        $plugin = new TestLmsPlugin();
 
         $this->seeder = $this->getMockBuilder(AbstractSeeder::class)
-            ->setConstructorArgs([$definition])
+            ->setConstructorArgs([$plugin])
             ->onlyMethods(['getPostType'])
             ->getMockForAbstractClass();
         $this->seeder->method('getPostType')->willReturnCallback(
@@ -42,7 +35,7 @@ class AbstractSeederTest extends \WPTestCase
         );
     }
 
-    public function test_identity_from_definition(): void
+    public function test_identity_from_plugin(): void
     {
         $this->assertSame('Test LMS', $this->seeder->getName());
         $this->assertSame('test-lms', $this->seeder->getSlug());

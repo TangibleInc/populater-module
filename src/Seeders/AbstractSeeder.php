@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tangible\Populater\Seeders;
 
-use Tangible\Populater\Registry\LmsPluginDefinition;
+use Tangible\Populater\Registry\AbstractLmsPlugin;
 use Tangible\Populater\Seeding\SeedConfig;
 use Tangible\Populater\Seeding\SeedQueueItem;
 
@@ -21,22 +21,22 @@ use Tangible\Populater\Seeding\SeedQueueItem;
 abstract class AbstractSeeder
 {
     public function __construct(
-        protected readonly LmsPluginDefinition $definition,
+        protected readonly AbstractLmsPlugin $plugin,
     ) {}
 
     public function getName(): string
     {
-        return $this->definition->name;
+        return $this->plugin->getName();
     }
 
     public function getSlug(): string
     {
-        return $this->definition->slug;
+        return $this->plugin->getSlug();
     }
 
     public function isActive(): bool
     {
-        return is_plugin_active($this->definition->pluginFile);
+        return $this->plugin->isActive();
     }
 
     /**

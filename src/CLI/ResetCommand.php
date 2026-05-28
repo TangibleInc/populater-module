@@ -17,7 +17,7 @@ class ResetCommand
     public function __construct(private readonly DatabaseReset $dbReset) {}
 
     /**
-     * Resets the WordPress database to a clean installation.
+     * Removes seeded LMS content while preserving site configuration.
      *
      * ## OPTIONS
      *
@@ -41,7 +41,7 @@ class ResetCommand
         $skipConfirmation = isset($assocArgs['yes']) && $assocArgs['yes'] !== false;
 
         if (!$skipConfirmation) {
-            \WP_CLI::confirm('⚠  This will permanently DELETE all database tables and re-install WordPress. Continue?');
+            \WP_CLI::confirm('⚠  This will delete posts, non-admin users, plugin/LMS data, and non-core options. Administrators, active plugins, and the active theme will be kept. Continue?');
         }
 
         \WP_CLI::line('Resetting database…');
@@ -49,7 +49,7 @@ class ResetCommand
         $success = $this->dbReset->reset(confirmed: true);
 
         if ($success) {
-            \WP_CLI::success('Database has been reset to a fresh WordPress installation.');
+            \WP_CLI::success('Seeded content has been removed. Administrators, plugins, and theme were preserved.');
         } else {
             \WP_CLI::warning('Database reset did not complete successfully.');
         }

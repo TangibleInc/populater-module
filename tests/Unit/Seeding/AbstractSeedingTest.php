@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Tangible\Populater\Tests\Unit\Seeding;
 
-use Tangible\Populater\Registry\LmsPluginDefinition;
 use Tangible\Populater\Seeding\AbstractSeeding;
 use Tangible\Populater\Seeding\SeedQueueItem;
 use Tangible\Populater\Seeding\SeedingStatus;
 use Tangible\Populater\Seeders\AbstractSeeder;
+use Tangible\Populater\Tests\Support\TestLmsPlugin;
 use Brain\Monkey\Functions;
 
 class AbstractSeedingTest extends \WPTestCase
@@ -27,17 +27,10 @@ class AbstractSeedingTest extends \WPTestCase
         Functions\when('delete_option')->justReturn(true);
         Functions\when('wp_generate_uuid4')->justReturn('test-uuid-1234');
 
-        $definition = new LmsPluginDefinition(
-            slug: 'test-lms',
-            name: 'Test LMS',
-            pluginFile: 'test/test.php',
-            seederClass: AbstractSeeder::class,
-            processClass: AbstractSeeding::class,
-            backgroundAction: 'seed_test',
-        );
+        $plugin = new TestLmsPlugin();
 
         $this->seeder = $this->getMockBuilder(AbstractSeeder::class)
-            ->setConstructorArgs([$definition])
+            ->setConstructorArgs([$plugin])
             ->onlyMethods(['buildSeedQueue', 'getPostType'])
             ->getMockForAbstractClass();
         $this->seeder->method('getPostType')->willReturn('post');

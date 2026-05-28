@@ -129,6 +129,7 @@ abstract class WPTestCase extends \PHPUnit\Framework\TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        \Tangible\Populater\Registry\AbstractLmsPlugin::clearRegistered();
         Monkey\setUp();
         // Stub common WP i18n and escaping functions used across tests
         Monkey\Functions\stubs([

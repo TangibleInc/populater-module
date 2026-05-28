@@ -29,8 +29,8 @@ class SeedingManager
         $this->repository = $repository ?? new ProcessRepository();
         $this->seeders    = [];
 
-        foreach ($this->registry->all() as $slug => $definition) {
-            $this->seeders[$slug] = $this->registry->createSeeder($slug);
+        foreach ($this->registry->all() as $slug => $plugin) {
+            $this->seeders[$slug] = $plugin->createSeeder();
         }
     }
 
@@ -42,10 +42,10 @@ class SeedingManager
     {
         $this->runners = [];
 
-        foreach ($this->registry->all() as $slug => $definition) {
-            $seeder            = $this->seeders[$slug];
-            $process           = $this->registry->createProcess($slug, $seeder);
-            $this->runners[$slug] = new WpBackgroundSeedingRunner($process);
+        foreach ($this->registry->all() as $slug => $plugin) {
+            $seeder                 = $this->seeders[$slug];
+            $process                = $plugin->createProcess($seeder);
+            $this->runners[$slug]   = new WpBackgroundSeedingRunner($process);
         }
     }
 

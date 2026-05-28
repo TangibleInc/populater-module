@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tangible\Populater\Tests\Unit\Seeders;
 
+use Tangible\Populater\LMS\TangibleLMS\TangibleLmsPlugin;
 use Tangible\Populater\LMS\TangibleLMS\TangibleLMSSeeder;
 use Brain\Monkey\Functions;
 
@@ -14,7 +15,7 @@ class TangibleLMSSeederTest extends \WPTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->seeder = new TangibleLMSSeeder();
+        $this->seeder = new TangibleLMSSeeder(new TangibleLmsPlugin());
     }
 
     public function test_get_name_returns_tangible_lms(): void

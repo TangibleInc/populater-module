@@ -10,6 +10,7 @@ use Tangible\Populater\CLI\SeedCommand;
 use Tangible\Populater\Database\DatabaseReset;
 use Tangible\Populater\REST\ResetController;
 use Tangible\Populater\REST\SeedController;
+use Tangible\Populater\Registry\LmsPlugins;
 use Tangible\Populater\Seeding\SeedingManager;
 
 /**
@@ -25,6 +26,8 @@ class Plugin
 
     private function __construct()
     {
+        LmsPlugins::registerBuiltIn();
+
         $this->pluginDetector = new PluginDetector();
         $this->seedingManager  = new SeedingManager($this->pluginDetector);
         $this->databaseReset   = new DatabaseReset();

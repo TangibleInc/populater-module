@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tangible\Populater\Tests\Integration;
 
 use Tangible\Populater\Registry\LmsPluginRegistry;
+use Tangible\Populater\Registry\LmsPlugins;
 use Tangible\Populater\Seeding\SeedConfig;
 
 /**
@@ -14,6 +15,12 @@ use Tangible\Populater\Seeding\SeedConfig;
  */
 class SeedingQueueIntegrationTest extends \WPTestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+        LmsPlugins::registerBuiltIn();
+    }
+
     /**
      * @return array<string, array{0: string, 1: int}>
      */

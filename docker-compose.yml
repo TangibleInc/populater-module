@@ -8,6 +8,7 @@ services:
       - "${PORT:-8888}:80"
     environment:
       PORT: ${PORT:-8888}
+      WP_ENVIRONMENT_TYPE: local
       WORDPRESS_URL: http://localhost:${PORT:-8888}
       WORDPRESS_TITLE: "WP Dev"
       WORDPRESS_DEVELOP_DIR: /var/www/html/
@@ -34,6 +35,7 @@ services:
       - "${TESTPORT:-8889}:80"
     environment:
       PORT: ${TESTPORT:-8889}
+      WP_ENVIRONMENT_TYPE: local
       WORDPRESS_URL: http://localhost:${TESTPORT:-8889}
       WORDPRESS_TITLE: "WP Test"
       WORDPRESS_DEVELOP_DIR: /var/www/html/

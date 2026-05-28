@@ -10,7 +10,7 @@ use Tangible\Populater\Database\DatabaseReset;
  * REST controller for database reset.
  *
  * Endpoint (requires manage_options):
- *   POST /tangible-populater/v1/reset   – drop and reinstall the WP database
+ *   POST /tangible-populater/v1/reset   – remove seeded content while preserving site config
  */
 class ResetController
 {
@@ -54,7 +54,7 @@ class ResetController
         return rest_ensure_response([
             'success' => $success,
             'message' => $success
-                ? __('Database has been reset to a fresh WordPress installation.', 'tangible-populater')
+                ? __('Seeded content has been removed. Administrator accounts, plugins, and theme were preserved.', 'tangible-populater')
                 : __('Reset aborted. Pass confirmed=true to proceed.', 'tangible-populater'),
         ]);
     }

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tangible\Populater\LMS\LearnDash;
 
-use Tangible\Populater\Registry\LmsPluginDefinition;
 use Tangible\Populater\Seeders\AbstractSeeder;
 
 /**
@@ -14,18 +13,6 @@ use Tangible\Populater\Seeders\AbstractSeeder;
  */
 class LearnDashSeeder extends AbstractSeeder
 {
-    public function __construct(?LmsPluginDefinition $definition = null)
-    {
-        parent::__construct($definition ?? new LmsPluginDefinition(
-            slug: 'learndash',
-            name: 'LearnDash LMS',
-            pluginFile: 'sfwd-lms/sfwd_lms.php',
-            seederClass: self::class,
-            processClass: LearnDashSeedingProcess::class,
-            backgroundAction: 'seed_learndash',
-        ));
-    }
-
     protected function getPostType(string $entity): string
     {
         return match ($entity) {

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tangible\Populater\LMS\LifterLMS;
 
-use Tangible\Populater\Registry\LmsPluginDefinition;
 use Tangible\Populater\Seeders\AbstractSeeder;
 
 /**
@@ -14,18 +13,6 @@ use Tangible\Populater\Seeders\AbstractSeeder;
  */
 class LifterLMSSeeder extends AbstractSeeder
 {
-    public function __construct(?LmsPluginDefinition $definition = null)
-    {
-        parent::__construct($definition ?? new LmsPluginDefinition(
-            slug: 'lifterlms',
-            name: 'LifterLMS',
-            pluginFile: 'lifterlms/lifterlms.php',
-            seederClass: self::class,
-            processClass: LifterLMSSeedingProcess::class,
-            backgroundAction: 'seed_lifterlms',
-        ));
-    }
-
     protected function getPostType(string $entity): string
     {
         return match ($entity) {

@@ -24,31 +24,53 @@ class DatabaseResetTest extends \WPTestCase
         $this->assertFalse($result);
     }
 
-    public function test_reset_drops_and_recreates_tables_when_confirmed(): void
+    public function test_reset_cleans_content_when_confirmed(): void
     {
-        global $wpdb;
-        $wpdb = $this->createMock(\stdClass::class);
+        Functions\when('get_users')->justReturn([1]);
+        Functions\when('wp_insert_term')->justReturn(['term_id' => 1]);
+        Functions\when('update_option')->justReturn(true);
+        Functions\when('delete_option')->justReturn(true);
+        Functions\when('wp_cache_flush')->justReturn(true);
+        Functions\when('delete_expired_transients')->justReturn(true);
 
-        Functions\when('dbDelta')->justReturn([]);
-        Functions\when('wp_get_current_user')->justReturn(new \stdClass());
-        Functions\when('get_option')->justReturn('1');
-
-        // We just test it doesn't throw and calls the hook
         Functions\expect('do_action')
             ->with('tangible_populater_database_reset')
             ->once();
 
-        // Use a partial mock to avoid actual DB operations
         $reset = $this->getMockBuilder(DatabaseReset::class)
-            ->onlyMethods(['dropAllTables', 'reinstallWordPress'])
+            ->onlyMethods([
+                'deletePostsAndComments',
+                'resetTaxonomies',
+                'deleteNonAdminUsers',
+                'cleanupOptions',
+                'truncateCustomTables',
+                'finalizeSiteState',
+            ])
             ->getMock();
 
-        $reset->expects($this->once())->method('dropAllTables');
-        $reset->expects($this->once())->method('reinstallWordPress');
+        $reset->expects($this->once())->method('deletePostsAndComments');
+        $reset->expects($this->once())->method('resetTaxonomies');
+        $reset->expects($this->once())->method('deleteNonAdminUsers')->with([1]);
+        $reset->expects($this->once())->method('cleanupOptions');
+        $reset->expects($this->once())->method('truncateCustomTables');
+        $reset->expects($this->once())->method('finalizeSiteState');
 
         $result = $reset->reset(confirmed: true);
 
         $this->assertTrue($result);
+    }
+
+    public function test_reset_aborts_when_no_administrators_exist(): void
+    {
+        Functions\when('get_users')->justReturn([]);
+
+        $reset = $this->getMockBuilder(DatabaseReset::class)
+            ->onlyMethods(['deletePostsAndComments'])
+            ->getMock();
+
+        $reset->expects($this->never())->method('deletePostsAndComments');
+
+        $this->assertFalse($reset->reset(confirmed: true));
     }
 
     public function test_get_tables_returns_array(): void
@@ -68,8 +90,21 @@ class DatabaseResetTest extends \WPTestCase
         $this->assertIsArray($tables);
     }
 
-    public function test_is_safe_environment_checks_env_constant(): void
+    public function test_is_safe_environment_allows_local_env_type(): void
     {
-        $this->assertIsBool($this->reset->isSafeEnvironment());
+        Functions\when('wp_get_environment_type')->justReturn('local');
+
+        $this->assertTrue($this->reset->isSafeEnvironment());
+    }
+
+    public function test_is_safe_environment_allows_wp_debug(): void
+    {
+        Functions\when('wp_get_environment_type')->justReturn('production');
+
+        if (!defined('WP_DEBUG')) {
+            define('WP_DEBUG', true);
+        }
+
+        $this->assertTrue($this->reset->isSafeEnvironment());
     }
 }
