@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tangible\Populater\Steps;
 
+use Tangible\Populater\Seeding\ProcessRepository;
 use Tangible\Populater\Seeding\SeedingIdMap;
 use Tangible\Populater\Support\Logger;
 
@@ -19,6 +20,10 @@ use Tangible\Populater\Support\Logger;
  */
 abstract class AbstractSeedingStep
 {
+    public function __construct(
+        protected readonly ProcessRepository $repository,
+    ) {}
+
     // -------------------------------------------------------------------------
     // Contract
     // -------------------------------------------------------------------------
@@ -63,7 +68,7 @@ abstract class AbstractSeedingStep
             $ids = $this->run($data, $logger);
 
             if (isset($data['process_id']) && is_string($data['process_id'])) {
-                SeedingIdMap::record($data['process_id'], $type, $data, $ids);
+                SeedingIdMap::record($data['process_id'], $type, $data, $ids, $this->repository);
             }
 
             $logger->info(sprintf('Completed step: %s', $type));

@@ -18,10 +18,9 @@ final class SeedingIdMap
         string $processId,
         string $type,
         array $data,
-        ?ProcessRepository $repository = null,
+        ProcessRepository $repository,
     ): array {
-        $repository ??= new ProcessRepository();
-        $map          = $repository->getIdMap($processId);
+        $map = $repository->getIdMap($processId);
 
         if ($type === 'lesson') {
             $courseIndex       = (int) ($data['course_index'] ?? 0);
@@ -46,14 +45,13 @@ final class SeedingIdMap
         string $type,
         array $data,
         array $ids,
-        ?ProcessRepository $repository = null,
+        ProcessRepository $repository,
     ): void {
         if ($ids === []) {
             return;
         }
 
-        $repository ??= new ProcessRepository();
-        $map          = $repository->getIdMap($processId);
+        $map = $repository->getIdMap($processId);
 
         match ($type) {
             'course' => $map['courses'][(int) ($data['index'] ?? 0)] = $ids[0],
@@ -64,8 +62,8 @@ final class SeedingIdMap
         $repository->saveIdMap($processId, $map);
     }
 
-    public static function delete(string $processId, ?ProcessRepository $repository = null): void
+    public static function delete(string $processId, ProcessRepository $repository): void
     {
-        ($repository ?? new ProcessRepository())->deleteIdMap($processId);
+        $repository->deleteIdMap($processId);
     }
 }

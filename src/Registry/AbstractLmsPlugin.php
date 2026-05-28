@@ -6,6 +6,8 @@ namespace Tangible\Populater\Registry;
 
 use Tangible\Populater\Seeders\AbstractSeeder;
 use Tangible\Populater\Seeding\AbstractSeeding;
+use Tangible\Populater\Seeding\LmsSeedingProcess;
+use Tangible\Populater\Seeding\ProcessRepository;
 
 /**
  * Base LMS registration: subclasses set properties and hook into
@@ -23,8 +25,6 @@ abstract class AbstractLmsPlugin
     protected string $pluginFile;
     /** @var class-string<AbstractSeeder> */
     protected string $seederClass;
-    /** @var class-string<AbstractSeeding> */
-    protected string $processClass;
     protected string $backgroundAction;
 
     public function __construct()
@@ -92,10 +92,8 @@ abstract class AbstractLmsPlugin
         return new $class($this);
     }
 
-    public function createProcess(AbstractSeeder $seeder): AbstractSeeding
+    public function createProcess(AbstractSeeder $seeder, ?ProcessRepository $repository = null): AbstractSeeding
     {
-        $class = $this->processClass;
-
-        return new $class($seeder);
+        return new LmsSeedingProcess($seeder, $this->backgroundAction, $repository);
     }
 }

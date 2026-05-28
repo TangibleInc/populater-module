@@ -24,7 +24,6 @@ class MyLmsPlugin extends AbstractLmsPlugin
     protected string $name = 'My LMS';
     protected string $pluginFile = 'my-lms/my-lms.php';
     protected string $seederClass = MyLmsSeeder::class;
-    protected string $processClass = MyLmsSeedingProcess::class;
     protected string $backgroundAction = 'seed_my_lms';
 }
 

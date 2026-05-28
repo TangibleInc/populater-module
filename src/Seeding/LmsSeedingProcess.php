@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tangible\Populater\Seeding;
 
+use Tangible\Populater\Seeders\AbstractSeeder;
 use Tangible\Populater\Steps\AbstractSeedingStep;
 use Tangible\Populater\Steps\DelegateSeedingStep;
 use Tangible\Populater\Support\Logger;
@@ -11,10 +12,19 @@ use Tangible\Populater\Support\Logger;
 /**
  * LMS seeding process using generic delegate steps.
  */
-abstract class LmsSeedingProcess extends AbstractSeeding
+class LmsSeedingProcess extends AbstractSeeding
 {
     /** @var array<string, AbstractSeedingStep>|null */
     private ?array $steps = null;
+
+    public function __construct(
+        AbstractSeeder $seeder,
+        string $action,
+        ?ProcessRepository $repository = null,
+    ) {
+        $this->action = $action;
+        parent::__construct($seeder, $repository);
+    }
 
     /** @return array<string, AbstractSeedingStep> */
     protected function buildSteps(): array
@@ -22,11 +32,11 @@ abstract class LmsSeedingProcess extends AbstractSeeding
         $label = $this->seeder->getName();
 
         return [
-            'course'      => new DelegateSeedingStep($this->seeder, 'course', $label),
-            'lesson'      => new DelegateSeedingStep($this->seeder, 'lesson', $label),
-            'quiz'        => new DelegateSeedingStep($this->seeder, 'quiz', $label),
-            'user'        => new DelegateSeedingStep($this->seeder, 'user', $label),
-            'certificate' => new DelegateSeedingStep($this->seeder, 'certificate', $label),
+            'course'      => new DelegateSeedingStep($this->repository, $this->seeder, 'course', $label),
+            'lesson'      => new DelegateSeedingStep($this->repository, $this->seeder, 'lesson', $label),
+            'quiz'        => new DelegateSeedingStep($this->repository, $this->seeder, 'quiz', $label),
+            'user'        => new DelegateSeedingStep($this->repository, $this->seeder, 'user', $label),
+            'certificate' => new DelegateSeedingStep($this->repository, $this->seeder, 'certificate', $label),
         ];
     }
 

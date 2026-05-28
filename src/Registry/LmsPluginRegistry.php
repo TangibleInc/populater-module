@@ -91,8 +91,8 @@ class LmsPluginRegistry
         return $this->get($slug)->createSeeder();
     }
 
-    public function createProcess(string $slug, AbstractSeeder $seeder): AbstractSeeding
+    public function createProcess(string $slug, AbstractSeeder $seeder, ?ProcessRepository $repository = null): AbstractSeeding
     {
-        return $this->get($slug)->createProcess($seeder);
+        return $this->get($slug)->createProcess($seeder, $repository);
     }
 }

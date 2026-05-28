@@ -12,6 +12,5 @@ class TangibleLmsPlugin extends AbstractLmsPlugin
     protected string $name = 'Tangible LMS';
     protected string $pluginFile = 'tangible-lms/tangible-lms.php';
     protected string $seederClass = TangibleLMSSeeder::class;
-    protected string $processClass = TangibleLMSSeedingProcess::class;
     protected string $backgroundAction = 'seed_tangible_lms';
 }

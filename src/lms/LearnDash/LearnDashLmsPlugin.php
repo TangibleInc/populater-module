@@ -12,6 +12,5 @@ class LearnDashLmsPlugin extends AbstractLmsPlugin
     protected string $name = 'LearnDash LMS';
     protected string $pluginFile = 'sfwd-lms/sfwd_lms.php';
     protected string $seederClass = LearnDashSeeder::class;
-    protected string $processClass = LearnDashSeedingProcess::class;
     protected string $backgroundAction = 'seed_learndash';
 }

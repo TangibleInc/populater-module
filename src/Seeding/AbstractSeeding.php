@@ -184,22 +184,7 @@ abstract class AbstractSeeding extends \WP_Background_Process
     /**
      * @param array{type: string, data: array<string, mixed>} $item
      */
-    protected function processItem(array $item, string $processId, Logger $logger): void
-    {
-        $type = $item['type'];
-        $data = $item['data'];
-
-        $logger->info(sprintf('Processing %s (process: %s)', $type, $processId));
-
-        match ($type) {
-            'course'      => SeedingIdMap::record($processId, $type, $data, $this->seeder->seedCourses(1, $data), $this->repository),
-            'lesson'      => SeedingIdMap::record($processId, $type, $data, $this->seeder->seedLessons(1, (int) ($data['course_id'] ?? 0), $data), $this->repository),
-            'quiz'        => $this->seeder->seedQuizzes(1, (int) ($data['lesson_id'] ?? 0), $data),
-            'user'        => $this->seeder->seedUsers(1, $data),
-            'certificate' => $this->seeder->seedCertificates(1, $data),
-            default       => $logger->warning(sprintf('Unknown item type: %s', $type)),
-        };
-    }
+    abstract protected function processItem(array $item, string $processId, Logger $logger): void;
 
     /** @param array<string, mixed> $data */
     protected function saveStatusForProcess(string $processId, array $data): void

@@ -44,7 +44,7 @@ class SeedingManager
 
         foreach ($this->registry->all() as $slug => $plugin) {
             $seeder                 = $this->seeders[$slug];
-            $process                = $plugin->createProcess($seeder);
+            $process                = $plugin->createProcess($seeder, $this->repository);
             $this->runners[$slug]   = new WpBackgroundSeedingRunner($process);
         }
     }

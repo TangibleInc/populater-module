@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tangible\Populater\Steps;
 
 use Tangible\Populater\Seeders\AbstractSeeder;
+use Tangible\Populater\Seeding\ProcessRepository;
 use Tangible\Populater\Support\Logger;
 
 /**
@@ -13,10 +14,13 @@ use Tangible\Populater\Support\Logger;
 class DelegateSeedingStep extends AbstractSeedingStep
 {
     public function __construct(
+        ProcessRepository $repository,
         private readonly AbstractSeeder $seeder,
         private readonly string $type,
         private readonly string $label,
-    ) {}
+    ) {
+        parent::__construct($repository);
+    }
 
     public function getType(): string
     {

@@ -4,14 +4,18 @@ declare(strict_types=1);
 
 namespace Tangible\Populater\Tests\Unit\Seeding;
 
+use Tangible\Populater\Seeding\ProcessRepository;
 use Tangible\Populater\Seeding\SeedingIdMap;
 use Brain\Monkey\Functions;
 
 class SeedingIdMapTest extends \WPTestCase
 {
+    private ProcessRepository $repository;
+
     protected function setUp(): void
     {
         parent::setUp();
+        $this->repository = new ProcessRepository();
         Functions\when('get_option')->justReturn(null);
         Functions\when('update_option')->justReturn(true);
         Functions\when('delete_option')->justReturn(true);
@@ -24,7 +28,7 @@ class SeedingIdMapTest extends \WPTestCase
             'lessons' => [],
         ]);
 
-        $data = SeedingIdMap::enrich('proc-1', 'lesson', ['course_index' => 1, 'index' => 1]);
+        $data = SeedingIdMap::enrich('proc-1', 'lesson', ['course_index' => 1, 'index' => 1], $this->repository);
 
         $this->assertSame(42, $data['course_id']);
     }
@@ -36,7 +40,7 @@ class SeedingIdMapTest extends \WPTestCase
             'lessons' => [2 => [3 => 99]],
         ]);
 
-        $data = SeedingIdMap::enrich('proc-1', 'quiz', ['course_index' => 2, 'lesson_index' => 3, 'index' => 1]);
+        $data = SeedingIdMap::enrich('proc-1', 'quiz', ['course_index' => 2, 'lesson_index' => 3, 'index' => 1], $this->repository);
 
         $this->assertSame(99, $data['lesson_id']);
     }
@@ -60,9 +64,9 @@ class SeedingIdMapTest extends \WPTestCase
             }
         );
 
-        SeedingIdMap::record('proc-1', 'course', ['index' => 1], [10]);
+        SeedingIdMap::record('proc-1', 'course', ['index' => 1], [10], $this->repository);
 
-        $data = SeedingIdMap::enrich('proc-1', 'lesson', ['course_index' => 1, 'index' => 1]);
+        $data = SeedingIdMap::enrich('proc-1', 'lesson', ['course_index' => 1, 'index' => 1], $this->repository);
 
         $this->assertSame(10, $data['course_id']);
     }

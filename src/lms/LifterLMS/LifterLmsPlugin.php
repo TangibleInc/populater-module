@@ -12,6 +12,5 @@ class LifterLmsPlugin extends AbstractLmsPlugin
     protected string $name = 'LifterLMS';
     protected string $pluginFile = 'lifterlms/lifterlms.php';
     protected string $seederClass = LifterLMSSeeder::class;
-    protected string $processClass = LifterLMSSeedingProcess::class;
     protected string $backgroundAction = 'seed_lifterlms';
 }

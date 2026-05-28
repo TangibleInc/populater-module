@@ -6,13 +6,12 @@ namespace Tangible\Populater\Tests\Unit\Registry;
 
 use Tangible\Populater\LMS\LearnDash\LearnDashLmsPlugin;
 use Tangible\Populater\LMS\LearnDash\LearnDashSeeder;
-use Tangible\Populater\LMS\LearnDash\LearnDashSeedingProcess;
 use Tangible\Populater\LMS\LifterLMS\LifterLmsPlugin;
-use Tangible\Populater\LMS\LifterLMS\LifterLMSSeedingProcess;
 use Tangible\Populater\Registry\LmsPluginRegistry;
 use Tangible\Populater\Registry\LmsPlugins;
 use Tangible\Populater\Seeders\AbstractSeeder;
 use Tangible\Populater\Seeding\AbstractSeeding;
+use Tangible\Populater\Seeding\LmsSeedingProcess;
 
 class LmsPluginRegistryTest extends \WPTestCase
 {
@@ -52,7 +51,7 @@ class LmsPluginRegistryTest extends \WPTestCase
         $seeder  = $this->registry->createSeeder('lifterlms');
         $process = $this->registry->createProcess('lifterlms', $seeder);
 
-        $this->assertInstanceOf(LifterLMSSeedingProcess::class, $process);
+        $this->assertInstanceOf(LmsSeedingProcess::class, $process);
         $this->assertInstanceOf(AbstractSeeding::class, $process);
     }
 
@@ -82,6 +81,5 @@ final class CustomLmsPluginForTest extends \Tangible\Populater\Registry\Abstract
     protected string $name = 'Custom LMS';
     protected string $pluginFile = 'custom/custom.php';
     protected string $seederClass = LearnDashSeeder::class;
-    protected string $processClass = LearnDashSeedingProcess::class;
     protected string $backgroundAction = 'seed_custom';
 }
