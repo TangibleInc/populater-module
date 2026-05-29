@@ -43,9 +43,14 @@ class LearnDashSeederTest extends \WPTestCase
     {
         Functions\expect('wp_insert_post')
             ->times(2)
-            ->with(\Mockery::on(fn($args) => isset($args['post_type']) && $args['post_type'] === 'sfwd-courses'))
-            ->andReturn(1, 2);
+            ->with(\Mockery::on(function (array $args): bool {
+                $this->assertSame('sfwd-courses', $args['post_type'] ?? '');
+                $this->assertStringContainsString('<h2>', (string) ($args['post_content'] ?? ''));
+                $this->assertStringContainsString('Tangible Populator', (string) ($args['post_excerpt'] ?? ''));
 
+                return true;
+            }))
+            ->andReturn(1, 2);
         Functions\when('is_wp_error')->justReturn(false);
 
         $ids = $this->seeder->seedCourses(2);
@@ -212,6 +217,67 @@ class LearnDashSeederTest extends \WPTestCase
         $this->seeder->seedQuizzes(1, lessonId: 10, options: ['course_id' => 5]);
 
         $this->assertSame(10, $this->meta->getValue(20, 'lesson_id'));
+    }
+
+    public function test_seed_quizzes_creates_questions_when_configured(): void
+    {
+        $this->meta->set(5, 'ld_course_steps', [
+            'steps' => ['h' => ['sfwd-lessons' => [10 => ['sfwd-topic' => [], 'sfwd-quiz' => []]]]],
+            'versions' => [],
+            'empty' => [],
+        ]);
+
+        Functions\expect('wp_insert_post')
+            ->times(3)
+            ->andReturnUsing(static function (array $args): int {
+                return match ($args['post_type'] ?? '') {
+                    'sfwd-quiz'      => 20,
+                    'sfwd-question'  => 100 + (int) preg_replace('/\D/', '', (string) ($args['post_title'] ?? '1')),
+                    default          => 0,
+                };
+            });
+        Functions\when('is_wp_error')->justReturn(false);
+
+        $this->seeder->seedQuizzes(1, lessonId: 10, options: [
+            'course_id'          => 5,
+            'questions_per_quiz' => 2,
+        ]);
+
+        $questions = $this->meta->getValue(20, 'ld_quiz_questions');
+        $this->assertIsArray($questions);
+        $this->assertCount(2, $questions);
+        $this->assertSame(20, $this->meta->getValue(101, 'quiz_id'));
+        $this->assertSame(101, $this->meta->getValue(101, 'question_pro_id'));
+    }
+
+    public function test_seed_lessons_creates_topics_when_configured(): void
+    {
+        $this->meta->set(5, 'ld_course_steps', [
+            'steps' => ['h' => ['sfwd-lessons' => []]],
+            'versions' => [],
+            'empty' => [],
+        ]);
+
+        Functions\expect('wp_insert_post')
+            ->times(3)
+            ->andReturnUsing(static function (array $args): int {
+                return match ($args['post_type'] ?? '') {
+                    'sfwd-lessons' => 10,
+                    'sfwd-topic'   => 100 + (int) preg_replace('/\D/', '', (string) ($args['post_title'] ?? '1')),
+                    default        => 0,
+                };
+            });
+        Functions\when('is_wp_error')->justReturn(false);
+
+        $this->seeder->seedLessons(1, courseId: 5, options: [
+            'index'             => 1,
+            'topics_per_lesson' => 2,
+        ]);
+
+        $steps = $this->meta->getValue(5, 'ld_course_steps');
+        $this->assertCount(2, $steps['steps']['h']['sfwd-lessons'][10]['sfwd-topic']);
+        $this->assertSame(5, $this->meta->getValue(101, 'course_id'));
+        $this->assertSame(10, $this->meta->getValue(101, 'lesson_id'));
     }
 
     public function test_seed_lessons_skips_course_steps_when_course_id_is_zero(): void

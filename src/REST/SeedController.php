@@ -11,6 +11,7 @@ use Tangible\Populater\Seeding\SeedingManager;
  *
  * Endpoints (all require manage_options):
  *   POST   /tangible-populater/v1/seed                         – start a seeding process
+ *   GET    /tangible-populater/v1/seed/active                  – get active seeding process
  *   GET    /tangible-populater/v1/seed/{id}/status             – get status
  *   GET    /tangible-populater/v1/seed/{id}/logs               – get logs
  *   POST   /tangible-populater/v1/seed/{id}/cancel             – cancel
@@ -29,6 +30,12 @@ class SeedController
             'callback'            => [$this, 'startSeed'],
             'permission_callback' => [$this, 'checkAdminPermission'],
             'args'                => $this->getSeedArgs(),
+        ]);
+
+        register_rest_route(self::NAMESPACE, '/seed/active', [
+            'methods'             => \WP_REST_Server::READABLE,
+            'callback'            => [$this, 'getActiveSeed'],
+            'permission_callback' => [$this, 'checkAdminPermission'],
         ]);
 
         register_rest_route(self::NAMESPACE, '/seed/(?P<id>[\w-]+)/status', [
@@ -64,11 +71,15 @@ class SeedController
     public function startSeed(\WP_REST_Request $request): \WP_REST_Response|\WP_Error
     {
         $config = [
-            'plugin'            => $request->get_param('plugin'),
-            'courses'           => (int) ($request->get_param('courses')           ?? 5),
+            'plugin'             => $request->get_param('plugin'),
+            'courses'            => (int) ($request->get_param('courses')            ?? 5),
             'lessons_per_course' => (int) ($request->get_param('lessons_per_course') ?? 5),
             'quizzes_per_lesson' => (int) ($request->get_param('quizzes_per_lesson') ?? 1),
-            'users'             => (int) ($request->get_param('users')             ?? 10),
+            'questions_per_quiz' => (int) ($request->get_param('questions_per_quiz') ?? 3),
+            'topics_per_lesson'  => (int) ($request->get_param('topics_per_lesson')  ?? 2),
+            'sections_per_course' => (int) ($request->get_param('sections_per_course') ?? 1),
+            'modules_per_course' => (int) ($request->get_param('modules_per_course') ?? 1),
+            'users'              => (int) ($request->get_param('users')              ?? 10),
         ];
 
         try {
@@ -82,6 +93,15 @@ class SeedController
         return rest_ensure_response([
             'process_id' => $processId,
             'message'    => __('Seeding process started.', 'tangible-populater'),
+        ]);
+    }
+
+    public function getActiveSeed(\WP_REST_Request $request): \WP_REST_Response
+    {
+        $active = $this->manager->getActiveProcess();
+
+        return rest_ensure_response([
+            'process' => $active?->toArray(),
         ]);
     }
 
@@ -151,6 +171,30 @@ class SeedController
                 'maximum' => 100,
             ],
             'quizzes_per_lesson' => [
+                'type'    => 'integer',
+                'default' => 1,
+                'minimum' => 0,
+                'maximum' => 50,
+            ],
+            'questions_per_quiz' => [
+                'type'    => 'integer',
+                'default' => 3,
+                'minimum' => 0,
+                'maximum' => 100,
+            ],
+            'topics_per_lesson' => [
+                'type'    => 'integer',
+                'default' => 2,
+                'minimum' => 0,
+                'maximum' => 50,
+            ],
+            'sections_per_course' => [
+                'type'    => 'integer',
+                'default' => 1,
+                'minimum' => 0,
+                'maximum' => 50,
+            ],
+            'modules_per_course' => [
                 'type'    => 'integer',
                 'default' => 1,
                 'minimum' => 0,

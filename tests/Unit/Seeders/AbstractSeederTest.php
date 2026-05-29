@@ -71,7 +71,7 @@ class AbstractSeederTest extends \WPTestCase
 
     public function test_build_seed_queue_accepts_seed_config(): void
     {
-        $config = new SeedConfig('test-lms', 3, 0, 0, 4);
+        $config = new SeedConfig('test-lms', 3, 0, 0, 0, 0, 0, 0, 4);
         $queue  = $this->seeder->buildSeedQueue($config);
 
         $courseItems = array_filter($queue, static fn(SeedQueueItem $item) => $item->type === 'course');
@@ -92,5 +92,22 @@ class AbstractSeederTest extends \WPTestCase
         $ids = $this->seeder->seedCourses(1);
 
         $this->assertSame([1], $ids);
+    }
+
+    public function test_seed_courses_includes_dummy_content_and_excerpt(): void
+    {
+        Functions\expect('wp_insert_post')
+            ->once()
+            ->with(\Mockery::on(function (array $args): bool {
+                $this->assertSame('test_course', $args['post_type'] ?? '');
+                $this->assertStringContainsString('<h2>', (string) ($args['post_content'] ?? ''));
+                $this->assertStringContainsString('Tangible Populator', (string) ($args['post_excerpt'] ?? ''));
+
+                return true;
+            }))
+            ->andReturn(1);
+        Functions\when('is_wp_error')->justReturn(false);
+
+        $this->seeder->seedCourses(1);
     }
 }

@@ -14,6 +14,10 @@ final class SeedConfig
         public readonly int $courses,
         public readonly int $lessonsPerCourse,
         public readonly int $quizzesPerLesson,
+        public readonly int $questionsPerQuiz,
+        public readonly int $topicsPerLesson,
+        public readonly int $sectionsPerCourse,
+        public readonly int $modulesPerCourse,
         public readonly int $users,
     ) {}
 
@@ -33,6 +37,10 @@ final class SeedConfig
             courses: max(0, (int) ($config['courses'] ?? 0)),
             lessonsPerCourse: max(0, (int) ($config['lessons_per_course'] ?? 0)),
             quizzesPerLesson: max(0, (int) ($config['quizzes_per_lesson'] ?? 0)),
+            questionsPerQuiz: max(0, (int) ($config['questions_per_quiz'] ?? 3)),
+            topicsPerLesson: max(0, (int) ($config['topics_per_lesson'] ?? 2)),
+            sectionsPerCourse: max(0, (int) ($config['sections_per_course'] ?? 1)),
+            modulesPerCourse: max(0, (int) ($config['modules_per_course'] ?? 1)),
             users: max(0, (int) ($config['users'] ?? 0)),
         );
     }
@@ -47,6 +55,10 @@ final class SeedConfig
             'courses'            => $this->courses,
             'lessons_per_course' => $this->lessonsPerCourse,
             'quizzes_per_lesson' => $this->quizzesPerLesson,
+            'questions_per_quiz' => $this->questionsPerQuiz,
+            'topics_per_lesson'  => $this->topicsPerLesson,
+            'sections_per_course' => $this->sectionsPerCourse,
+            'modules_per_course' => $this->modulesPerCourse,
             'users'              => $this->users,
         ];
     }

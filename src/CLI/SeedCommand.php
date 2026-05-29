@@ -37,6 +37,9 @@ class SeedCommand
      * [--quizzes=<n>]
      * : Quizzes per lesson. Default: 1.
      *
+     * [--questions=<n>]
+     * : Questions per quiz. Default: 3.
+     *
      * [--users=<n>]
      * : Number of users to create. Default: 10.
      *
@@ -55,11 +58,15 @@ class SeedCommand
         $plugin = $args[0] ?? '';
 
         $config = [
-            'plugin'            => $plugin,
-            'courses'           => (int) ($assocArgs['courses'] ?? 5),
+            'plugin'             => $plugin,
+            'courses'            => (int) ($assocArgs['courses']  ?? 5),
             'lessons_per_course' => (int) ($assocArgs['lessons']  ?? 5),
             'quizzes_per_lesson' => (int) ($assocArgs['quizzes']  ?? 1),
-            'users'             => (int) ($assocArgs['users']   ?? 10),
+            'questions_per_quiz' => (int) ($assocArgs['questions'] ?? 3),
+            'topics_per_lesson'  => (int) ($assocArgs['topics']   ?? 2),
+            'sections_per_course' => (int) ($assocArgs['sections'] ?? 1),
+            'modules_per_course' => (int) ($assocArgs['modules']  ?? 1),
+            'users'              => (int) ($assocArgs['users']    ?? 10),
         ];
 
         try {

@@ -11,9 +11,10 @@ use Tangible\Populater\Support\Logger;
  */
 class ProcessRepository
 {
-    public const PREFIX_STATUS = 'tangible_populater_status_';
-    public const PREFIX_LOGS   = 'tangible_populater_logs_';
-    public const PREFIX_IDS    = 'tangible_populater_ids_';
+    public const PREFIX_STATUS     = 'tangible_populater_status_';
+    public const PREFIX_LOGS       = 'tangible_populater_logs_';
+    public const PREFIX_IDS        = 'tangible_populater_ids_';
+    public const ACTIVE_PROCESS    = 'tangible_populater_active_process';
 
     /** @return array<string, mixed> */
     public function getStatus(string $processId): array
@@ -73,5 +74,90 @@ class ProcessRepository
         delete_option(self::PREFIX_STATUS . $processId);
         delete_option(self::PREFIX_IDS . $processId);
         (new Logger($processId))->clear();
+        $this->clearActiveProcessIfMatches($processId);
+    }
+
+    public function setActiveProcess(string $processId): void
+    {
+        update_option(self::ACTIVE_PROCESS, $processId, false);
+    }
+
+    public function getStoredActiveProcessId(): ?string
+    {
+        $processId = get_option(self::ACTIVE_PROCESS, null);
+
+        return is_string($processId) && $processId !== '' ? $processId : null;
+    }
+
+    public function findActiveProcessId(): ?string
+    {
+        $stored = $this->getStoredActiveProcessId();
+
+        if ($stored !== null && $this->isActiveStatus($this->getStatus($stored))) {
+            return $stored;
+        }
+
+        global $wpdb;
+
+        $like = $wpdb->esc_like(self::PREFIX_STATUS) . '%';
+        $rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT option_name, option_value FROM {$wpdb->options} WHERE option_name LIKE %s",
+                $like
+            ),
+            ARRAY_A
+        );
+
+        $activeId       = null;
+        $latestProgress = -1;
+
+        foreach ($rows as $row) {
+            $data = maybe_unserialize($row['option_value']);
+
+            if (!is_array($data) || !$this->isActiveStatus($data)) {
+                continue;
+            }
+
+            $processId = substr((string) $row['option_name'], strlen(self::PREFIX_STATUS));
+            $progress  = (int) ($data['processed'] ?? 0);
+
+            if ($progress >= $latestProgress) {
+                $latestProgress = $progress;
+                $activeId       = $processId;
+            }
+        }
+
+        if ($activeId !== null) {
+            $this->setActiveProcess($activeId);
+
+            return $activeId;
+        }
+
+        if ($stored !== null) {
+            $this->clearActiveProcess();
+        }
+
+        return null;
+    }
+
+    /** @param array<string, mixed> $data */
+    private function isActiveStatus(array $data): bool
+    {
+        return in_array($data['status'] ?? '', [
+            SeedingStatus::STATUS_PENDING,
+            SeedingStatus::STATUS_RUNNING,
+        ], true);
+    }
+
+    public function clearActiveProcess(): void
+    {
+        delete_option(self::ACTIVE_PROCESS);
+    }
+
+    public function clearActiveProcessIfMatches(string $processId): void
+    {
+        if ($this->getStoredActiveProcessId() === $processId) {
+            $this->clearActiveProcess();
+        }
     }
 }

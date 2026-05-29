@@ -78,6 +78,25 @@ class SeedingManager
         return SeedingStatus::fromArray($processId, $data);
     }
 
+    public function getActiveProcess(): ?SeedingStatus
+    {
+        $processId = $this->repository->findActiveProcessId();
+
+        if ($processId === null) {
+            return null;
+        }
+
+        $status = $this->getStatus($processId);
+
+        if (!$status->canBeCancelled()) {
+            $this->repository->clearActiveProcess();
+
+            return null;
+        }
+
+        return $status;
+    }
+
     /**
      * @return list<array{level: string, message: string, timestamp: int}>
      */

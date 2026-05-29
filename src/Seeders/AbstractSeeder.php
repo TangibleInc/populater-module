@@ -7,6 +7,7 @@ namespace Tangible\Populater\Seeders;
 use Tangible\Populater\Registry\AbstractLmsPlugin;
 use Tangible\Populater\Seeding\SeedConfig;
 use Tangible\Populater\Seeding\SeedQueueItem;
+use Tangible\Populater\Support\DummyContent;
 
 /**
  * Base contract for all LMS seeders.
@@ -53,9 +54,10 @@ abstract class AbstractSeeder
     protected function getMetaFor(string $entity, array $context): array
     {
         return match ($entity) {
-            'lessons' => ['course_id' => (int) ($context['courseId'] ?? 0)],
-            'quizzes' => ['lesson_id' => (int) ($context['lessonId'] ?? 0)],
-            default   => [],
+            'lessons'   => ['course_id' => (int) ($context['courseId'] ?? 0)],
+            'quizzes'   => ['lesson_id' => (int) ($context['lessonId'] ?? 0)],
+            'questions' => ['quiz_id' => (int) ($context['quizId'] ?? 0)],
+            default     => [],
         };
     }
 
@@ -75,11 +77,13 @@ abstract class AbstractSeeder
     {
         $ids = [];
         for ($i = 1; $i <= $count; $i++) {
+            $title = $this->defaultTitle($options['title_prefix'] ?? $this->getTitlePrefix('courses'), $i);
             $postId = $this->insertPost([
-                'post_title'   => $this->defaultTitle($options['title_prefix'] ?? $this->getTitlePrefix('courses'), $i),
+                'post_title'   => $title,
                 'post_type'    => $this->getPostType('courses'),
                 'post_status'  => 'publish',
-                'post_content' => sprintf('Sample course %d content.', $i),
+                'post_content' => DummyContent::course($title, $i),
+                'post_excerpt' => DummyContent::excerpt('course', $title, $i),
             ]);
 
             if ($postId > 0) {
@@ -99,17 +103,20 @@ abstract class AbstractSeeder
     {
         $ids = [];
         for ($i = 1; $i <= $count; $i++) {
+            $index = (int) ($options['index'] ?? $i);
+            $title = $this->defaultTitle($options['title_prefix'] ?? $this->getTitlePrefix('lessons'), $index);
             $postId = $this->insertPost([
-                'post_title'   => $this->defaultTitle($options['title_prefix'] ?? $this->getTitlePrefix('lessons'), $i),
+                'post_title'   => $title,
                 'post_type'    => $this->getPostType('lessons'),
                 'post_status'  => 'publish',
-                'post_content' => sprintf('Sample lesson %d content.', $i),
+                'post_content' => DummyContent::lesson($title, $index),
+                'post_excerpt' => DummyContent::excerpt('lesson', $title, $index),
                 'post_parent'  => $courseId,
             ]);
 
             if ($postId > 0) {
                 $this->applyMeta($postId, $this->getMetaFor('lessons', ['courseId' => $courseId]));
-                $this->afterLessonCreated($postId, $courseId, $i, $options);
+                $this->afterLessonCreated($postId, $courseId, $index, $options);
                 $ids[] = $postId;
             }
         }
@@ -125,16 +132,45 @@ abstract class AbstractSeeder
     {
         $ids = [];
         for ($i = 1; $i <= $count; $i++) {
+            $index = (int) ($options['index'] ?? $i);
+            $title = $this->defaultTitle($options['title_prefix'] ?? $this->getTitlePrefix('quizzes'), $index);
             $postId = $this->insertPost([
-                'post_title'   => $this->defaultTitle($options['title_prefix'] ?? $this->getTitlePrefix('quizzes'), $i),
+                'post_title'   => $title,
                 'post_type'    => $this->getPostType('quizzes'),
                 'post_status'  => 'publish',
-                'post_content' => sprintf('Sample quiz %d.', $i),
+                'post_content' => DummyContent::quiz($title, $index),
             ]);
 
             if ($postId > 0) {
                 $this->applyMeta($postId, $this->getMetaFor('quizzes', ['lessonId' => $lessonId]));
-                $this->afterQuizCreated($postId, $lessonId, $i, $options);
+                $this->afterQuizCreated($postId, $lessonId, $index, $options);
+                $this->seedQuestionsForQuiz($postId, $options);
+                $ids[] = $postId;
+            }
+        }
+
+        return $ids;
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     * @return list<int>
+     */
+    public function seedQuestions(int $count, int $quizId, array $options = []): array
+    {
+        $ids = [];
+        for ($i = 1; $i <= $count; $i++) {
+            $title = $this->defaultTitle($options['title_prefix'] ?? $this->getTitlePrefix('questions'), $i);
+            $postId = $this->insertPost([
+                'post_title'   => $title,
+                'post_type'    => $this->getPostType('questions'),
+                'post_status'  => 'publish',
+                'post_content' => DummyContent::question($title, $i),
+            ]);
+
+            if ($postId > 0) {
+                $this->applyMeta($postId, $this->getMetaFor('questions', ['quizId' => $quizId]));
+                $this->afterQuestionCreated($postId, $quizId, $i, $options);
                 $ids[] = $postId;
             }
         }
@@ -209,13 +245,21 @@ abstract class AbstractSeeder
             $queue[] = new SeedQueueItem('course', ['index' => $c]);
 
             for ($l = 1; $l <= $seedConfig->lessonsPerCourse; $l++) {
-                $queue[] = new SeedQueueItem('lesson', ['course_index' => $c, 'index' => $l]);
+                $queue[] = new SeedQueueItem('lesson', [
+                    'course_index'        => $c,
+                    'index'               => $l,
+                    'lessons_per_course'  => $seedConfig->lessonsPerCourse,
+                    'topics_per_lesson'   => $seedConfig->topicsPerLesson,
+                    'sections_per_course' => $seedConfig->sectionsPerCourse,
+                    'modules_per_course'  => $seedConfig->modulesPerCourse,
+                ]);
 
                 for ($q = 1; $q <= $seedConfig->quizzesPerLesson; $q++) {
                     $queue[] = new SeedQueueItem('quiz', [
-                        'course_index' => $c,
-                        'lesson_index' => $l,
-                        'index'        => $q,
+                        'course_index'       => $c,
+                        'lesson_index'       => $l,
+                        'index'              => $q,
+                        'questions_per_quiz' => $seedConfig->questionsPerQuiz,
                     ]);
                 }
             }
@@ -291,4 +335,22 @@ abstract class AbstractSeeder
 
     /** @param array<string, mixed> $options */
     protected function afterQuizCreated(int $postId, int $lessonId, int $index, array $options = []): void {}
+
+    /** @param array<string, mixed> $options */
+    protected function afterQuestionCreated(int $postId, int $quizId, int $index, array $options = []): void {}
+
+    /**
+     * @param array<string, mixed> $options
+     * @return list<int>
+     */
+    protected function seedQuestionsForQuiz(int $quizId, array $options = []): array
+    {
+        $count = (int) ($options['questions_per_quiz'] ?? 0);
+
+        if ($count <= 0 || $quizId <= 0) {
+            return [];
+        }
+
+        return $this->seedQuestions($count, $quizId, $options);
+    }
 }

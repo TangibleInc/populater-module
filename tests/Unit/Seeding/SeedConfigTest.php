@@ -15,6 +15,7 @@ class SeedConfigTest extends \WPTestCase
             'courses'            => 2,
             'lessons_per_course' => 3,
             'quizzes_per_lesson' => 1,
+            'questions_per_quiz' => 5,
             'users'              => 4,
         ]);
 
@@ -22,6 +23,10 @@ class SeedConfigTest extends \WPTestCase
         $this->assertSame(2, $config->courses);
         $this->assertSame(3, $config->lessonsPerCourse);
         $this->assertSame(1, $config->quizzesPerLesson);
+        $this->assertSame(5, $config->questionsPerQuiz);
+        $this->assertSame(2, $config->topicsPerLesson);
+        $this->assertSame(1, $config->sectionsPerCourse);
+        $this->assertSame(1, $config->modulesPerCourse);
         $this->assertSame(4, $config->users);
     }
 
@@ -39,5 +44,47 @@ class SeedConfigTest extends \WPTestCase
         ]);
 
         $this->assertSame(0, $config->courses);
+    }
+
+    public function test_questions_per_quiz_defaults_to_three(): void
+    {
+        $config = SeedConfig::fromArray([
+            'plugin' => 'learndash',
+        ]);
+
+        $this->assertSame(3, $config->questionsPerQuiz);
+    }
+
+    public function test_topics_per_lesson_defaults_to_two(): void
+    {
+        $config = SeedConfig::fromArray([
+            'plugin' => 'learndash',
+        ]);
+
+        $this->assertSame(2, $config->topicsPerLesson);
+    }
+
+    public function test_sections_and_modules_default_to_one(): void
+    {
+        $config = SeedConfig::fromArray([
+            'plugin' => 'lifterlms',
+        ]);
+
+        $this->assertSame(1, $config->sectionsPerCourse);
+        $this->assertSame(1, $config->modulesPerCourse);
+    }
+
+    public function test_to_array_includes_structure_settings(): void
+    {
+        $config = SeedConfig::fromArray([
+            'plugin'              => 'learndash',
+            'topics_per_lesson'   => 4,
+            'sections_per_course' => 2,
+            'modules_per_course'  => 3,
+        ]);
+
+        $this->assertSame(4, $config->toArray()['topics_per_lesson']);
+        $this->assertSame(2, $config->toArray()['sections_per_course']);
+        $this->assertSame(3, $config->toArray()['modules_per_course']);
     }
 }

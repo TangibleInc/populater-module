@@ -69,10 +69,13 @@ class SettingsPage
             true
         );
 
+        $activeProcess = $this->seedingManager->getActiveProcess();
+
         wp_localize_script('tangible-populater-admin', 'tangiblePopulater', [
-            'restUrl'   => rest_url('tangible-populater/v1'),
-            'nonce'     => wp_create_nonce('wp_rest'),
-            'plugins'   => $this->seedingManager->getSupportedPlugins(),
+            'restUrl'       => rest_url('tangible-populater/v1'),
+            'nonce'         => wp_create_nonce('wp_rest'),
+            'plugins'       => $this->seedingManager->getSupportedPlugins(),
+            'activeProcess' => $activeProcess?->toArray(),
         ]);
     }
 
@@ -122,6 +125,10 @@ class SettingsPage
                     <tr>
                         <th scope="row"><label for="tp-quizzes"><?php esc_html_e('Quizzes per Lesson', 'tangible-populater'); ?></label></th>
                         <td><input type="number" id="tp-quizzes" name="quizzes_per_lesson" value="1" min="0" max="50" class="small-text"></td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="tp-questions"><?php esc_html_e('Questions per Quiz', 'tangible-populater'); ?></label></th>
+                        <td><input type="number" id="tp-questions" name="questions_per_quiz" value="3" min="0" max="100" class="small-text"></td>
                     </tr>
                     <tr>
                         <th scope="row"><label for="tp-users"><?php esc_html_e('Users', 'tangible-populater'); ?></label></th>

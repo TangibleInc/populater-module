@@ -48,6 +48,7 @@ abstract class AbstractSeeding extends \WP_Background_Process
             'errors'    => 0,
             'error'     => null,
         ]);
+        $this->repository->setActiveProcess($processId);
 
         foreach ($queue as $item) {
             $this->push_to_queue([
@@ -76,6 +77,7 @@ abstract class AbstractSeeding extends \WP_Background_Process
             'status' => SeedingStatus::STATUS_CANCELLED,
         ]));
         $this->repository->deleteIdMap($processId);
+        $this->repository->clearActiveProcessIfMatches($processId);
 
         return true;
     }
@@ -166,6 +168,13 @@ abstract class AbstractSeeding extends \WP_Background_Process
         if ($statusData['status'] === SeedingStatus::STATUS_COMPLETED) {
             $this->repository->deleteIdMap($processId);
             $logger->info('Seeding completed.');
+        }
+
+        if (in_array($statusData['status'], [
+            SeedingStatus::STATUS_COMPLETED,
+            SeedingStatus::STATUS_FAILED,
+        ], true)) {
+            $this->repository->clearActiveProcessIfMatches($processId);
         }
 
         return false;

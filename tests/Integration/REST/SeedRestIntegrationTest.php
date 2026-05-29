@@ -18,10 +18,14 @@ use Tangible\Populater\Tests\Support\PluginTestAccessor;
  */
 class SeedRestIntegrationTest extends WordPressIntegrationTestCase
 {
-    private const COURSES = 2;
-    private const LESSONS = 3;
-    private const QUIZZES = 2;
-    private const USERS   = 4;
+    private const COURSES   = 2;
+    private const LESSONS   = 3;
+    private const QUIZZES   = 2;
+    private const QUESTIONS = 3;
+    private const TOPICS    = 2;
+    private const SECTIONS  = 1;
+    private const MODULES   = 1;
+    private const USERS     = 4;
 
     /**
      * @return array<string, array{0: string}>
@@ -65,6 +69,10 @@ class SeedRestIntegrationTest extends WordPressIntegrationTestCase
             self::LESSONS,
             self::QUIZZES,
             self::USERS,
+            self::QUESTIONS,
+            self::TOPICS,
+            self::SECTIONS,
+            self::MODULES,
         );
         $expectedTotal = $expected['courses'] + $expected['lessons'] + $expected['quizzes'] + $expected['users'];
 
@@ -80,23 +88,19 @@ class SeedRestIntegrationTest extends WordPressIntegrationTestCase
 
         $delta = LmsContentInspector::diff($before, LmsContentInspector::snapshot($plugin));
 
-        $this->assertSame($expected['courses'], $delta['courses'], 'Course count mismatch.');
-        $this->assertSame($expected['lessons'], $delta['lessons'], 'Lesson count mismatch.');
-        $this->assertSame($expected['quizzes'], $delta['quizzes'], 'Quiz count mismatch.');
-        $this->assertSame($expected['users'], $delta['users'], 'User count mismatch.');
-
-        if ($plugin === 'lifterlms') {
-            $this->assertSame($expected['sections'], $delta['sections'], 'LifterLMS section count mismatch.');
-            LmsContentInspector::assertLifterStructure($this, self::COURSES, self::LESSONS, self::QUIZZES, $maxPostId);
-        }
-
-        if ($plugin === 'learndash') {
-            LmsContentInspector::assertLearnDashStructure($this, self::COURSES, self::LESSONS, self::QUIZZES, $maxPostId);
-        }
-
-        if ($plugin === 'tangible-lms') {
-            LmsContentInspector::assertTangibleStructure($this, self::COURSES, self::LESSONS, self::QUIZZES, $maxPostId);
-        }
+        LmsContentInspector::assertSeededCounts($this, $plugin, $delta, $expected);
+        LmsContentInspector::assertSeededStructure(
+            $this,
+            $plugin,
+            self::COURSES,
+            self::LESSONS,
+            self::QUIZZES,
+            $maxPostId,
+            self::QUESTIONS,
+            self::TOPICS,
+            self::SECTIONS,
+            self::MODULES,
+        );
 
         $statusResponse = $this->restRequest('GET', '/tangible-populater/v1/seed/' . $processId . '/status');
         $statusData     = $this->restData($statusResponse);

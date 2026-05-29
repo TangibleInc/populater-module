@@ -43,7 +43,13 @@ class TangibleLMSSeederTest extends \WPTestCase
     {
         Functions\expect('wp_insert_post')
             ->times(2)
-            ->with(\Mockery::on(fn($args) => ($args['post_type'] ?? '') === 'tgl_course'))
+            ->with(\Mockery::on(function (array $args): bool {
+                $this->assertSame('tgl_course', $args['post_type'] ?? '');
+                $this->assertStringContainsString('<h2>', (string) ($args['post_content'] ?? ''));
+                $this->assertStringContainsString('Tangible Populator', (string) ($args['post_excerpt'] ?? ''));
+
+                return true;
+            }))
             ->andReturn(1, 2);
         Functions\when('is_wp_error')->justReturn(false);
 
@@ -52,19 +58,44 @@ class TangibleLMSSeederTest extends \WPTestCase
         $this->assertCount(2, $ids);
     }
 
-    public function test_seed_lessons_parents_to_course_and_sets_tgl_course_id_meta(): void
+    public function test_seed_lessons_creates_module_and_parents_lesson_to_it(): void
     {
+        Functions\expect('wp_insert_post')
+            ->twice()
+            ->andReturnUsing(static function (array $args): int {
+                return match ($args['post_type'] ?? '') {
+                    'tgl_module' => 50,
+                    'tgl_lesson' => 10,
+                    default      => 0,
+                };
+            });
+        Functions\when('is_wp_error')->justReturn(false);
+
+        $ids = $this->seeder->seedLessons(1, courseId: 5);
+
+        $this->assertSame([10], $ids);
+        $this->assertSame(50, (int) $this->meta->getValue(10, '_tgl_module_id'));
+        $this->assertSame(5, $this->meta->getValue(10, '_tgl_course_id'));
+        $this->assertSame(5, $this->meta->getValue(50, '_tgl_course_id'));
+        $moduleIds = $this->meta->getValue(5, '_populater_tgl_module_ids');
+        $this->assertIsArray($moduleIds);
+        $this->assertSame(50, $moduleIds[1] ?? null);
+    }
+
+    public function test_seed_lessons_reuses_cached_module_for_course(): void
+    {
+        $this->meta->set(5, '_populater_tgl_module_ids', [1 => 50]);
+
         Functions\expect('wp_insert_post')
             ->once()
             ->with(\Mockery::on(fn($args) => ($args['post_type'] ?? '') === 'tgl_lesson'
-                && ($args['post_parent'] ?? 0) === 5))
+                && ($args['post_parent'] ?? 0) === 50))
             ->andReturn(10);
         Functions\when('is_wp_error')->justReturn(false);
 
         $ids = $this->seeder->seedLessons(1, courseId: 5);
 
         $this->assertSame([10], $ids);
-        $this->assertSame(5, $this->meta->getValue(10, '_tgl_course_id'));
     }
 
     public function test_seed_quizzes_uses_tgl_quiz_post_type_and_sets_lesson_meta(): void
@@ -94,6 +125,41 @@ class TangibleLMSSeederTest extends \WPTestCase
 
         $this->assertSame(15, $this->meta->getValue(20, '_tgl_lesson_id'));
         $this->assertNull($this->meta->getValue(20, '_tgl_course_id'));
+    }
+
+    public function test_seed_quizzes_creates_questions_when_configured(): void
+    {
+        Functions\expect('wp_insert_post')
+            ->times(3)
+            ->andReturnUsing(static function (array $args): int {
+                return match ($args['post_type'] ?? '') {
+                    'tgl_quiz'      => 20,
+                    'tgl_question'  => 40 + (int) preg_replace('/\D/', '', (string) ($args['post_title'] ?? '1')),
+                    default         => 0,
+                };
+            });
+        Functions\when('is_wp_error')->justReturn(false);
+
+        $this->seeder->seedQuizzes(1, lessonId: 15, options: ['questions_per_quiz' => 2]);
+
+        $this->assertSame(20, $this->meta->getValue(41, '_tgl_quiz_id'));
+        $this->assertSame(20, $this->meta->getValue(42, '_tgl_quiz_id'));
+    }
+
+    public function test_seed_quizzes_include_dummy_quiz_content(): void
+    {
+        Functions\expect('wp_insert_post')
+            ->once()
+            ->with(\Mockery::on(function (array $args): bool {
+                $this->assertSame('tgl_quiz', $args['post_type'] ?? '');
+                $this->assertStringContainsString('<h2>', (string) ($args['post_content'] ?? ''));
+
+                return true;
+            }))
+            ->andReturn(20);
+        Functions\when('is_wp_error')->justReturn(false);
+
+        $this->seeder->seedQuizzes(1, lessonId: 15);
     }
 
     public function test_seed_users_returns_array_of_ids(): void

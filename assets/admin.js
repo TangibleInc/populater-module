@@ -7,7 +7,8 @@
 (function () {
     'use strict';
 
-    const { restUrl, nonce } = window.tangiblePopulater || {};
+    const { restUrl, nonce, activeProcess: initialActiveProcess } = window.tangiblePopulater || {};
+    const PROCESS_STORAGE_KEY = 'tangiblePopulater.processId';
 
     const apiFetch = async (path, options = {}) => {
         const response = await fetch(`${restUrl}${path}`, {
@@ -79,11 +80,52 @@
         statusEl.style.display = message ? '' : 'none';
     };
 
+    const rememberProcessId = (processId) => {
+        try {
+            sessionStorage.setItem(PROCESS_STORAGE_KEY, processId);
+        } catch (err) {
+            // Ignore storage failures (private mode, quota, etc.).
+        }
+    };
+
+    const forgetProcessId = () => {
+        try {
+            sessionStorage.removeItem(PROCESS_STORAGE_KEY);
+        } catch (err) {
+            // Ignore storage failures.
+        }
+    };
+
+    const isActiveStatus = (status) => ['pending', 'running'].includes(status);
+
     // -------------------------------------------------------------------------
     // Polling
     // -------------------------------------------------------------------------
 
     let lastLogCount = 0;
+
+    const startPolling = (processId) => {
+        if (pollTimer) {
+            clearInterval(pollTimer);
+        }
+
+        currentProcessId = processId;
+        rememberProcessId(processId);
+        setRunning(true);
+        pollTimer = setInterval(poll, 1500);
+        poll();
+    };
+
+    const stopPolling = () => {
+        if (pollTimer) {
+            clearInterval(pollTimer);
+            pollTimer = null;
+        }
+        currentProcessId = null;
+        lastLogCount = 0;
+        forgetProcessId();
+        setRunning(false);
+    };
 
     const poll = async () => {
         if (!currentProcessId) return;
@@ -104,10 +146,7 @@
 
             const terminal = ['completed', 'cancelled', 'failed'];
             if (terminal.includes(status.status)) {
-                clearInterval(pollTimer);
-                setRunning(false);
-                currentProcessId = null;
-                lastLogCount = 0;
+                stopPolling();
 
                 if (status.status === 'failed') {
                     showStatusMessage(status.error || 'Seeding failed. See log for details.', true);
@@ -118,17 +157,63 @@
                 }
             }
         } catch (err) {
-            clearInterval(pollTimer);
-            setRunning(false);
+            stopPolling();
             showStatusMessage(err.message || 'Failed to fetch status.', true);
         }
+    };
+
+    const resolveActiveProcess = async () => {
+        if (initialActiveProcess?.id && isActiveStatus(initialActiveProcess.status)) {
+            return initialActiveProcess;
+        }
+
+        let storedId = null;
+        try {
+            storedId = sessionStorage.getItem(PROCESS_STORAGE_KEY);
+        } catch (err) {
+            storedId = null;
+        }
+
+        if (storedId) {
+            try {
+                const status = await apiFetch(`/seed/${storedId}/status`);
+                if (isActiveStatus(status.status)) {
+                    return status;
+                }
+                forgetProcessId();
+            } catch (err) {
+                forgetProcessId();
+            }
+        }
+
+        try {
+            const data = await apiFetch('/seed/active');
+            if (data.process?.id && isActiveStatus(data.process.status)) {
+                return data.process;
+            }
+        } catch (err) {
+            // Fall through silently; page still works for starting new seeds.
+        }
+
+        return null;
+    };
+
+    const resumeActiveProcess = async () => {
+        const active = await resolveActiveProcess();
+
+        if (!active?.id) {
+            return;
+        }
+
+        setProgress(active.processed, active.total);
+        startPolling(active.id);
     };
 
     // -------------------------------------------------------------------------
     // Event listeners
     // -------------------------------------------------------------------------
 
-    document.addEventListener('DOMContentLoaded', () => {
+    const init = () => {
         const startBtn  = el('tp-start-btn');
         const cancelBtn = el('tp-cancel-btn');
         const resetBtn  = el('tp-reset-btn');
@@ -139,6 +224,7 @@
                 const courses = parseInt(el('tp-courses').value, 10);
                 const lessons = parseInt(el('tp-lessons').value, 10);
                 const quizzes = parseInt(el('tp-quizzes').value, 10);
+                const questions = parseInt(el('tp-questions').value, 10);
                 const users   = parseInt(el('tp-users').value, 10);
 
                 el('tp-log-output').textContent = '';
@@ -154,19 +240,19 @@
                             courses,
                             lessons_per_course: lessons,
                             quizzes_per_lesson: quizzes,
+                            questions_per_quiz: questions,
                             users,
                         }),
                     });
 
                     if (data.process_id) {
-                        currentProcessId = data.process_id;
-                        pollTimer = setInterval(poll, 1500);
+                        startPolling(data.process_id);
                     } else {
-                        setRunning(false);
+                        stopPolling();
                         showStatusMessage(data.message || 'Failed to start seeding.', true);
                     }
                 } catch (err) {
-                    setRunning(false);
+                    stopPolling();
                     showStatusMessage(err.message || 'Failed to start seeding.', true);
                 }
             });
@@ -180,9 +266,7 @@
                 } catch (err) {
                     showStatusMessage(err.message || 'Failed to cancel.', true);
                 } finally {
-                    clearInterval(pollTimer);
-                    setRunning(false);
-                    currentProcessId = null;
+                    stopPolling();
                 }
             });
         }
@@ -213,5 +297,13 @@
                     });
             });
         }
-    });
+
+        resumeActiveProcess();
+    };
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
 })();
