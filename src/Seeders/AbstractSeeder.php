@@ -43,7 +43,10 @@ abstract class AbstractSeeder
     /**
      * Post type for an entity key: courses, lessons, quizzes, certificates.
      */
-    abstract protected function getPostType(string $entity): string;
+    protected function getPostType(string $entity): string
+    {
+        return $this->plugin->getEntitySchema()->getPostType($entity);
+    }
 
     /**
      * Meta to set after a post is created.
@@ -53,12 +56,7 @@ abstract class AbstractSeeder
      */
     protected function getMetaFor(string $entity, array $context): array
     {
-        return match ($entity) {
-            'lessons'   => ['course_id' => (int) ($context['courseId'] ?? 0)],
-            'quizzes'   => ['lesson_id' => (int) ($context['lessonId'] ?? 0)],
-            'questions' => ['quiz_id' => (int) ($context['quizId'] ?? 0)],
-            default     => [],
-        };
+        return $this->plugin->getEntitySchema()->resolveMeta($entity, $context);
     }
 
     /**
@@ -66,7 +64,7 @@ abstract class AbstractSeeder
      */
     protected function getTitlePrefix(string $entity): string
     {
-        return $this->getName() . ' ' . ucfirst(rtrim($entity, 's'));
+        return $this->plugin->getEntitySchema()->getTitlePrefix($entity, $this->getName());
     }
 
     /**

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tangible\Populater\Tests\Support;
 
 use Tangible\Populater\Registry\AbstractLmsPlugin;
+use Tangible\Populater\Registry\LmsEntitySchema;
 use Tangible\Populater\Seeders\AbstractSeeder;
 
 /**
@@ -17,4 +18,21 @@ final class TestLmsPlugin extends AbstractLmsPlugin
     protected string $pluginFile = 'test/test.php';
     protected string $seederClass = AbstractSeeder::class;
     protected string $backgroundAction = 'seed_test';
+
+    protected function defineEntitySchema(): LmsEntitySchema
+    {
+        return new LmsEntitySchema(
+            postTypes: [
+                'courses' => 'test_course',
+                'lessons' => 'test_lesson',
+                'quizzes' => 'test_quiz',
+            ],
+            userPrefix: 'test_lms_user',
+            metaMap: [
+                'lessons'   => ['course_id' => 'courseId'],
+                'quizzes'   => ['lesson_id' => 'lessonId'],
+                'questions' => ['quiz_id' => 'quizId'],
+            ],
+        );
+    }
 }

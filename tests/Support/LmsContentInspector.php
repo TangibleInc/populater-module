@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace Tangible\Populater\Tests\Support;
 
+use Tangible\Populater\Registry\AbstractLmsPlugin;
+use Tangible\Populater\Registry\LmsEntitySchema;
+use Tangible\Populater\Registry\LmsPlugins;
+use Tangible\Populater\Seeders\AbstractSeeder;
+
 /**
  * Counts LMS entities in WordPress and verifies LMS-specific structure.
  */
@@ -92,7 +97,7 @@ final class LmsContentInspector
     /** @return array{courses: int, lessons: int, topics: int, quizzes: int, questions: int, sections: int, modules: int, users: int} */
     public static function snapshot(string $pluginSlug): array
     {
-        $types = self::postTypesFor($pluginSlug);
+        $types = self::schemaFor($pluginSlug)->postTypesForSnapshot();
 
         return [
             'courses'   => self::countPosts($types['courses']),
@@ -182,7 +187,13 @@ final class LmsContentInspector
         int $questionsPerQuiz = 3,
         int $topicsPerLesson = 2,
     ): void {
-        $coursePosts = self::newestPosts('sfwd-courses', $courses, $afterPostId);
+        $schema      = self::schemaFor('learndash');
+        $courseType  = $schema->getPostType('courses');
+        $lessonType  = $schema->getPostType('lessons');
+        $topicType   = $schema->getPostType('topics');
+        $quizType    = $schema->getPostType('quizzes');
+        $questionType = $schema->getPostType('questions');
+        $coursePosts = self::newestPosts($courseType, $courses, $afterPostId);
 
         $test->assertCount($courses, $coursePosts, 'Expected newly created LearnDash courses.');
 
@@ -191,20 +202,20 @@ final class LmsContentInspector
 
             $steps = get_post_meta($course->ID, 'ld_course_steps', true);
             $test->assertIsArray($steps, 'Course should have ld_course_steps meta.');
-            $lessonSteps = $steps['steps']['h']['sfwd-lessons'] ?? [];
+            $lessonSteps = $steps['steps']['h'][$lessonType] ?? [];
             $test->assertCount($lessonsPerCourse, $lessonSteps, 'Course should contain expected lessons in ld_course_steps.');
 
             foreach ($lessonSteps as $lessonId => $entry) {
-                $test->assertArrayHasKey('sfwd-topic', $entry, 'LearnDash lesson step should reserve sfwd-topic.');
-                $test->assertIsArray($entry['sfwd-topic']);
-                $test->assertCount($topicsPerLesson, $entry['sfwd-topic'], 'Lesson should contain expected topics in ld_course_steps.');
-                $test->assertArrayHasKey('sfwd-quiz', $entry);
-                $test->assertCount($quizzesPerLesson, $entry['sfwd-quiz'], 'Lesson should contain expected quizzes in ld_course_steps.');
+                $test->assertArrayHasKey($topicType, $entry, 'LearnDash lesson step should reserve topic post type.');
+                $test->assertIsArray($entry[$topicType]);
+                $test->assertCount($topicsPerLesson, $entry[$topicType], 'Lesson should contain expected topics in ld_course_steps.');
+                $test->assertArrayHasKey($quizType, $entry);
+                $test->assertCount($quizzesPerLesson, $entry[$quizType], 'Lesson should contain expected quizzes in ld_course_steps.');
                 $test->assertSame($courses > 0 ? $course->ID : 0, (int) get_post_meta((int) $lessonId, 'course_id', true));
             }
         }
 
-        $lessonPosts = self::newestPosts('sfwd-lessons', $courses * $lessonsPerCourse, $afterPostId);
+        $lessonPosts = self::newestPosts($lessonType, $courses * $lessonsPerCourse, $afterPostId);
 
         foreach ($lessonPosts as $lesson) {
             self::assertRichLessonContent($test, $lesson);
@@ -213,7 +224,7 @@ final class LmsContentInspector
 
         if ($topicsPerLesson > 0) {
             $topics = self::newestPosts(
-                'sfwd-topic',
+                $topicType,
                 $courses * $lessonsPerCourse * $topicsPerLesson,
                 $afterPostId,
             );
@@ -226,7 +237,7 @@ final class LmsContentInspector
         }
 
         $quizPosts = self::newestPosts(
-            'sfwd-quiz',
+            $quizType,
             $courses * $lessonsPerCourse * $quizzesPerLesson,
             $afterPostId,
         );
@@ -254,7 +265,7 @@ final class LmsContentInspector
 
         if ($questionsPerQuiz > 0) {
             $questionPosts = self::newestPosts(
-                'sfwd-question',
+                $questionType,
                 $courses * $lessonsPerCourse * $quizzesPerLesson * $questionsPerQuiz,
                 $afterPostId,
             );
@@ -277,13 +288,20 @@ final class LmsContentInspector
         int $questionsPerQuiz = 3,
         int $sectionsPerCourse = 1,
     ): void {
-        $coursePosts = self::newestPosts('course', $courses, $afterPostId);
+        $schema       = self::schemaFor('lifterlms');
+        $courseType   = $schema->getPostType('courses');
+        $sectionType  = $schema->getPostType('sections');
+        $lessonType   = $schema->getPostType('lessons');
+        $quizType     = $schema->getPostType('quizzes');
+        $questionType = $schema->getPostType('questions');
+        $container    = $schema->container;
+        $coursePosts  = self::newestPosts($courseType, $courses, $afterPostId);
 
         foreach ($coursePosts as $course) {
             self::assertRichCourseContent($test, $course);
         }
 
-        $sections = self::newestPosts('llms_section', $courses * $sectionsPerCourse, $afterPostId);
+        $sections = self::newestPosts($sectionType, $courses * $sectionsPerCourse, $afterPostId);
         $test->assertCount($courses * $sectionsPerCourse, $sections, 'LifterLMS should create expected sections per course.');
 
         foreach ($sections as $section) {
@@ -291,22 +309,22 @@ final class LmsContentInspector
             self::assertRichSectionContent($test, $section);
             $test->assertSame(
                 (int) $section->post_parent,
-                (int) get_post_meta($section->ID, '_llms_parent_course', true),
+                (int) get_post_meta($section->ID, $container?->parentMetaKey ?? '_llms_parent_course', true),
             );
         }
 
-        $lessons = self::newestPosts('lesson', $courses * $lessonsPerCourse, $afterPostId);
+        $lessons = self::newestPosts($lessonType, $courses * $lessonsPerCourse, $afterPostId);
 
         foreach ($lessons as $lesson) {
             self::assertRichLessonContent($test, $lesson);
-            $sectionId = (int) get_post_meta($lesson->ID, '_llms_parent_section', true);
+            $sectionId = (int) get_post_meta($lesson->ID, $container?->lessonParentMetaKey ?? '_llms_parent_section', true);
             $test->assertGreaterThan(0, $sectionId, 'LifterLMS lesson should belong to a section.');
             $test->assertSame($sectionId, (int) $lesson->post_parent, 'LifterLMS lesson post_parent should be the section.');
             $test->assertGreaterThan(0, (int) get_post_meta($lesson->ID, '_llms_parent_course', true));
         }
 
         $quizzes = self::newestPosts(
-            'llms_quiz',
+            $quizType,
             $courses * $lessonsPerCourse * $quizzesPerLesson,
             $afterPostId,
         );
@@ -318,7 +336,7 @@ final class LmsContentInspector
 
         if ($questionsPerQuiz > 0) {
             $questions = self::newestPosts(
-                'llms_question',
+                $questionType,
                 $courses * $lessonsPerCourse * $quizzesPerLesson * $questionsPerQuiz,
                 $afterPostId,
             );
@@ -328,7 +346,7 @@ final class LmsContentInspector
                 $quizId = (int) get_post_meta($question->ID, '_llms_parent_id', true);
                 $test->assertGreaterThan(0, $quizId, 'LifterLMS question should reference a quiz.');
                 $test->assertSame('true_false', get_post_meta($question->ID, '_llms_question_type', true));
-                $test->assertSame('llms_quiz', get_post_type($quizId), 'LifterLMS question should belong to a quiz post.');
+                $test->assertSame($quizType, get_post_type($quizId), 'LifterLMS question should belong to a quiz post.');
             }
         }
     }
@@ -342,13 +360,20 @@ final class LmsContentInspector
         int $questionsPerQuiz = 3,
         int $modulesPerCourse = 1,
     ): void {
-        $coursePosts = self::newestPosts('tgl_course', $courses, $afterPostId);
+        $schema       = self::schemaFor('tangible-lms');
+        $courseType   = $schema->getPostType('courses');
+        $moduleType   = $schema->getPostType('modules');
+        $lessonType   = $schema->getPostType('lessons');
+        $quizType     = $schema->getPostType('quizzes');
+        $questionType = $schema->getPostType('questions');
+        $container    = $schema->container;
+        $coursePosts  = self::newestPosts($courseType, $courses, $afterPostId);
 
         foreach ($coursePosts as $course) {
             self::assertRichCourseContent($test, $course);
         }
 
-        $modules = self::newestPosts('tgl_module', $courses * $modulesPerCourse, $afterPostId);
+        $modules = self::newestPosts($moduleType, $courses * $modulesPerCourse, $afterPostId);
         $test->assertCount($courses * $modulesPerCourse, $modules, 'Tangible LMS should create expected modules per course.');
 
         foreach ($modules as $module) {
@@ -356,11 +381,11 @@ final class LmsContentInspector
             self::assertRichModuleContent($test, $module);
             $test->assertSame(
                 (int) $module->post_parent,
-                (int) get_post_meta($module->ID, '_tgl_course_id', true),
+                (int) get_post_meta($module->ID, $container?->parentMetaKey ?? '_tgl_course_id', true),
             );
         }
 
-        $lessons = self::newestPosts('tgl_lesson', $courses * $lessonsPerCourse, $afterPostId);
+        $lessons = self::newestPosts($lessonType, $courses * $lessonsPerCourse, $afterPostId);
 
         foreach ($lessons as $lesson) {
             self::assertRichLessonContent($test, $lesson);
@@ -371,7 +396,7 @@ final class LmsContentInspector
         }
 
         $quizzes = self::newestPosts(
-            'tgl_quiz',
+            $quizType,
             $courses * $lessonsPerCourse * $quizzesPerLesson,
             $afterPostId,
         );
@@ -383,7 +408,7 @@ final class LmsContentInspector
 
         if ($questionsPerQuiz > 0) {
             $questions = self::newestPosts(
-                'tgl_question',
+                $questionType,
                 $courses * $lessonsPerCourse * $quizzesPerLesson * $questionsPerQuiz,
                 $afterPostId,
             );
@@ -392,7 +417,7 @@ final class LmsContentInspector
                 self::assertRichQuestionContent($test, $question);
                 $quizId = (int) get_post_meta($question->ID, '_tgl_quiz_id', true);
                 $test->assertGreaterThan(0, $quizId, 'Tangible question should reference a quiz.');
-                $test->assertSame('tgl_quiz', get_post_type($quizId), 'Tangible question should belong to a quiz post.');
+                $test->assertSame($quizType, get_post_type($quizId), 'Tangible question should belong to a quiz post.');
             }
         }
     }
@@ -444,36 +469,20 @@ final class LmsContentInspector
         $test->assertNotSame('', trim(strip_tags((string) $post->post_content)), 'Question should have body content.');
     }
 
-    /** @return array{courses: string, lessons: string, quizzes: string, questions: string, user_prefix: string, topics?: string, sections?: string, modules?: string} */
-    private static function postTypesFor(string $pluginSlug): array
+    private static function schemaFor(string $pluginSlug): LmsEntitySchema
     {
-        return match ($pluginSlug) {
-            'learndash' => [
-                'courses'     => 'sfwd-courses',
-                'lessons'     => 'sfwd-lessons',
-                'topics'      => 'sfwd-topic',
-                'quizzes'     => 'sfwd-quiz',
-                'questions'   => 'sfwd-question',
-                'user_prefix' => 'learndash_user',
-            ],
-            'lifterlms' => [
-                'courses'     => 'course',
-                'lessons'     => 'lesson',
-                'quizzes'     => 'llms_quiz',
-                'questions'   => 'llms_question',
-                'sections'    => 'llms_section',
-                'user_prefix' => 'lifterlms_user',
-            ],
-            'tangible-lms' => [
-                'courses'     => 'tgl_course',
-                'lessons'     => 'tgl_lesson',
-                'quizzes'     => 'tgl_quiz',
-                'questions'   => 'tgl_question',
-                'modules'     => 'tgl_module',
-                'user_prefix' => 'tangible_lms_user',
-            ],
-            default => throw new \InvalidArgumentException(sprintf('Unknown plugin slug "%s".', $pluginSlug)),
-        };
+        $registered = AbstractLmsPlugin::getRegistered();
+
+        if (!isset($registered[$pluginSlug])) {
+            LmsPlugins::registerBuiltIn();
+            $registered = AbstractLmsPlugin::getRegistered();
+        }
+
+        if (!isset($registered[$pluginSlug])) {
+            throw new \InvalidArgumentException(sprintf('Unknown plugin slug "%s".', $pluginSlug));
+        }
+
+        return $registered[$pluginSlug]->getEntitySchema();
     }
 
     private static function countPosts(string $postType): int

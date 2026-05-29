@@ -15,43 +15,6 @@ use Tangible\Populater\Support\DummyContent;
  */
 class LearnDashSeeder extends AbstractSeeder
 {
-    protected function getPostType(string $entity): string
-    {
-        return match ($entity) {
-            'courses'      => 'sfwd-courses',
-            'lessons'      => 'sfwd-lessons',
-            'topics'       => 'sfwd-topic',
-            'quizzes'      => 'sfwd-quiz',
-            'questions'    => 'sfwd-question',
-            'certificates' => 'sfwd-certificates',
-            default        => 'post',
-        };
-    }
-
-    protected function getTitlePrefix(string $entity): string
-    {
-        return match ($entity) {
-            'courses'      => 'LearnDash Course',
-            'lessons'      => 'LearnDash Lesson',
-            'topics'       => 'LearnDash Topic',
-            'quizzes'      => 'LearnDash Quiz',
-            'questions'    => 'LearnDash Question',
-            'certificates' => 'LearnDash Certificate',
-            default        => parent::getTitlePrefix($entity),
-        };
-    }
-
-    protected function getMetaFor(string $entity, array $context): array
-    {
-        return match ($entity) {
-            'topics' => [
-                'course_id' => (int) ($context['courseId'] ?? 0),
-                'lesson_id' => (int) ($context['lessonId'] ?? 0),
-            ],
-            default => parent::getMetaFor($entity, $context),
-        };
-    }
-
     protected function afterCourseCreated(int $postId, int $index, array $options = []): void
     {
         $this->initializeCourseSteps($postId);
@@ -159,10 +122,12 @@ class LearnDashSeeder extends AbstractSeeder
 
     private function initializeCourseSteps(int $courseId): void
     {
+        $lessonType = $this->getPostType('lessons');
+
         $steps = [
             'steps' => [
                 'h' => [
-                    'sfwd-lessons' => [],
+                    $lessonType => [],
                 ],
             ],
             'versions' => [],
@@ -174,6 +139,9 @@ class LearnDashSeeder extends AbstractSeeder
 
     private function addLessonToCourseSteps(int $courseId, int $lessonId): void
     {
+        $lessonType = $this->getPostType('lessons');
+        $topicType  = $this->getPostType('topics');
+        $quizType   = $this->getPostType('quizzes');
         $steps = get_post_meta($courseId, 'ld_course_steps', true);
 
         if (!is_array($steps)) {
@@ -185,13 +153,13 @@ class LearnDashSeeder extends AbstractSeeder
             return;
         }
 
-        if (!isset($steps['steps']['h']['sfwd-lessons']) || !is_array($steps['steps']['h']['sfwd-lessons'])) {
-            $steps['steps']['h']['sfwd-lessons'] = [];
+        if (!isset($steps['steps']['h'][$lessonType]) || !is_array($steps['steps']['h'][$lessonType])) {
+            $steps['steps']['h'][$lessonType] = [];
         }
 
-        $steps['steps']['h']['sfwd-lessons'][$lessonId] = [
-            'sfwd-topic' => [],
-            'sfwd-quiz'  => [],
+        $steps['steps']['h'][$lessonType][$lessonId] = [
+            $topicType => [],
+            $quizType  => [],
         ];
 
         update_post_meta($courseId, 'ld_course_steps', $steps);
@@ -199,13 +167,15 @@ class LearnDashSeeder extends AbstractSeeder
 
     private function addTopicToCourseSteps(int $courseId, int $lessonId, int $topicId): void
     {
+        $lessonType = $this->getPostType('lessons');
+        $topicType  = $this->getPostType('topics');
         $steps = get_post_meta($courseId, 'ld_course_steps', true);
 
         if (!is_array($steps)) {
             return;
         }
 
-        if (!isset($steps['steps']['h']['sfwd-lessons'][$lessonId])) {
+        if (!isset($steps['steps']['h'][$lessonType][$lessonId])) {
             $this->addLessonToCourseSteps($courseId, $lessonId);
             $steps = get_post_meta($courseId, 'ld_course_steps', true);
         }
@@ -214,24 +184,26 @@ class LearnDashSeeder extends AbstractSeeder
             return;
         }
 
-        if (!isset($steps['steps']['h']['sfwd-lessons'][$lessonId]['sfwd-topic']) || !is_array($steps['steps']['h']['sfwd-lessons'][$lessonId]['sfwd-topic'])) {
-            $steps['steps']['h']['sfwd-lessons'][$lessonId]['sfwd-topic'] = [];
+        if (!isset($steps['steps']['h'][$lessonType][$lessonId][$topicType]) || !is_array($steps['steps']['h'][$lessonType][$lessonId][$topicType])) {
+            $steps['steps']['h'][$lessonType][$lessonId][$topicType] = [];
         }
 
-        $steps['steps']['h']['sfwd-lessons'][$lessonId]['sfwd-topic'][$topicId] = [];
+        $steps['steps']['h'][$lessonType][$lessonId][$topicType][$topicId] = [];
 
         update_post_meta($courseId, 'ld_course_steps', $steps);
     }
 
     private function addQuizToCourseSteps(int $courseId, int $lessonId, int $quizId): void
     {
+        $lessonType = $this->getPostType('lessons');
+        $quizType   = $this->getPostType('quizzes');
         $steps = get_post_meta($courseId, 'ld_course_steps', true);
 
         if (!is_array($steps)) {
             return;
         }
 
-        if (!isset($steps['steps']['h']['sfwd-lessons'][$lessonId])) {
+        if (!isset($steps['steps']['h'][$lessonType][$lessonId])) {
             $this->addLessonToCourseSteps($courseId, $lessonId);
             $steps = get_post_meta($courseId, 'ld_course_steps', true);
         }
@@ -240,11 +212,11 @@ class LearnDashSeeder extends AbstractSeeder
             return;
         }
 
-        if (!isset($steps['steps']['h']['sfwd-lessons'][$lessonId]['sfwd-quiz']) || !is_array($steps['steps']['h']['sfwd-lessons'][$lessonId]['sfwd-quiz'])) {
-            $steps['steps']['h']['sfwd-lessons'][$lessonId]['sfwd-quiz'] = [];
+        if (!isset($steps['steps']['h'][$lessonType][$lessonId][$quizType]) || !is_array($steps['steps']['h'][$lessonType][$lessonId][$quizType])) {
+            $steps['steps']['h'][$lessonType][$lessonId][$quizType] = [];
         }
 
-        $steps['steps']['h']['sfwd-lessons'][$lessonId]['sfwd-quiz'][$quizId] = [];
+        $steps['steps']['h'][$lessonType][$lessonId][$quizType][$quizId] = [];
 
         update_post_meta($courseId, 'ld_course_steps', $steps);
     }

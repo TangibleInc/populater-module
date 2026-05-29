@@ -23,16 +23,7 @@ class AbstractSeederTest extends \WPTestCase
 
         $this->seeder = $this->getMockBuilder(AbstractSeeder::class)
             ->setConstructorArgs([$plugin])
-            ->onlyMethods(['getPostType'])
             ->getMockForAbstractClass();
-        $this->seeder->method('getPostType')->willReturnCallback(
-            static fn(string $entity) => match ($entity) {
-                'courses' => 'test_course',
-                'lessons' => 'test_lesson',
-                'quizzes' => 'test_quiz',
-                default   => 'post',
-            }
-        );
     }
 
     public function test_identity_from_plugin(): void
@@ -41,12 +32,14 @@ class AbstractSeederTest extends \WPTestCase
         $this->assertSame('test-lms', $this->seeder->getSlug());
     }
 
-    public function test_get_post_type_must_be_implemented(): void
+    public function test_get_post_type_reads_from_plugin_schema(): void
     {
         $reflection = new \ReflectionClass(AbstractSeeder::class);
-        $method = $reflection->getMethod('getPostType');
+        $method     = $reflection->getMethod('getPostType');
+        $method->setAccessible(true);
 
-        $this->assertTrue($method->isAbstract());
+        $this->assertSame('test_course', $method->invoke($this->seeder, 'courses'));
+        $this->assertSame('test_lesson', $method->invoke($this->seeder, 'lessons'));
     }
 
     public function test_get_seedable_types_returns_default_set(): void

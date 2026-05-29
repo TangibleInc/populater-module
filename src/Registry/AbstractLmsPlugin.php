@@ -27,6 +27,8 @@ abstract class AbstractLmsPlugin
     protected string $seederClass;
     protected string $backgroundAction;
 
+    private ?LmsEntitySchema $entitySchema = null;
+
     public function __construct()
     {
         $this->register([]);
@@ -95,5 +97,12 @@ abstract class AbstractLmsPlugin
     public function createProcess(AbstractSeeder $seeder, ?ProcessRepository $repository = null): AbstractSeeding
     {
         return new LmsSeedingProcess($seeder, $this->backgroundAction, $repository);
+    }
+
+    abstract protected function defineEntitySchema(): LmsEntitySchema;
+
+    public function getEntitySchema(): LmsEntitySchema
+    {
+        return $this->entitySchema ??= $this->defineEntitySchema();
     }
 }

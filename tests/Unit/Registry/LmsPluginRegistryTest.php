@@ -70,6 +70,28 @@ class LmsPluginRegistryTest extends \WPTestCase
         $this->assertArrayHasKey('custom-lms', $this->registry->all());
         $this->assertSame('Custom LMS', $this->registry->get('custom-lms')->getName());
     }
+
+    public function test_entity_schema_exposes_post_types_and_meta(): void
+    {
+        $schema = $this->registry->get('learndash')->getEntitySchema();
+
+        $this->assertSame('sfwd-courses', $schema->getPostType('courses'));
+        $this->assertSame('LearnDash Course', $schema->getTitlePrefix('courses', 'LearnDash LMS'));
+        $this->assertSame(
+            ['course_id' => 42, 'lesson_id' => 7],
+            $schema->resolveMeta('topics', ['courseId' => 42, 'lessonId' => 7]),
+        );
+        $this->assertSame('learndash_user', $schema->userPrefix);
+    }
+
+    public function test_lifter_schema_includes_container_entity(): void
+    {
+        $container = $this->registry->get('lifterlms')->getEntitySchema()->container;
+
+        $this->assertNotNull($container);
+        $this->assertSame('sections', $container->entity);
+        $this->assertSame('_populater_llms_section_ids', $container->cacheMetaKey);
+    }
 }
 
 /**
@@ -82,4 +104,12 @@ final class CustomLmsPluginForTest extends \Tangible\Populater\Registry\Abstract
     protected string $pluginFile = 'custom/custom.php';
     protected string $seederClass = LearnDashSeeder::class;
     protected string $backgroundAction = 'seed_custom';
+
+    protected function defineEntitySchema(): \Tangible\Populater\Registry\LmsEntitySchema
+    {
+        return new \Tangible\Populater\Registry\LmsEntitySchema(
+            postTypes: ['courses' => 'custom_course'],
+            userPrefix: 'custom_user',
+        );
+    }
 }

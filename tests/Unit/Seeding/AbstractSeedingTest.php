@@ -31,9 +31,8 @@ class AbstractSeedingTest extends \WPTestCase
 
         $this->seeder = $this->getMockBuilder(AbstractSeeder::class)
             ->setConstructorArgs([$plugin])
-            ->onlyMethods(['buildSeedQueue', 'getPostType'])
+            ->onlyMethods(['buildSeedQueue'])
             ->getMockForAbstractClass();
-        $this->seeder->method('getPostType')->willReturn('post');
         $this->seeder->method('buildSeedQueue')->willReturn([
             new SeedQueueItem('course', ['index' => 1]),
             new SeedQueueItem('user', ['index' => 1]),

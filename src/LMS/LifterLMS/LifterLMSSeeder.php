@@ -14,46 +14,14 @@ use Tangible\Populater\Support\DummyContent;
  */
 class LifterLMSSeeder extends AbstractSeeder
 {
-    protected function getPostType(string $entity): string
-    {
-        return match ($entity) {
-            'courses'      => 'course',
-            'lessons'      => 'lesson',
-            'quizzes'      => 'llms_quiz',
-            'questions'    => 'llms_question',
-            'certificates' => 'llms_certificate',
-            default        => 'post',
-        };
-    }
-
-    protected function getTitlePrefix(string $entity): string
-    {
-        return match ($entity) {
-            'courses'      => 'LifterLMS Course',
-            'lessons'      => 'LifterLMS Lesson',
-            'quizzes'      => 'LifterLMS Quiz',
-            'questions'    => 'LifterLMS Question',
-            'certificates' => 'LifterLMS Certificate',
-            default        => parent::getTitlePrefix($entity),
-        };
-    }
-
-    protected function getMetaFor(string $entity, array $context): array
-    {
-        return match ($entity) {
-            'lessons'   => ['_llms_parent_course' => (int) ($context['courseId'] ?? 0)],
-            'quizzes'   => ['_llms_lesson_id' => (int) ($context['lessonId'] ?? 0)],
-            'questions' => ['_llms_parent_id' => (int) ($context['quizId'] ?? 0)],
-            default     => parent::getMetaFor($entity, $context),
-        };
-    }
-
     /**
      * @param array<string, mixed> $options
      * @return list<int>
      */
     public function seedLessons(int $count, int $courseId, array $options = []): array
     {
+        $schema           = $this->plugin->getEntitySchema();
+        $container        = $schema->container;
         $lessonIndex      = (int) ($options['index'] ?? 1);
         $lessonsPerCourse = max(1, (int) ($options['lessons_per_course'] ?? 1));
         $sectionsPerCourse = max(1, (int) ($options['sections_per_course'] ?? 1));
@@ -77,8 +45,8 @@ class LifterLMSSeeder extends AbstractSeeder
 
         $this->applyMeta($postId, $this->getMetaFor('lessons', ['courseId' => $courseId]));
 
-        if ($sectionId > 0) {
-            update_post_meta($postId, '_llms_parent_section', $sectionId);
+        if ($sectionId > 0 && $container !== null && $container->lessonParentMetaKey !== '') {
+            update_post_meta($postId, $container->lessonParentMetaKey, $sectionId);
         }
 
         return [$postId];
@@ -94,22 +62,29 @@ class LifterLMSSeeder extends AbstractSeeder
      */
     private function ensureSectionForCourse(int $courseId, int $sectionIndex, array $options): int
     {
+        $schema    = $this->plugin->getEntitySchema();
+        $container = $schema->container;
+
+        if ($container === null) {
+            return 0;
+        }
+
         $existing = (int) ($options['section_id'] ?? 0);
 
         if ($existing > 0) {
             return $existing;
         }
 
-        $cached = get_post_meta($courseId, '_populater_llms_section_ids', true);
+        $cached = get_post_meta($courseId, $container->cacheMetaKey, true);
 
         if (is_array($cached) && isset($cached[$sectionIndex])) {
             return (int) $cached[$sectionIndex];
         }
 
-        $title   = $this->defaultTitle('LifterLMS Section', $sectionIndex);
+        $title     = $this->defaultTitle($this->getTitlePrefix($container->entity), $sectionIndex);
         $sectionId = $this->insertPost([
             'post_title'   => $title,
-            'post_type'    => 'llms_section',
+            'post_type'    => $schema->getPostType($container->entity),
             'post_status'  => 'publish',
             'post_content' => DummyContent::section($title, $sectionIndex),
             'post_excerpt' => DummyContent::excerpt('section', $title, $sectionIndex),
@@ -117,14 +92,14 @@ class LifterLMSSeeder extends AbstractSeeder
         ]);
 
         if ($sectionId > 0) {
-            update_post_meta($sectionId, '_llms_parent_course', $courseId);
+            update_post_meta($sectionId, $container->parentMetaKey, $courseId);
 
             if (!is_array($cached)) {
                 $cached = [];
             }
 
             $cached[$sectionIndex] = $sectionId;
-            update_post_meta($courseId, '_populater_llms_section_ids', $cached);
+            update_post_meta($courseId, $container->cacheMetaKey, $cached);
         }
 
         return $sectionId;
