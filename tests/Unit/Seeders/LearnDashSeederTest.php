@@ -71,16 +71,14 @@ class LearnDashSeederTest extends \WPTestCase
         $this->assertSame([5], $ids);
     }
 
-    public function test_seed_courses_initializes_ld_course_steps(): void
+    public function test_seed_courses_does_not_initialize_ld_course_steps_until_lessons_exist(): void
     {
         Functions\expect('wp_insert_post')->once()->andReturn(100);
         Functions\when('is_wp_error')->justReturn(false);
 
         $this->seeder->seedCourses(1);
 
-        $steps = $this->meta->getValue(100, 'ld_course_steps');
-        $this->assertIsArray($steps);
-        $this->assertSame([], $steps['steps']['h']['sfwd-lessons']);
+        $this->assertNull($this->meta->getValue(100, 'ld_course_steps'));
     }
 
     public function test_seed_lessons_registers_lesson_in_course_steps_with_topic_slot(): void
@@ -217,6 +215,7 @@ class LearnDashSeederTest extends \WPTestCase
         $this->seeder->seedQuizzes(1, lessonId: 10, options: ['course_id' => 5]);
 
         $this->assertSame(10, $this->meta->getValue(20, 'lesson_id'));
+        $this->assertSame(5, $this->meta->getValue(20, 'course_id'));
     }
 
     public function test_seed_quizzes_creates_questions_when_configured(): void

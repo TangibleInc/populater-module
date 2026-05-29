@@ -38,7 +38,7 @@ class LearnDashLmsPlugin extends AbstractLmsPlugin
             metaMap: [
                 'lessons'   => ['course_id' => 'courseId'],
                 'topics'    => ['course_id' => 'courseId', 'lesson_id' => 'lessonId'],
-                'quizzes'   => ['lesson_id' => 'lessonId'],
+                'quizzes'   => ['lesson_id' => 'lessonId', 'course_id' => 'courseId'],
                 'questions' => ['quiz_id' => 'quizId'],
             ],
         );

@@ -246,18 +246,25 @@ final class LmsContentInspector
             self::assertRichQuizContent($test, $quiz);
             $proId = (int) get_post_meta($quiz->ID, 'quiz_pro_id', true);
             $test->assertGreaterThan(0, $proId, 'LearnDash quiz should have quiz_pro_id meta.');
+            self::assertLearnDashProQuizExists($test, $proId);
             $test->assertGreaterThan(0, (int) get_post_meta($quiz->ID, 'lesson_id', true), 'LearnDash quiz should reference a lesson.');
+            $test->assertGreaterThan(0, (int) get_post_meta($quiz->ID, 'course_id', true), 'LearnDash quiz should reference a course.');
 
             if ($questionsPerQuiz > 0) {
                 $questionIds = get_post_meta($quiz->ID, 'ld_quiz_questions', true);
                 $test->assertIsArray($questionIds, 'LearnDash quiz should have ld_quiz_questions meta.');
                 $test->assertCount($questionsPerQuiz, $questionIds, 'LearnDash quiz should contain expected questions.');
 
-                foreach (array_keys($questionIds) as $questionId) {
+                foreach ($questionIds as $questionPostId => $questionProId) {
                     $test->assertSame(
                         $quiz->ID,
-                        (int) get_post_meta((int) $questionId, 'quiz_id', true),
+                        (int) get_post_meta((int) $questionPostId, 'quiz_id', true),
                         'LearnDash question should reference its parent quiz.',
+                    );
+                    $test->assertNotSame(
+                        (int) $questionPostId,
+                        (int) $questionProId,
+                        'LearnDash ld_quiz_questions should map question post IDs to ProQuiz IDs.',
                     );
                 }
             }
@@ -483,6 +490,20 @@ final class LmsContentInspector
         }
 
         return $registered[$pluginSlug]->getEntitySchema();
+    }
+
+    private static function assertLearnDashProQuizExists(\PHPUnit\Framework\TestCase $test, int $proId): void
+    {
+        if (!class_exists(\WpProQuiz_Model_QuizMapper::class)) {
+            return;
+        }
+
+        $mapper = new \WpProQuiz_Model_QuizMapper();
+        $test->assertGreaterThan(
+            0,
+            (int) $mapper->exists($proId),
+            'LearnDash quiz_pro_id should reference an existing ProQuiz record.',
+        );
     }
 
     private static function countPosts(string $postType): int
