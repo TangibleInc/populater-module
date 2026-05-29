@@ -22,7 +22,7 @@ class LifterLmsPlugin extends AbstractLmsPlugin
             postTypes: [
                 'courses'      => 'course',
                 'lessons'      => 'lesson',
-                'sections'     => 'llms_section',
+                'sections'     => 'section',
                 'quizzes'      => 'llms_quiz',
                 'questions'    => 'llms_question',
                 'certificates' => 'llms_certificate',

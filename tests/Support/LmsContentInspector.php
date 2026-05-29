@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tangible\Populater\Tests\Support;
 
+use Tangible\Populater\LMS\LifterLMS\LifterLmsTrueFalseAnswers;
 use Tangible\Populater\Registry\AbstractLmsPlugin;
 use Tangible\Populater\Registry\LmsEntitySchema;
 use Tangible\Populater\Registry\LmsPlugins;
@@ -316,18 +317,53 @@ final class LmsContentInspector
 
         foreach ($coursePosts as $course) {
             self::assertRichCourseContent($test, $course);
+            self::assertLifterCourseEnrollmentReady($test, (int) $course->ID);
+        }
+
+        $checkoutPageId = (int) get_option('lifterlms_checkout_page_id', 0);
+        $test->assertGreaterThan(0, $checkoutPageId, 'LifterLMS checkout page should be assigned.');
+        $test->assertStringContainsString(
+            '[lifterlms_checkout]',
+            (string) get_post_field('post_content', $checkoutPageId),
+            'LifterLMS checkout page should contain the checkout shortcode.',
+        );
+
+        foreach ($coursePosts as $course) {
+            $test->assertStringContainsString(
+                'llms/pricing-table',
+                (string) $course->post_content,
+                'LifterLMS course should include the pricing table block for enrollment UI.',
+            );
+            $test->assertStringContainsString(
+                'llms/course-syllabus',
+                (string) $course->post_content,
+                'LifterLMS course should include the syllabus block for the course outline.',
+            );
         }
 
         $sections = self::newestPosts($sectionType, $courses * $sectionsPerCourse, $afterPostId);
         $test->assertCount($courses * $sectionsPerCourse, $sections, 'LifterLMS should create expected sections per course.');
 
         foreach ($sections as $section) {
+            $test->assertSame('section', $section->post_type, 'LifterLMS sections must use the section post type.');
             $test->assertGreaterThan(0, (int) $section->post_parent, 'Section should be attached to a course.');
             self::assertRichSectionContent($test, $section);
             $test->assertSame(
                 (int) $section->post_parent,
                 (int) get_post_meta($section->ID, $container?->parentMetaKey ?? '_llms_parent_course', true),
             );
+            $test->assertNotSame('', (string) get_post_meta($section->ID, '_llms_order', true), 'LifterLMS section should have order meta.');
+        }
+
+        if ($courses > 0 && $lessonsPerCourse > 0 && class_exists(\LLMS_Course::class)) {
+            foreach ($coursePosts as $course) {
+                $llmsCourse = new \LLMS_Course((int) $course->ID);
+                $test->assertGreaterThan(
+                    0,
+                    count($llmsCourse->get_sections()),
+                    'LifterLMS course should expose sections in the syllabus.',
+                );
+            }
         }
 
         $lessons = self::newestPosts($lessonType, $courses * $lessonsPerCourse, $afterPostId);
@@ -338,6 +374,14 @@ final class LmsContentInspector
             $test->assertGreaterThan(0, $sectionId, 'LifterLMS lesson should belong to a section.');
             $test->assertSame($sectionId, (int) $lesson->post_parent, 'LifterLMS lesson post_parent should be the section.');
             $test->assertGreaterThan(0, (int) get_post_meta($lesson->ID, '_llms_parent_course', true));
+            $test->assertNotSame('', (string) get_post_meta($lesson->ID, '_llms_order', true), 'LifterLMS lesson should have order meta.');
+
+            if ($quizzesPerLesson > 0) {
+                $quizId = (int) get_post_meta($lesson->ID, '_llms_quiz', true);
+                $test->assertGreaterThan(0, $quizId, 'LifterLMS lesson should reference an assigned quiz.');
+                $test->assertSame('yes', get_post_meta($lesson->ID, '_llms_quiz_enabled', true));
+                $test->assertSame($lesson->ID, (int) get_post_meta($quizId, '_llms_lesson_id', true));
+            }
         }
 
         $quizzes = self::newestPosts(
@@ -364,6 +408,51 @@ final class LmsContentInspector
                 $test->assertGreaterThan(0, $quizId, 'LifterLMS question should reference a quiz.');
                 $test->assertSame('true_false', get_post_meta($question->ID, '_llms_question_type', true));
                 $test->assertSame($quizType, get_post_type($quizId), 'LifterLMS question should belong to a quiz post.');
+
+                $marker = (string) get_post_meta(
+                    $question->ID,
+                    LifterLmsTrueFalseAnswers::CORRECT_MARKER_META,
+                    true,
+                );
+                $test->assertContains(
+                    $marker,
+                    [LifterLmsTrueFalseAnswers::TRUE_MARKER, LifterLmsTrueFalseAnswers::FALSE_MARKER],
+                    'LifterLMS question should record which choice marker is correct for stress tests.',
+                );
+
+                if (function_exists('llms_get_post')) {
+                    $llmsQuestion = llms_get_post((int) $question->ID);
+
+                    if ($llmsQuestion instanceof \LLMS_Question) {
+                        $choices = $llmsQuestion->get_choices();
+                        $test->assertGreaterThanOrEqual(
+                            2,
+                            count($choices),
+                            'LifterLMS true/false questions need True/False answer choices.',
+                        );
+
+                        $correctCount = 0;
+
+                        foreach ($choices as $choice) {
+                            if ($choice->is_correct()) {
+                                $correctCount++;
+                                $test->assertSame($marker, $choice->get('marker'));
+                            }
+                        }
+
+                        $test->assertSame(
+                            1,
+                            $correctCount,
+                            'LifterLMS question should have exactly one correct choice.',
+                        );
+                    }
+                }
+
+                $test->assertStringContainsString(
+                    'populater-stress-hint',
+                    (string) $question->post_content,
+                    'LifterLMS question should include a stress-test hint for automation.',
+                );
             }
         }
     }
@@ -435,6 +524,36 @@ final class LmsContentInspector
                 $quizId = (int) get_post_meta($question->ID, '_tgl_quiz_id', true);
                 $test->assertGreaterThan(0, $quizId, 'Tangible question should reference a quiz.');
                 $test->assertSame($quizType, get_post_type($quizId), 'Tangible question should belong to a quiz post.');
+            }
+        }
+    }
+
+    private static function assertLifterCourseEnrollmentReady(\PHPUnit\Framework\TestCase $test, int $courseId): void
+    {
+        $plans = get_posts([
+            'post_type'      => 'llms_access_plan',
+            'post_status'    => 'publish',
+            'posts_per_page' => 1,
+            'meta_query'     => [
+                [
+                    'key'   => '_llms_product_id',
+                    'value' => $courseId,
+                ],
+                [
+                    'key'   => '_llms_is_free',
+                    'value' => 'yes',
+                ],
+            ],
+        ]);
+
+        $test->assertNotEmpty($plans, 'LifterLMS course should have a free access plan.');
+        $test->assertSame('yes', get_post_meta($plans[0]->ID, '_llms_is_free', true));
+
+        if (function_exists('llms_get_post')) {
+            $product = llms_get_post($courseId);
+
+            if (is_object($product) && method_exists($product, 'has_free_access_plan')) {
+                $test->assertTrue($product->has_free_access_plan(), 'LifterLMS course should report a free access plan.');
             }
         }
     }

@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Tangible\Populater\Tests\Unit\Seeders;
 
+use Tangible\Populater\LMS\LifterLMS\LifterLmsEnrollmentSetup;
 use Tangible\Populater\LMS\LifterLMS\LifterLmsPlugin;
+use Tangible\Populater\LMS\LifterLMS\LifterLmsTrueFalseAnswers;
 use Tangible\Populater\LMS\LifterLMS\LifterLMSSeeder;
 use Tangible\Populater\Tests\Support\InMemoryPostMeta;
 use Brain\Monkey\Functions;
@@ -18,6 +20,7 @@ class LifterLMSSeederTest extends \WPTestCase
     protected function setUp(): void
     {
         parent::setUp();
+        LifterLmsEnrollmentSetup::resetCheckoutState();
         $this->seeder = new LifterLMSSeeder(new LifterLmsPlugin());
         $this->meta   = (new InMemoryPostMeta())->install();
     }
@@ -42,20 +45,45 @@ class LifterLMSSeederTest extends \WPTestCase
     public function test_seed_courses_creates_posts_with_correct_type(): void
     {
         Functions\expect('wp_insert_post')
-            ->times(2)
+            ->times(5)
+            ->andReturnUsing(static function (array $args): int {
+                return match ($args['post_type'] ?? '') {
+                    'course'           => ($args['post_title'] ?? '') === 'LifterLMS Course 1' ? 1 : 2,
+                    'page'             => 99,
+                    'llms_access_plan' => ($args['post_title'] ?? '') === 'Free Access 1' ? 201 : 202,
+                    default            => 0,
+                };
+            });
+        Functions\when('is_wp_error')->justReturn(false);
+        Functions\when('get_option')->justReturn(0);
+        Functions\when('get_post_status')->justReturn('publish');
+        Functions\when('taxonomy_exists')->justReturn(true);
+        Functions\when('wp_set_object_terms')->justReturn([]);
+        Functions\when('update_option')->justReturn(true);
+        Functions\when('get_post')->alias(function (int $id) {
+            return (object) [
+                'ID'           => $id,
+                'post_type'    => 'course',
+                'post_content' => '<p>Course body</p>',
+            ];
+        });
+        Functions\expect('wp_update_post')
+            ->twice()
             ->with(\Mockery::on(function (array $args): bool {
-                $this->assertSame('course', $args['post_type'] ?? '');
-                $this->assertStringContainsString('<h2>', (string) ($args['post_content'] ?? ''));
-                $this->assertStringContainsString('Tangible Populator', (string) ($args['post_excerpt'] ?? ''));
+                $content = (string) ($args['post_content'] ?? '');
+                $this->assertStringContainsString('llms/pricing-table', $content);
+                $this->assertStringContainsString('llms/course-syllabus', $content);
 
                 return true;
             }))
-            ->andReturn(1, 2);
-        Functions\when('is_wp_error')->justReturn(false);
+            ->andReturn(1);
 
         $ids = $this->seeder->seedCourses(2);
 
         $this->assertCount(2, $ids);
+        $this->assertSame(1, $this->meta->getValue(201, '_llms_product_id'));
+        $this->assertSame('yes', $this->meta->getValue(201, '_llms_is_free'));
+        $this->assertSame(2, $this->meta->getValue(202, '_llms_product_id'));
     }
 
     public function test_seed_lessons_creates_section_and_parents_lesson_to_it(): void
@@ -64,12 +92,13 @@ class LifterLMSSeederTest extends \WPTestCase
             ->twice()
             ->andReturnUsing(static function (array $args): int {
                 return match ($args['post_type'] ?? '') {
-                    'llms_section' => 50,
+                    'section'      => 50,
                     'lesson'       => 10,
                     default        => 0,
                 };
             });
         Functions\when('is_wp_error')->justReturn(false);
+        Functions\when('get_post')->justReturn((object) ['ID' => 5, 'post_type' => 'course', 'post_content' => '']);
 
         $ids = $this->seeder->seedLessons(1, courseId: 5);
 
@@ -77,6 +106,8 @@ class LifterLMSSeederTest extends \WPTestCase
         $this->assertSame(50, $this->meta->getValue(10, '_llms_parent_section'));
         $this->assertSame(5, $this->meta->getValue(10, '_llms_parent_course'));
         $this->assertSame(5, $this->meta->getValue(50, '_llms_parent_course'));
+        $this->assertSame(1, $this->meta->getValue(50, '_llms_order'));
+        $this->assertSame(1, $this->meta->getValue(10, '_llms_order'));
         $sectionIds = $this->meta->getValue(5, '_populater_llms_section_ids');
         $this->assertIsArray($sectionIds);
         $this->assertSame(50, $sectionIds[1] ?? null);
@@ -87,15 +118,16 @@ class LifterLMSSeederTest extends \WPTestCase
         Functions\expect('wp_insert_post')
             ->twice()
             ->with(\Mockery::on(function (array $args): bool {
-                if (($args['post_type'] ?? '') === 'llms_section') {
+                if (($args['post_type'] ?? '') === 'section') {
                     $this->assertStringContainsString('<h2>', (string) ($args['post_content'] ?? ''));
                     $this->assertStringContainsString('Tangible Populator', (string) ($args['post_excerpt'] ?? ''));
                 }
 
                 return true;
             }))
-            ->andReturnUsing(static fn(array $args) => ($args['post_type'] ?? '') === 'llms_section' ? 50 : 10);
+            ->andReturnUsing(static fn(array $args) => ($args['post_type'] ?? '') === 'section' ? 50 : 10);
         Functions\when('is_wp_error')->justReturn(false);
+        Functions\when('get_post')->justReturn((object) ['ID' => 5, 'post_type' => 'course', 'post_content' => '']);
 
         $this->seeder->seedLessons(1, courseId: 5);
     }
@@ -110,6 +142,13 @@ class LifterLMSSeederTest extends \WPTestCase
                 && ($args['post_parent'] ?? 0) === 50))
             ->andReturn(10);
         Functions\when('is_wp_error')->justReturn(false);
+        Functions\when('get_post')->alias(function (int $id) {
+            if ($id === 5) {
+                return (object) ['ID' => 5, 'post_type' => 'course', 'post_content' => '<p>Course</p>'];
+            }
+
+            return null;
+        });
 
         $ids = $this->seeder->seedLessons(1, courseId: 5);
 
@@ -124,6 +163,7 @@ class LifterLMSSeederTest extends \WPTestCase
                 && ($args['post_parent'] ?? 0) === 88))
             ->andReturn(10);
         Functions\when('is_wp_error')->justReturn(false);
+        Functions\when('get_post')->justReturn((object) ['ID' => 5, 'post_type' => 'course', 'post_content' => '']);
 
         $ids = $this->seeder->seedLessons(1, courseId: 5, options: ['section_id' => 88]);
 
@@ -141,6 +181,8 @@ class LifterLMSSeederTest extends \WPTestCase
         $this->seeder->seedQuizzes(1, lessonId: 15);
 
         $this->assertSame(15, $this->meta->getValue(20, '_llms_lesson_id'));
+        $this->assertSame(20, $this->meta->getValue(15, '_llms_quiz'));
+        $this->assertSame('yes', $this->meta->getValue(15, '_llms_quiz_enabled'));
     }
 
     public function test_seed_quizzes_attaches_to_lesson_not_course(): void
@@ -171,11 +213,37 @@ class LifterLMSSeederTest extends \WPTestCase
             });
         Functions\when('is_wp_error')->justReturn(false);
 
+        Functions\when('get_post')->alias(function (int $id) {
+            return (object) [
+                'ID'           => $id,
+                'post_type'    => 'llms_question',
+                'post_content' => '<p>Question body</p>',
+            ];
+        });
+        Functions\when('wp_update_post')->justReturn(31);
+
         $this->seeder->seedQuizzes(1, lessonId: 15, options: ['questions_per_quiz' => 2]);
 
         $this->assertSame(20, $this->meta->getValue(31, '_llms_parent_id'));
         $this->assertSame('true_false', $this->meta->getValue(31, '_llms_question_type'));
+        $this->assertSame('A', $this->meta->getValue(31, LifterLmsTrueFalseAnswers::CORRECT_MARKER_META));
+        $this->assertSame('B', $this->meta->getValue(32, LifterLmsTrueFalseAnswers::CORRECT_MARKER_META));
         $this->assertSame(20, $this->meta->getValue(32, '_llms_parent_id'));
+        $this->assertCount(2, $this->choiceMetaKeys(31));
+        $this->assertCount(2, $this->choiceMetaKeys(32));
+        $this->assertTrue($this->meta->getValue(31, '_llms_choice_a')['correct'] ?? false);
+        $this->assertFalse($this->meta->getValue(31, '_llms_choice_b')['correct'] ?? true);
+        $this->assertFalse($this->meta->getValue(32, '_llms_choice_a')['correct'] ?? true);
+        $this->assertTrue($this->meta->getValue(32, '_llms_choice_b')['correct'] ?? false);
+    }
+
+    /** @return list<string> */
+    private function choiceMetaKeys(int $questionId): array
+    {
+        return array_values(array_filter(
+            array_keys($this->meta->allForPost($questionId)),
+            static fn(string $key): bool => str_starts_with($key, '_llms_choice_'),
+        ));
     }
 
     public function test_seed_users_creates_students(): void
