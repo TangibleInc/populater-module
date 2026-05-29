@@ -55,7 +55,7 @@ class SeedRestIntegrationTest extends WordPressIntegrationTestCase
             'plugin'             => $plugin,
             'courses'            => self::COURSES,
             'lessons_per_course' => self::LESSONS,
-            'quizzes_per_lesson' => self::QUIZZES,
+            'quizzes_per_section' => self::QUIZZES,
             'users'              => self::USERS,
         ]);
 
@@ -64,6 +64,7 @@ class SeedRestIntegrationTest extends WordPressIntegrationTestCase
 
         $processId = (string) $startData['process_id'];
         $expected  = LmsContentInspector::expectedCounts(
+            $plugin,
             self::COURSES,
             self::LESSONS,
             self::QUIZZES,
@@ -152,7 +153,7 @@ class SeedRestIntegrationTest extends WordPressIntegrationTestCase
             'plugin'             => 'tangible-lms',
             'courses'            => 5,
             'lessons_per_course' => 5,
-            'quizzes_per_lesson' => 1,
+            'quizzes_per_section' => 1,
             'users'              => 10,
         ]);
 

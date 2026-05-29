@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Tangible\Populater\LMS\TangibleLMS;
 
 use Tangible\Populater\Seeders\AbstractSeeder;
+use Tangible\Populater\Seeding\ProcessRepository;
+use Tangible\Populater\Seeding\SeedingIdMap;
 use Tangible\Populater\Support\DummyContent;
 
 /**
@@ -52,6 +54,46 @@ class TangibleLMSSeeder extends AbstractSeeder
 
     /**
      * @param array<string, mixed> $options
+     * @return list<int>
+     */
+    public function seedQuizzes(int $count, int $parentId, array $options = []): array
+    {
+        $moduleId = (int) ($options['quiz_parent_id'] ?? $parentId);
+        $courseId = (int) ($options['course_id'] ?? 0);
+
+        if ($courseId <= 0 && $moduleId > 0) {
+            $courseId = (int) get_post_meta($moduleId, '_tgl_course_id', true);
+        }
+
+        $ids = [];
+
+        for ($i = 1; $i <= $count; $i++) {
+            $index = (int) ($options['index'] ?? $i);
+            $title = $this->defaultTitle($options['title_prefix'] ?? $this->getTitlePrefix('quizzes'), $index);
+            $postId = $this->insertPost([
+                'post_title'   => $title,
+                'post_type'    => $this->getPostType('quizzes'),
+                'post_status'  => 'publish',
+                'post_content' => DummyContent::quiz($title, $index),
+                'post_parent'  => $moduleId > 0 ? $moduleId : 0,
+            ]);
+
+            if ($postId > 0) {
+                $this->applyMeta($postId, $this->getMetaFor('quizzes', [
+                    'moduleId' => $moduleId,
+                    'courseId' => $courseId,
+                ]));
+                $this->afterQuizCreated($postId, $moduleId, $index, $options);
+                $this->seedQuestionsForQuiz($postId, $options);
+                $ids[] = $postId;
+            }
+        }
+
+        return $ids;
+    }
+
+    /**
+     * @param array<string, mixed> $options
      */
     private function ensureModuleForCourse(int $courseId, int $moduleIndex, array $options): int
     {
@@ -93,9 +135,32 @@ class TangibleLMSSeeder extends AbstractSeeder
 
             $cached[$moduleIndex] = $moduleId;
             update_post_meta($courseId, $container->cacheMetaKey, $cached);
+
+            $this->recordModuleInIdMap($moduleId, $moduleIndex, $options);
         }
 
         return $moduleId;
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     */
+    private function recordModuleInIdMap(int $moduleId, int $moduleIndex, array $options): void
+    {
+        $processId = (string) ($options['process_id'] ?? '');
+
+        if ($processId === '') {
+            return;
+        }
+
+        SeedingIdMap::recordQuizParent(
+            $processId,
+            'modules',
+            (int) ($options['course_index'] ?? 0),
+            $moduleIndex,
+            $moduleId,
+            new ProcessRepository(),
+        );
     }
 
     private function resolveContainerIndex(int $itemIndex, int $itemsPerContainer, int $containers): int

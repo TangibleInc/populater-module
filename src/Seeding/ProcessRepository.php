@@ -43,7 +43,7 @@ class ProcessRepository
         (new Logger($processId))->log($message, $level);
     }
 
-    /** @return array{courses: array<int, int>, lessons: array<int, array<int, int>>} */
+    /** @return array<string, mixed> */
     public function getIdMap(string $processId): array
     {
         $stored = get_option(self::PREFIX_IDS . $processId, null);
@@ -52,13 +52,21 @@ class ProcessRepository
             return ['courses' => [], 'lessons' => []];
         }
 
-        return [
+        $map = [
             'courses' => is_array($stored['courses'] ?? null) ? $stored['courses'] : [],
             'lessons' => is_array($stored['lessons'] ?? null) ? $stored['lessons'] : [],
         ];
+
+        foreach (['topics', 'sections', 'modules', 'section_lessons'] as $entity) {
+            if (isset($stored[$entity]) && is_array($stored[$entity])) {
+                $map[$entity] = $stored[$entity];
+            }
+        }
+
+        return $map;
     }
 
-    /** @param array{courses: array<int, int>, lessons: array<int, array<int, int>>} $map */
+    /** @param array<string, mixed> $map */
     public function saveIdMap(string $processId, array $map): void
     {
         update_option(self::PREFIX_IDS . $processId, $map, false);

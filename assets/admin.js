@@ -239,7 +239,7 @@
                             plugin,
                             courses,
                             lessons_per_course: lessons,
-                            quizzes_per_lesson: quizzes,
+                            quizzes_per_section: quizzes,
                             questions_per_quiz: questions,
                             users,
                         }),

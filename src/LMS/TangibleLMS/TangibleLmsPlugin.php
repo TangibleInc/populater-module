@@ -41,7 +41,7 @@ class TangibleLmsPlugin extends AbstractLmsPlugin
                     '_tgl_course_id' => 'courseId',
                     '_tgl_module_id' => 'moduleId',
                 ],
-                'quizzes'   => ['_tgl_lesson_id' => 'lessonId'],
+                'quizzes'   => ['_tgl_module_id' => 'moduleId', '_tgl_course_id' => 'courseId'],
                 'questions' => ['_tgl_quiz_id' => 'quizId'],
             ],
             container: new LmsContainerEntity(
@@ -49,6 +49,7 @@ class TangibleLmsPlugin extends AbstractLmsPlugin
                 cacheMetaKey: '_populater_tgl_module_ids',
                 parentMetaKey: '_tgl_course_id',
             ),
+            quizParentEntity: 'modules',
         );
     }
 }

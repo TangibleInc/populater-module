@@ -98,33 +98,38 @@ class TangibleLMSSeederTest extends \WPTestCase
         $this->assertSame([10], $ids);
     }
 
-    public function test_seed_quizzes_uses_tgl_quiz_post_type_and_sets_lesson_meta(): void
-    {
-        Functions\expect('wp_insert_post')
-            ->once()
-            ->with(\Mockery::on(fn($args) => ($args['post_type'] ?? '') === 'tgl_quiz'))
-            ->andReturn(20);
-        Functions\when('is_wp_error')->justReturn(false);
-
-        $ids = $this->seeder->seedQuizzes(1, lessonId: 15);
-
-        $this->assertSame([20], $ids);
-        $this->assertSame(15, $this->meta->getValue(20, '_tgl_lesson_id'));
-    }
-
-    public function test_seed_quizzes_attaches_to_lesson_not_course(): void
+    public function test_seed_quizzes_uses_tgl_quiz_post_type_and_sets_module_meta(): void
     {
         Functions\expect('wp_insert_post')
             ->once()
             ->with(\Mockery::on(fn($args) => ($args['post_type'] ?? '') === 'tgl_quiz'
-                && !isset($args['post_parent'])))
+                && ($args['post_parent'] ?? 0) === 50))
             ->andReturn(20);
         Functions\when('is_wp_error')->justReturn(false);
 
-        $this->seeder->seedQuizzes(1, lessonId: 15);
+        $ids = $this->seeder->seedQuizzes(1, parentId: 50, options: [
+            'course_id'      => 5,
+            'quiz_parent_id' => 50,
+        ]);
 
-        $this->assertSame(15, $this->meta->getValue(20, '_tgl_lesson_id'));
-        $this->assertNull($this->meta->getValue(20, '_tgl_course_id'));
+        $this->assertSame([20], $ids);
+        $this->assertSame(50, $this->meta->getValue(20, '_tgl_module_id'));
+        $this->assertSame(5, $this->meta->getValue(20, '_tgl_course_id'));
+    }
+
+    public function test_seed_quizzes_attaches_to_module_not_lesson(): void
+    {
+        Functions\expect('wp_insert_post')
+            ->once()
+            ->with(\Mockery::on(fn($args) => ($args['post_type'] ?? '') === 'tgl_quiz'
+                && ($args['post_parent'] ?? 0) === 50))
+            ->andReturn(20);
+        Functions\when('is_wp_error')->justReturn(false);
+
+        $this->seeder->seedQuizzes(1, parentId: 50, options: ['quiz_parent_id' => 50]);
+
+        $this->assertSame(50, $this->meta->getValue(20, '_tgl_module_id'));
+        $this->assertNull($this->meta->getValue(20, '_tgl_lesson_id'));
     }
 
     public function test_seed_quizzes_creates_questions_when_configured(): void
@@ -140,7 +145,10 @@ class TangibleLMSSeederTest extends \WPTestCase
             });
         Functions\when('is_wp_error')->justReturn(false);
 
-        $this->seeder->seedQuizzes(1, lessonId: 15, options: ['questions_per_quiz' => 2]);
+        $this->seeder->seedQuizzes(1, parentId: 50, options: [
+            'quiz_parent_id' => 50,
+            'questions_per_quiz' => 2,
+        ]);
 
         $this->assertSame(20, $this->meta->getValue(41, '_tgl_quiz_id'));
         $this->assertSame(20, $this->meta->getValue(42, '_tgl_quiz_id'));
@@ -159,7 +167,7 @@ class TangibleLMSSeederTest extends \WPTestCase
             ->andReturn(20);
         Functions\when('is_wp_error')->justReturn(false);
 
-        $this->seeder->seedQuizzes(1, lessonId: 15);
+        $this->seeder->seedQuizzes(1, parentId: 50, options: ['quiz_parent_id' => 50]);
     }
 
     public function test_seed_users_returns_array_of_ids(): void

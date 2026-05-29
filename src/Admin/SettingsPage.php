@@ -123,8 +123,8 @@ class SettingsPage
                         <td><input type="number" id="tp-lessons" name="lessons_per_course" value="5" min="0" max="100" class="small-text"></td>
                     </tr>
                     <tr>
-                        <th scope="row"><label for="tp-quizzes"><?php esc_html_e('Quizzes per Lesson', 'tangible-populater'); ?></label></th>
-                        <td><input type="number" id="tp-quizzes" name="quizzes_per_lesson" value="1" min="0" max="50" class="small-text"></td>
+                        <th scope="row"><label for="tp-quizzes"><?php esc_html_e('Quizzes per Section/Topic', 'tangible-populater'); ?></label></th>
+                        <td><input type="number" id="tp-quizzes" name="quizzes_per_section" value="1" min="0" max="50" class="small-text"></td>
                     </tr>
                     <tr>
                         <th scope="row"><label for="tp-questions"><?php esc_html_e('Questions per Quiz', 'tangible-populater'); ?></label></th>

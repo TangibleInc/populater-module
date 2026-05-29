@@ -47,6 +47,7 @@ class LifterLmsPlugin extends AbstractLmsPlugin
                 parentMetaKey: '_llms_parent_course',
                 lessonParentMetaKey: '_llms_parent_section',
             ),
+            quizParentEntity: 'sections',
         );
     }
 }

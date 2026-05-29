@@ -32,7 +32,7 @@ class DelegateSeedingStep extends AbstractSeedingStep
         $ids = match ($this->type) {
             'course' => $this->seeder->seedCourses(1, $data),
             'lesson' => $this->seeder->seedLessons(1, (int) ($data['course_id'] ?? 0), $data),
-            'quiz'   => $this->seeder->seedQuizzes(1, (int) ($data['lesson_id'] ?? 0), $data),
+            'quiz'   => $this->seeder->seedQuizzes(1, (int) ($data['quiz_parent_id'] ?? 0), $data),
             'user'   => $this->seeder->seedUsers(1, $data),
             'certificate' => $this->seeder->seedCertificates(1, $data),
             default  => [],

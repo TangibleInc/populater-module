@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Tangible\Populater\LMS\LifterLMS;
 
 use Tangible\Populater\Seeders\AbstractSeeder;
+use Tangible\Populater\Seeding\ProcessRepository;
+use Tangible\Populater\Seeding\SeedingIdMap;
 use Tangible\Populater\Support\DummyContent;
 
 /**
@@ -66,16 +68,78 @@ HTML;
 
         update_post_meta($postId, '_llms_order', $index);
 
+        $this->recordLessonForSection($sectionIndex, $postId, $options);
+
         return [$postId];
     }
 
-    protected function afterQuizCreated(int $postId, int $lessonId, int $index, array $options = []): void
+    /**
+     * @param array<string, mixed> $options
+     */
+    private function recordLessonForSection(int $sectionIndex, int $lessonId, array $options): void
     {
+        $processId = (string) ($options['process_id'] ?? '');
+
+        if ($processId === '') {
+            return;
+        }
+
+        SeedingIdMap::recordSectionLesson(
+            $processId,
+            (int) ($options['course_index'] ?? 0),
+            $sectionIndex,
+            $lessonId,
+            new ProcessRepository(),
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     * @return list<int>
+     */
+    public function seedQuizzes(int $count, int $parentId, array $options = []): array
+    {
+        $sectionId = (int) ($options['quiz_parent_id'] ?? $parentId);
+        $lessonId  = (int) ($options['lesson_id'] ?? 0);
+
+        if ($lessonId <= 0 && $sectionId > 0) {
+            $lessonId = $this->resolveLessonForSectionQuiz($sectionId, (int) ($options['index'] ?? 1));
+        }
+
+        $ids = [];
+
+        for ($i = 1; $i <= $count; $i++) {
+            $index = (int) ($options['index'] ?? $i);
+            $title = $this->defaultTitle($options['title_prefix'] ?? $this->getTitlePrefix('quizzes'), $index);
+            $postId = $this->insertPost([
+                'post_title'   => $title,
+                'post_type'    => $this->getPostType('quizzes'),
+                'post_status'  => 'publish',
+                'post_content' => DummyContent::quiz($title, $index),
+            ]);
+
+            if ($postId > 0) {
+                $this->applyMeta($postId, $this->getMetaFor('quizzes', ['lessonId' => $lessonId]));
+                $this->afterQuizCreated($postId, $lessonId, $index, array_merge($options, [
+                    'lesson_id'      => $lessonId,
+                    'quiz_parent_id' => $sectionId,
+                ]));
+                $this->seedQuestionsForQuiz($postId, $options);
+                $ids[] = $postId;
+            }
+        }
+
+        return $ids;
+    }
+
+    protected function afterQuizCreated(int $postId, int $parentId, int $index, array $options = []): void
+    {
+        $lessonId = (int) ($options['lesson_id'] ?? $parentId);
+
         if ($lessonId <= 0 || $postId <= 0) {
             return;
         }
 
-        // LifterLMS exposes quizzes on lessons via lesson meta (one quiz per lesson).
         if ((int) get_post_meta($lessonId, '_llms_quiz', true) > 0) {
             return;
         }
@@ -186,7 +250,10 @@ HTML;
         $cached = get_post_meta($courseId, $container->cacheMetaKey, true);
 
         if (is_array($cached) && isset($cached[$sectionIndex])) {
-            return (int) $cached[$sectionIndex];
+            $sectionId = (int) $cached[$sectionIndex];
+            $this->recordSectionInIdMap($sectionId, $sectionIndex, $options);
+
+            return $sectionId;
         }
 
         $title     = $this->defaultTitle($this->getTitlePrefix($container->entity), $sectionIndex);
@@ -209,9 +276,62 @@ HTML;
 
             $cached[$sectionIndex] = $sectionId;
             update_post_meta($courseId, $container->cacheMetaKey, $cached);
+
+            $this->recordSectionInIdMap($sectionId, $sectionIndex, $options);
         }
 
         return $sectionId;
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     */
+    private function recordSectionInIdMap(int $sectionId, int $sectionIndex, array $options): void
+    {
+        $processId = (string) ($options['process_id'] ?? '');
+
+        if ($processId === '') {
+            return;
+        }
+
+        SeedingIdMap::recordQuizParent(
+            $processId,
+            'sections',
+            (int) ($options['course_index'] ?? 0),
+            $sectionIndex,
+            $sectionId,
+            new ProcessRepository(),
+        );
+    }
+
+    private function resolveLessonForSectionQuiz(int $sectionId, int $quizIndex): int
+    {
+        if ($sectionId <= 0) {
+            return 0;
+        }
+
+        $lessons = get_posts([
+            'post_type'      => $this->getPostType('lessons'),
+            'post_status'    => 'any',
+            'posts_per_page' => 50,
+            'orderby'        => 'meta_value_num',
+            'order'          => 'ASC',
+            'meta_key'       => '_llms_order',
+            'meta_query'     => [
+                [
+                    'key'   => '_llms_parent_section',
+                    'value' => $sectionId,
+                ],
+            ],
+        ]);
+
+        if ($lessons === []) {
+            return 0;
+        }
+
+        $position = count($lessons) - max(1, $quizIndex);
+
+        return (int) ($lessons[max(0, $position)]->ID ?? $lessons[array_key_last($lessons)]->ID);
     }
 
     private function appendCourseBlocks(int $courseId): void

@@ -14,7 +14,7 @@ class SeedConfigTest extends \WPTestCase
             'plugin'             => 'learndash',
             'courses'            => 2,
             'lessons_per_course' => 3,
-            'quizzes_per_lesson' => 1,
+            'quizzes_per_section' => 1,
             'questions_per_quiz' => 5,
             'users'              => 4,
         ]);
@@ -22,7 +22,7 @@ class SeedConfigTest extends \WPTestCase
         $this->assertSame('learndash', $config->plugin);
         $this->assertSame(2, $config->courses);
         $this->assertSame(3, $config->lessonsPerCourse);
-        $this->assertSame(1, $config->quizzesPerLesson);
+        $this->assertSame(1, $config->quizzesPerSection);
         $this->assertSame(5, $config->questionsPerQuiz);
         $this->assertSame(2, $config->topicsPerLesson);
         $this->assertSame(1, $config->sectionsPerCourse);

@@ -30,7 +30,7 @@ final class TestLmsPlugin extends AbstractLmsPlugin
             userPrefix: 'test_lms_user',
             metaMap: [
                 'lessons'   => ['course_id' => 'courseId'],
-                'quizzes'   => ['lesson_id' => 'lessonId'],
+                'quizzes'   => ['lesson_id' => 'parentId'],
                 'questions' => ['quiz_id' => 'quizId'],
             ],
         );

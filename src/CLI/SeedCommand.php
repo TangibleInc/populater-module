@@ -35,7 +35,7 @@ class SeedCommand
      * : Lessons per course. Default: 5.
      *
      * [--quizzes=<n>]
-     * : Quizzes per lesson. Default: 1.
+     * : Quizzes per section/topic/module (depends on LMS). Default: 1.
      *
      * [--questions=<n>]
      * : Questions per quiz. Default: 3.
@@ -61,7 +61,7 @@ class SeedCommand
             'plugin'             => $plugin,
             'courses'            => (int) ($assocArgs['courses']  ?? 5),
             'lessons_per_course' => (int) ($assocArgs['lessons']  ?? 5),
-            'quizzes_per_lesson' => (int) ($assocArgs['quizzes']  ?? 1),
+            'quizzes_per_section' => (int) ($assocArgs['quizzes']  ?? 1),
             'questions_per_quiz' => (int) ($assocArgs['questions'] ?? 3),
             'topics_per_lesson'  => (int) ($assocArgs['topics']   ?? 2),
             'sections_per_course' => (int) ($assocArgs['sections'] ?? 1),

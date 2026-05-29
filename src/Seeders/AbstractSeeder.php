@@ -126,7 +126,7 @@ abstract class AbstractSeeder
      * @param array<string, mixed> $options
      * @return list<int>
      */
-    public function seedQuizzes(int $count, int $lessonId, array $options = []): array
+    public function seedQuizzes(int $count, int $parentId, array $options = []): array
     {
         $ids = [];
         for ($i = 1; $i <= $count; $i++) {
@@ -140,8 +140,8 @@ abstract class AbstractSeeder
             ]);
 
             if ($postId > 0) {
-                $this->applyMeta($postId, $this->getMetaFor('quizzes', ['lessonId' => $lessonId]));
-                $this->afterQuizCreated($postId, $lessonId, $index, $options);
+                $this->applyMeta($postId, $this->getMetaFor('quizzes', ['parentId' => $parentId]));
+                $this->afterQuizCreated($postId, $parentId, $index, $options);
                 $this->seedQuestionsForQuiz($postId, $options);
                 $ids[] = $postId;
             }
@@ -251,15 +251,10 @@ abstract class AbstractSeeder
                     'sections_per_course' => $seedConfig->sectionsPerCourse,
                     'modules_per_course'  => $seedConfig->modulesPerCourse,
                 ]);
+            }
 
-                for ($q = 1; $q <= $seedConfig->quizzesPerLesson; $q++) {
-                    $queue[] = new SeedQueueItem('quiz', [
-                        'course_index'       => $c,
-                        'lesson_index'       => $l,
-                        'index'              => $q,
-                        'questions_per_quiz' => $seedConfig->questionsPerQuiz,
-                    ]);
-                }
+            foreach ($this->buildQuizQueueItems($c, $seedConfig) as $item) {
+                $queue[] = $item;
             }
         }
 
@@ -332,7 +327,74 @@ abstract class AbstractSeeder
     protected function afterLessonCreated(int $postId, int $courseId, int $index, array $options = []): void {}
 
     /** @param array<string, mixed> $options */
-    protected function afterQuizCreated(int $postId, int $lessonId, int $index, array $options = []): void {}
+    protected function afterQuizCreated(int $postId, int $parentId, int $index, array $options = []): void {}
+
+    /**
+     * @return list<SeedQueueItem>
+     */
+    protected function buildQuizQueueItems(int $courseIndex, SeedConfig $seedConfig): array
+    {
+        $quizParent = $this->plugin->getEntitySchema()->quizParentEntity;
+        $items      = [];
+        $base       = [
+            'course_index'       => $courseIndex,
+            'questions_per_quiz' => $seedConfig->questionsPerQuiz,
+            'quiz_parent_entity' => $quizParent,
+        ];
+
+        if ($quizParent === 'topics') {
+            for ($l = 1; $l <= $seedConfig->lessonsPerCourse; $l++) {
+                for ($t = 1; $t <= $seedConfig->topicsPerLesson; $t++) {
+                    for ($q = 1; $q <= $seedConfig->quizzesPerSection; $q++) {
+                        $items[] = new SeedQueueItem('quiz', array_merge($base, [
+                            'lesson_index'      => $l,
+                            'quiz_parent_index' => $t,
+                            'index'             => $q,
+                        ]));
+                    }
+                }
+            }
+
+            return $items;
+        }
+
+        if ($quizParent === 'sections') {
+            for ($s = 1; $s <= $seedConfig->sectionsPerCourse; $s++) {
+                for ($q = 1; $q <= $seedConfig->quizzesPerSection; $q++) {
+                    $items[] = new SeedQueueItem('quiz', array_merge($base, [
+                        'quiz_parent_index' => $s,
+                        'index'             => $q,
+                    ]));
+                }
+            }
+
+            return $items;
+        }
+
+        if ($quizParent === 'modules') {
+            for ($m = 1; $m <= $seedConfig->modulesPerCourse; $m++) {
+                for ($q = 1; $q <= $seedConfig->quizzesPerSection; $q++) {
+                    $items[] = new SeedQueueItem('quiz', array_merge($base, [
+                        'quiz_parent_index' => $m,
+                        'index'             => $q,
+                    ]));
+                }
+            }
+
+            return $items;
+        }
+
+        for ($l = 1; $l <= $seedConfig->lessonsPerCourse; $l++) {
+            for ($q = 1; $q <= $seedConfig->quizzesPerSection; $q++) {
+                $items[] = new SeedQueueItem('quiz', array_merge($base, [
+                    'lesson_index' => $l,
+                    'index'        => $q,
+                ]));
+            }
+        }
+
+        return $items;
+    }
 
     /** @param array<string, mixed> $options */
     protected function afterQuestionCreated(int $postId, int $quizId, int $index, array $options = []): void {}

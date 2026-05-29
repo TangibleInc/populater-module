@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tangible\Populater\LMS\LearnDash;
 
 use Tangible\Populater\Seeders\AbstractSeeder;
+use Tangible\Populater\Seeding\SeedingIdMap;
 use Tangible\Populater\Support\DummyContent;
 
 /**
@@ -22,10 +23,14 @@ class LearnDashSeeder extends AbstractSeeder
         }
 
         $options['course_id'] = $courseId;
-        $this->seedTopicsForLesson($postId, $options);
+        $topicIds             = $this->seedTopicsForLesson($postId, $options);
+
+        if ($topicIds !== []) {
+            SeedingIdMap::recordQuizParentsFromOptions('topics', $topicIds, $options);
+        }
     }
 
-    protected function afterQuizCreated(int $postId, int $lessonId, int $index, array $options = []): void
+    protected function afterQuizCreated(int $postId, int $parentId, int $index, array $options = []): void
     {
         $title = $this->defaultTitle(
             $options['title_prefix'] ?? $this->getTitlePrefix('quizzes'),
@@ -34,13 +39,19 @@ class LearnDashSeeder extends AbstractSeeder
         LearnDashProQuizHelper::createProQuiz($postId, $title);
 
         $courseId = (int) ($options['course_id'] ?? 0);
+        $topicId  = (int) ($options['quiz_parent_id'] ?? $parentId);
+        $lessonId = (int) ($options['lesson_id'] ?? 0);
+
+        if ($lessonId <= 0 && $topicId > 0) {
+            $lessonId = (int) get_post_meta($topicId, 'lesson_id', true);
+        }
 
         if ($courseId <= 0 && $lessonId > 0) {
             $courseId = (int) get_post_meta($lessonId, 'course_id', true);
         }
 
-        if ($courseId > 0 && $lessonId > 0) {
-            $this->linkStepToCourse($courseId, $postId, $lessonId, $this->getPostType('quizzes'));
+        if ($courseId > 0 && $topicId > 0 && $lessonId > 0) {
+            $this->linkQuizToTopic($courseId, $postId, $lessonId, $topicId);
         }
     }
 
@@ -100,14 +111,21 @@ class LearnDashSeeder extends AbstractSeeder
      * @param array<string, mixed> $options
      * @return list<int>
      */
-    public function seedQuizzes(int $count, int $lessonId, array $options = []): array
+    public function seedQuizzes(int $count, int $parentId, array $options = []): array
     {
-        if (!isset($options['course_id']) && $lessonId > 0) {
-            $options['course_id'] = (int) get_post_meta($lessonId, 'course_id', true);
+        $topicId  = (int) ($options['quiz_parent_id'] ?? $parentId);
+        $lessonId = (int) ($options['lesson_id'] ?? 0);
+        $courseId = (int) ($options['course_id'] ?? 0);
+
+        if ($lessonId <= 0 && $topicId > 0) {
+            $lessonId = (int) get_post_meta($topicId, 'lesson_id', true);
         }
 
-        $courseId = (int) ($options['course_id'] ?? 0);
-        $ids      = [];
+        if ($courseId <= 0 && $lessonId > 0) {
+            $courseId = (int) get_post_meta($lessonId, 'course_id', true);
+        }
+
+        $ids = [];
 
         for ($i = 1; $i <= $count; $i++) {
             $index = (int) ($options['index'] ?? $i);
@@ -123,8 +141,13 @@ class LearnDashSeeder extends AbstractSeeder
                 $this->applyMeta($postId, $this->getMetaFor('quizzes', [
                     'lessonId' => $lessonId,
                     'courseId' => $courseId,
+                    'topicId'  => $topicId,
                 ]));
-                $this->afterQuizCreated($postId, $lessonId, $index, $options);
+                $this->afterQuizCreated($postId, $topicId, $index, array_merge($options, [
+                    'course_id'      => $courseId,
+                    'lesson_id'      => $lessonId,
+                    'quiz_parent_id' => $topicId,
+                ]));
                 $this->seedQuestionsForQuiz($postId, $options);
                 $ids[] = $postId;
             }
@@ -146,6 +169,21 @@ class LearnDashSeeder extends AbstractSeeder
         }
 
         return $this->seedTopics($count, $lessonId, $options);
+    }
+
+    private function linkQuizToTopic(int $courseId, int $quizId, int $lessonId, int $topicId): void
+    {
+        if ($courseId <= 0 || $quizId <= 0 || $lessonId <= 0 || $topicId <= 0) {
+            return;
+        }
+
+        if (function_exists('learndash_course_add_child_to_parent')) {
+            learndash_course_add_child_to_parent($courseId, $quizId, $topicId);
+
+            return;
+        }
+
+        $this->linkQuizToTopicFallback($courseId, $quizId, $lessonId, $topicId);
     }
 
     /**
@@ -212,21 +250,51 @@ class LearnDashSeeder extends AbstractSeeder
             }
 
             $steps['steps']['h'][$lessonType][$parentId][$topicType][$childId] = [];
-        } elseif ($childType === $quizType) {
-            if (!isset($steps['steps']['h'][$lessonType][$parentId])) {
-                $steps['steps']['h'][$lessonType][$parentId] = [
-                    $topicType => [],
-                    $quizType  => [],
-                ];
-            }
-
-            if (!isset($steps['steps']['h'][$lessonType][$parentId][$quizType]) || !is_array($steps['steps']['h'][$lessonType][$parentId][$quizType])) {
-                $steps['steps']['h'][$lessonType][$parentId][$quizType] = [];
-            }
-
-            $steps['steps']['h'][$lessonType][$parentId][$quizType][$childId] = [];
         }
 
+        $steps['empty'] = false;
+        update_post_meta($courseId, 'ld_course_steps', $steps);
+    }
+
+    private function linkQuizToTopicFallback(int $courseId, int $quizId, int $lessonId, int $topicId): void
+    {
+        update_post_meta($quizId, 'course_id', $courseId);
+
+        $steps = get_post_meta($courseId, 'ld_course_steps', true);
+
+        if (!is_array($steps)) {
+            $steps = [
+                'steps'    => ['h' => [$this->getPostType('lessons') => []]],
+                'versions' => [],
+                'empty'    => false,
+                'course_id' => $courseId,
+            ];
+        }
+
+        $lessonType = $this->getPostType('lessons');
+        $topicType  = $this->getPostType('topics');
+        $quizType   = $this->getPostType('quizzes');
+
+        if (!isset($steps['steps']['h'][$lessonType]) || !is_array($steps['steps']['h'][$lessonType])) {
+            $steps['steps']['h'][$lessonType] = [];
+        }
+
+        if (!isset($steps['steps']['h'][$lessonType][$lessonId])) {
+            $steps['steps']['h'][$lessonType][$lessonId] = [
+                $topicType => [],
+                $quizType  => [],
+            ];
+        }
+
+        if (!isset($steps['steps']['h'][$lessonType][$lessonId][$topicType][$topicId]) || !is_array($steps['steps']['h'][$lessonType][$lessonId][$topicType][$topicId])) {
+            $steps['steps']['h'][$lessonType][$lessonId][$topicType][$topicId] = [];
+        }
+
+        if (!isset($steps['steps']['h'][$lessonType][$lessonId][$topicType][$topicId][$quizType]) || !is_array($steps['steps']['h'][$lessonType][$lessonId][$topicType][$topicId][$quizType])) {
+            $steps['steps']['h'][$lessonType][$lessonId][$topicType][$topicId][$quizType] = [];
+        }
+
+        $steps['steps']['h'][$lessonType][$lessonId][$topicType][$topicId][$quizType][$quizId] = [];
         $steps['empty'] = false;
         update_post_meta($courseId, 'ld_course_steps', $steps);
     }

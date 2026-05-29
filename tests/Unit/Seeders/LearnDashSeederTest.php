@@ -122,19 +122,20 @@ class LearnDashSeederTest extends \WPTestCase
         $this->assertSame(5, $this->meta->getValue(10, 'course_id'));
     }
 
-    public function test_seed_quizzes_attaches_quiz_to_lesson_in_course_steps(): void
+    public function test_seed_quizzes_attaches_quiz_to_topic_in_course_steps(): void
     {
         $this->meta->set(5, 'ld_course_steps', [
             'steps' => [
                 'h' => [
                     'sfwd-lessons' => [
-                        10 => ['sfwd-topic' => [], 'sfwd-quiz' => []],
+                        10 => ['sfwd-topic' => [101 => []], 'sfwd-quiz' => []],
                     ],
                 ],
             ],
             'versions' => [],
             'empty' => [],
         ]);
+        $this->meta->set(110, 'lesson_id', 10);
 
         Functions\expect('wp_insert_post')
             ->once()
@@ -142,19 +143,24 @@ class LearnDashSeederTest extends \WPTestCase
             ->andReturn(20);
         Functions\when('is_wp_error')->justReturn(false);
 
-        $ids = $this->seeder->seedQuizzes(1, lessonId: 10, options: ['course_id' => 5]);
+        $ids = $this->seeder->seedQuizzes(1, parentId: 110, options: [
+            'course_id'      => 5,
+            'lesson_id'      => 10,
+            'quiz_parent_id' => 110,
+        ]);
 
         $this->assertSame([20], $ids);
 
         $steps = $this->meta->getValue(5, 'ld_course_steps');
-        $this->assertArrayHasKey(20, $steps['steps']['h']['sfwd-lessons'][10]['sfwd-quiz']);
+        $this->assertArrayHasKey(20, $steps['steps']['h']['sfwd-lessons'][10]['sfwd-topic'][110]['sfwd-quiz']);
     }
 
-    public function test_seed_quizzes_resolves_course_id_from_lesson_meta(): void
+    public function test_seed_quizzes_resolves_course_id_from_topic_lesson_meta(): void
     {
+        $this->meta->set(110, 'lesson_id', 10);
         $this->meta->set(10, 'course_id', 99);
         $this->meta->set(99, 'ld_course_steps', [
-            'steps' => ['h' => ['sfwd-lessons' => []]],
+            'steps' => ['h' => ['sfwd-lessons' => [10 => ['sfwd-topic' => [110 => []], 'sfwd-quiz' => []]]]],
             'versions' => [],
             'empty' => [],
         ]);
@@ -162,24 +168,29 @@ class LearnDashSeederTest extends \WPTestCase
         Functions\expect('wp_insert_post')->once()->andReturn(20);
         Functions\when('is_wp_error')->justReturn(false);
 
-        $this->seeder->seedQuizzes(1, lessonId: 10);
+        $this->seeder->seedQuizzes(1, parentId: 110, options: ['quiz_parent_id' => 110]);
 
         $steps = $this->meta->getValue(99, 'ld_course_steps');
-        $this->assertArrayHasKey(20, $steps['steps']['h']['sfwd-lessons'][10]['sfwd-quiz']);
+        $this->assertArrayHasKey(20, $steps['steps']['h']['sfwd-lessons'][10]['sfwd-topic'][110]['sfwd-quiz']);
     }
 
     public function test_seed_quizzes_sets_quiz_pro_id_when_missing(): void
     {
         $this->meta->set(5, 'ld_course_steps', [
-            'steps' => ['h' => ['sfwd-lessons' => [10 => ['sfwd-topic' => [], 'sfwd-quiz' => []]]]],
+            'steps' => ['h' => ['sfwd-lessons' => [10 => ['sfwd-topic' => [110 => []], 'sfwd-quiz' => []]]]],
             'versions' => [],
             'empty' => [],
         ]);
+        $this->meta->set(110, 'lesson_id', 10);
 
         Functions\expect('wp_insert_post')->once()->andReturn(50);
         Functions\when('is_wp_error')->justReturn(false);
 
-        $this->seeder->seedQuizzes(1, lessonId: 10, options: ['course_id' => 5]);
+        $this->seeder->seedQuizzes(1, parentId: 110, options: [
+            'course_id'      => 5,
+            'lesson_id'      => 10,
+            'quiz_parent_id' => 110,
+        ]);
 
         $this->assertSame(50, $this->meta->getValue(50, 'quiz_pro_id'));
     }
@@ -187,44 +198,56 @@ class LearnDashSeederTest extends \WPTestCase
     public function test_seed_quizzes_preserves_existing_quiz_pro_id(): void
     {
         $this->meta->set(5, 'ld_course_steps', [
-            'steps' => ['h' => ['sfwd-lessons' => [10 => ['sfwd-topic' => [], 'sfwd-quiz' => []]]]],
+            'steps' => ['h' => ['sfwd-lessons' => [10 => ['sfwd-topic' => [110 => []], 'sfwd-quiz' => []]]]],
             'versions' => [],
             'empty' => [],
         ]);
+        $this->meta->set(110, 'lesson_id', 10);
         $this->meta->set(50, 'quiz_pro_id', 777);
 
         Functions\expect('wp_insert_post')->once()->andReturn(50);
         Functions\when('is_wp_error')->justReturn(false);
 
-        $this->seeder->seedQuizzes(1, lessonId: 10, options: ['course_id' => 5]);
+        $this->seeder->seedQuizzes(1, parentId: 110, options: [
+            'course_id'      => 5,
+            'lesson_id'      => 10,
+            'quiz_parent_id' => 110,
+        ]);
 
         $this->assertSame(777, $this->meta->getValue(50, 'quiz_pro_id'));
     }
 
-    public function test_seed_quizzes_sets_lesson_id_meta_on_quiz(): void
+    public function test_seed_quizzes_sets_topic_and_lesson_meta_on_quiz(): void
     {
         $this->meta->set(5, 'ld_course_steps', [
-            'steps' => ['h' => ['sfwd-lessons' => [10 => ['sfwd-topic' => [], 'sfwd-quiz' => []]]]],
+            'steps' => ['h' => ['sfwd-lessons' => [10 => ['sfwd-topic' => [110 => []], 'sfwd-quiz' => []]]]],
             'versions' => [],
             'empty' => [],
         ]);
+        $this->meta->set(110, 'lesson_id', 10);
 
         Functions\expect('wp_insert_post')->once()->andReturn(20);
         Functions\when('is_wp_error')->justReturn(false);
 
-        $this->seeder->seedQuizzes(1, lessonId: 10, options: ['course_id' => 5]);
+        $this->seeder->seedQuizzes(1, parentId: 110, options: [
+            'course_id'      => 5,
+            'lesson_id'      => 10,
+            'quiz_parent_id' => 110,
+        ]);
 
         $this->assertSame(10, $this->meta->getValue(20, 'lesson_id'));
+        $this->assertSame(110, $this->meta->getValue(20, 'topic_id'));
         $this->assertSame(5, $this->meta->getValue(20, 'course_id'));
     }
 
     public function test_seed_quizzes_creates_questions_when_configured(): void
     {
         $this->meta->set(5, 'ld_course_steps', [
-            'steps' => ['h' => ['sfwd-lessons' => [10 => ['sfwd-topic' => [], 'sfwd-quiz' => []]]]],
+            'steps' => ['h' => ['sfwd-lessons' => [10 => ['sfwd-topic' => [110 => []], 'sfwd-quiz' => []]]]],
             'versions' => [],
             'empty' => [],
         ]);
+        $this->meta->set(110, 'lesson_id', 10);
 
         Functions\expect('wp_insert_post')
             ->times(3)
@@ -237,8 +260,10 @@ class LearnDashSeederTest extends \WPTestCase
             });
         Functions\when('is_wp_error')->justReturn(false);
 
-        $this->seeder->seedQuizzes(1, lessonId: 10, options: [
+        $this->seeder->seedQuizzes(1, parentId: 110, options: [
             'course_id'          => 5,
+            'lesson_id'          => 10,
+            'quiz_parent_id'     => 110,
             'questions_per_quiz' => 2,
         ]);
 
@@ -290,22 +315,27 @@ class LearnDashSeederTest extends \WPTestCase
         $this->assertNull($this->meta->getValue(0, 'ld_course_steps'));
     }
 
-    public function test_seed_quizzes_creates_lesson_entry_in_course_steps_when_missing(): void
+    public function test_seed_quizzes_creates_topic_and_lesson_entries_in_course_steps_when_missing(): void
     {
         $this->meta->set(5, 'ld_course_steps', [
             'steps' => ['h' => ['sfwd-lessons' => []]],
             'versions' => [],
             'empty' => [],
         ]);
+        $this->meta->set(110, 'lesson_id', 10);
 
         Functions\expect('wp_insert_post')->once()->andReturn(20);
         Functions\when('is_wp_error')->justReturn(false);
 
-        $this->seeder->seedQuizzes(1, lessonId: 10, options: ['course_id' => 5]);
+        $this->seeder->seedQuizzes(1, parentId: 110, options: [
+            'course_id'      => 5,
+            'lesson_id'      => 10,
+            'quiz_parent_id' => 110,
+        ]);
 
         $steps = $this->meta->getValue(5, 'ld_course_steps');
         $this->assertArrayHasKey(10, $steps['steps']['h']['sfwd-lessons']);
-        $this->assertArrayHasKey(20, $steps['steps']['h']['sfwd-lessons'][10]['sfwd-quiz']);
+        $this->assertArrayHasKey(20, $steps['steps']['h']['sfwd-lessons'][10]['sfwd-topic'][110]['sfwd-quiz']);
     }
 
     public function test_seed_users_creates_users(): void

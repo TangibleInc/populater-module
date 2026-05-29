@@ -178,14 +178,17 @@ class LifterLMSSeederTest extends \WPTestCase
             ->andReturn(20);
         Functions\when('is_wp_error')->justReturn(false);
 
-        $this->seeder->seedQuizzes(1, lessonId: 15);
+        $this->seeder->seedQuizzes(1, parentId: 88, options: [
+            'quiz_parent_id' => 88,
+            'lesson_id'      => 15,
+        ]);
 
         $this->assertSame(15, $this->meta->getValue(20, '_llms_lesson_id'));
         $this->assertSame(20, $this->meta->getValue(15, '_llms_quiz'));
         $this->assertSame('yes', $this->meta->getValue(15, '_llms_quiz_enabled'));
     }
 
-    public function test_seed_quizzes_attaches_to_lesson_not_course(): void
+    public function test_seed_quizzes_attaches_to_lesson_not_section(): void
     {
         Functions\expect('wp_insert_post')
             ->once()
@@ -194,10 +197,13 @@ class LifterLMSSeederTest extends \WPTestCase
             ->andReturn(20);
         Functions\when('is_wp_error')->justReturn(false);
 
-        $this->seeder->seedQuizzes(1, lessonId: 15);
+        $this->seeder->seedQuizzes(1, parentId: 88, options: [
+            'quiz_parent_id' => 88,
+            'lesson_id'      => 15,
+        ]);
 
         $this->assertSame(15, $this->meta->getValue(20, '_llms_lesson_id'));
-        $this->assertNull($this->meta->getValue(20, '_llms_parent_course'));
+        $this->assertNull($this->meta->getValue(20, '_llms_parent_section'));
     }
 
     public function test_seed_quizzes_creates_questions_when_configured(): void
@@ -222,7 +228,11 @@ class LifterLMSSeederTest extends \WPTestCase
         });
         Functions\when('wp_update_post')->justReturn(31);
 
-        $this->seeder->seedQuizzes(1, lessonId: 15, options: ['questions_per_quiz' => 2]);
+        $this->seeder->seedQuizzes(1, parentId: 88, options: [
+            'quiz_parent_id' => 88,
+            'lesson_id'      => 15,
+            'questions_per_quiz' => 2,
+        ]);
 
         $this->assertSame(20, $this->meta->getValue(31, '_llms_parent_id'));
         $this->assertSame('true_false', $this->meta->getValue(31, '_llms_question_type'));

@@ -32,12 +32,25 @@ class LearnDashQuizIntegrationTest extends WordPressIntegrationTestCase
 
         $lessonIds = $seeder->seedLessons(1, $courseIds[0], [
             'index'             => 1,
-            'topics_per_lesson' => 0,
+            'topics_per_lesson' => 1,
         ]);
         $this->assertCount(1, $lessonIds);
 
-        $quizIds = $seeder->seedQuizzes(1, $lessonIds[0], [
+        $topics = get_posts([
+            'post_type'      => 'sfwd-topic',
+            'post_status'    => 'any',
+            'posts_per_page' => 1,
+            'meta_key'       => 'lesson_id',
+            'meta_value'     => $lessonIds[0],
+            'orderby'        => 'ID',
+            'order'          => 'ASC',
+        ]);
+        $this->assertCount(1, $topics);
+
+        $quizIds = $seeder->seedQuizzes(1, (int) $topics[0]->ID, [
             'course_id'          => $courseIds[0],
+            'lesson_id'          => $lessonIds[0],
+            'quiz_parent_id'     => (int) $topics[0]->ID,
             'questions_per_quiz' => 2,
         ]);
         $this->assertCount(1, $quizIds);
@@ -47,10 +60,10 @@ class LearnDashQuizIntegrationTest extends WordPressIntegrationTestCase
             'learndash',
             courses: 1,
             lessonsPerCourse: 1,
-            quizzesPerLesson: 1,
+            quizzesPerSection: 1,
             afterPostId: $maxPostId,
             questionsPerQuiz: 2,
-            topicsPerLesson: 0,
+            topicsPerLesson: 1,
         );
     }
 

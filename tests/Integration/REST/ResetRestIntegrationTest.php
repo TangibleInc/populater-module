@@ -28,7 +28,7 @@ class ResetRestIntegrationTest extends WordPressIntegrationTestCase
             'plugin'             => $plugin,
             'courses'            => 1,
             'lessons_per_course' => 1,
-            'quizzes_per_lesson' => 1,
+            'quizzes_per_section' => 1,
             'users'              => 1,
         ]);
 

@@ -21,6 +21,8 @@ final readonly class LmsEntitySchema
         public string $userPrefix = '',
         public array $metaMap = [],
         public ?LmsContainerEntity $container = null,
+        /** Entity key quizzes attach to: topics, sections, modules, etc. */
+        public ?string $quizParentEntity = null,
     ) {}
 
     public function getPostType(string $entity): string

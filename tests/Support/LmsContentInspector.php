@@ -56,7 +56,7 @@ final class LmsContentInspector
         string $pluginSlug,
         int $courses,
         int $lessonsPerCourse,
-        int $quizzesPerLesson,
+        int $quizzesPerSection,
         int $afterPostId = 0,
         int $questionsPerQuiz = 3,
         int $topicsPerLesson = 2,
@@ -68,7 +68,7 @@ final class LmsContentInspector
                 $test,
                 $courses,
                 $lessonsPerCourse,
-                $quizzesPerLesson,
+                $quizzesPerSection,
                 $afterPostId,
                 $questionsPerQuiz,
                 $topicsPerLesson,
@@ -77,7 +77,7 @@ final class LmsContentInspector
                 $test,
                 $courses,
                 $lessonsPerCourse,
-                $quizzesPerLesson,
+                $quizzesPerSection,
                 $afterPostId,
                 $questionsPerQuiz,
                 $sectionsPerCourse,
@@ -86,7 +86,7 @@ final class LmsContentInspector
                 $test,
                 $courses,
                 $lessonsPerCourse,
-                $quizzesPerLesson,
+                $quizzesPerSection,
                 $afterPostId,
                 $questionsPerQuiz,
                 $modulesPerCourse,
@@ -132,19 +132,27 @@ final class LmsContentInspector
     }
 
     public static function expectedCounts(
+        string $pluginSlug,
         int $courses,
         int $lessonsPerCourse,
-        int $quizzesPerLesson,
+        int $quizzesPerSection,
         int $users,
         int $questionsPerQuiz = 3,
         int $topicsPerLesson = 2,
         int $sectionsPerCourse = 1,
         int $modulesPerCourse = 1,
     ): array {
-        $lessons   = $courses * $lessonsPerCourse;
-        $quizzes   = $lessons * $quizzesPerLesson;
+        $lessons  = $courses * $lessonsPerCourse;
+        $topics   = $lessons * $topicsPerLesson;
+        $sections = $courses * $sectionsPerCourse;
+        $modules  = $courses * $modulesPerCourse;
+        $quizzes  = match ($pluginSlug) {
+            'learndash'    => $topics * $quizzesPerSection,
+            'lifterlms'    => $sections * $quizzesPerSection,
+            'tangible-lms' => $modules * $quizzesPerSection,
+            default        => $lessons * $quizzesPerSection,
+        };
         $questions = $quizzes * $questionsPerQuiz;
-        $topics    = $lessons * $topicsPerLesson;
 
         return [
             'courses'   => $courses,
@@ -152,8 +160,8 @@ final class LmsContentInspector
             'topics'    => $topics,
             'quizzes'   => $quizzes,
             'questions' => $questions,
-            'sections'  => $courses * $sectionsPerCourse,
-            'modules'   => $courses * $modulesPerCourse,
+            'sections'  => $sections,
+            'modules'   => $modules,
             'users'     => $users,
         ];
     }
@@ -183,7 +191,7 @@ final class LmsContentInspector
         \PHPUnit\Framework\TestCase $test,
         int $courses,
         int $lessonsPerCourse,
-        int $quizzesPerLesson,
+        int $quizzesPerSection,
         int $afterPostId = 0,
         int $questionsPerQuiz = 3,
         int $topicsPerLesson = 2,
@@ -211,10 +219,15 @@ final class LmsContentInspector
                     $test->assertArrayHasKey($topicType, $entry, 'LearnDash lesson step should reserve topic post type.');
                     $test->assertIsArray($entry[$topicType]);
                     $test->assertCount($topicsPerLesson, $entry[$topicType], 'Lesson should contain expected topics in ld_course_steps.');
+
+                    if ($quizzesPerSection > 0) {
+                        foreach ($entry[$topicType] as $topicEntry) {
+                            $test->assertArrayHasKey($quizType, $topicEntry, 'LearnDash topic step should reserve quiz post type.');
+                            $test->assertCount($quizzesPerSection, $topicEntry[$quizType], 'Topic should contain expected quizzes in ld_course_steps.');
+                        }
+                    }
                 }
 
-                $test->assertArrayHasKey($quizType, $entry);
-                $test->assertCount($quizzesPerLesson, $entry[$quizType], 'Lesson should contain expected quizzes in ld_course_steps.');
                 $test->assertSame($courses > 0 ? $course->ID : 0, (int) get_post_meta((int) $lessonId, 'course_id', true));
             }
         }
@@ -242,7 +255,7 @@ final class LmsContentInspector
 
         $quizPosts = self::newestPosts(
             $quizType,
-            $courses * $lessonsPerCourse * $quizzesPerLesson,
+            $courses * $lessonsPerCourse * $topicsPerLesson * $quizzesPerSection,
             $afterPostId,
         );
 
@@ -252,6 +265,7 @@ final class LmsContentInspector
             $test->assertGreaterThan(0, $proId, 'LearnDash quiz should have quiz_pro_id meta.');
             self::assertLearnDashProQuizExists($test, $proId);
             $test->assertGreaterThan(0, (int) get_post_meta($quiz->ID, 'lesson_id', true), 'LearnDash quiz should reference a lesson.');
+            $test->assertGreaterThan(0, (int) get_post_meta($quiz->ID, 'topic_id', true), 'LearnDash quiz should reference a topic.');
             $test->assertGreaterThan(0, (int) get_post_meta($quiz->ID, 'course_id', true), 'LearnDash quiz should reference a course.');
 
             if ($questionsPerQuiz > 0) {
@@ -284,7 +298,7 @@ final class LmsContentInspector
         if ($questionsPerQuiz > 0) {
             $questionPosts = self::newestPosts(
                 $questionType,
-                $courses * $lessonsPerCourse * $quizzesPerLesson * $questionsPerQuiz,
+                $courses * $lessonsPerCourse * $topicsPerLesson * $quizzesPerSection * $questionsPerQuiz,
                 $afterPostId,
             );
 
@@ -301,7 +315,7 @@ final class LmsContentInspector
         \PHPUnit\Framework\TestCase $test,
         int $courses,
         int $lessonsPerCourse,
-        int $quizzesPerLesson,
+        int $quizzesPerSection,
         int $afterPostId = 0,
         int $questionsPerQuiz = 3,
         int $sectionsPerCourse = 1,
@@ -375,30 +389,38 @@ final class LmsContentInspector
             $test->assertSame($sectionId, (int) $lesson->post_parent, 'LifterLMS lesson post_parent should be the section.');
             $test->assertGreaterThan(0, (int) get_post_meta($lesson->ID, '_llms_parent_course', true));
             $test->assertNotSame('', (string) get_post_meta($lesson->ID, '_llms_order', true), 'LifterLMS lesson should have order meta.');
+        }
 
-            if ($quizzesPerLesson > 0) {
-                $quizId = (int) get_post_meta($lesson->ID, '_llms_quiz', true);
-                $test->assertGreaterThan(0, $quizId, 'LifterLMS lesson should reference an assigned quiz.');
-                $test->assertSame('yes', get_post_meta($lesson->ID, '_llms_quiz_enabled', true));
-                $test->assertSame($lesson->ID, (int) get_post_meta($quizId, '_llms_lesson_id', true));
-            }
+        if ($quizzesPerSection > 0) {
+            $lessonsWithQuiz = array_values(array_filter(
+                $lessons,
+                static fn(\WP_Post $lesson) => (int) get_post_meta($lesson->ID, '_llms_quiz', true) > 0,
+            ));
+            $test->assertGreaterThanOrEqual(
+                min($quizzesPerSection * count($sections), count($lessons)),
+                count($lessonsWithQuiz),
+                'LifterLMS should assign quizzes to lessons within sections.',
+            );
         }
 
         $quizzes = self::newestPosts(
             $quizType,
-            $courses * $lessonsPerCourse * $quizzesPerLesson,
+            $courses * $sectionsPerCourse * $quizzesPerSection,
             $afterPostId,
         );
 
         foreach ($quizzes as $quiz) {
             self::assertRichQuizContent($test, $quiz);
-            $test->assertGreaterThan(0, (int) get_post_meta($quiz->ID, '_llms_lesson_id', true), 'LifterLMS quiz should reference a lesson.');
+            $lessonId = (int) get_post_meta($quiz->ID, '_llms_lesson_id', true);
+            $test->assertGreaterThan(0, $lessonId, 'LifterLMS quiz should reference a lesson.');
+            $test->assertSame('yes', get_post_meta($lessonId, '_llms_quiz_enabled', true));
+            $test->assertSame($quiz->ID, (int) get_post_meta($lessonId, '_llms_quiz', true));
         }
 
         if ($questionsPerQuiz > 0) {
             $questions = self::newestPosts(
                 $questionType,
-                $courses * $lessonsPerCourse * $quizzesPerLesson * $questionsPerQuiz,
+                $courses * $sectionsPerCourse * $quizzesPerSection * $questionsPerQuiz,
                 $afterPostId,
             );
 
@@ -461,7 +483,7 @@ final class LmsContentInspector
         \PHPUnit\Framework\TestCase $test,
         int $courses,
         int $lessonsPerCourse,
-        int $quizzesPerLesson,
+        int $quizzesPerSection,
         int $afterPostId = 0,
         int $questionsPerQuiz = 3,
         int $modulesPerCourse = 1,
@@ -503,19 +525,20 @@ final class LmsContentInspector
 
         $quizzes = self::newestPosts(
             $quizType,
-            $courses * $lessonsPerCourse * $quizzesPerLesson,
+            $courses * $modulesPerCourse * $quizzesPerSection,
             $afterPostId,
         );
 
         foreach ($quizzes as $quiz) {
             self::assertRichQuizContent($test, $quiz);
-            $test->assertGreaterThan(0, (int) get_post_meta($quiz->ID, '_tgl_lesson_id', true), 'Tangible quiz should reference a lesson.');
+            $test->assertGreaterThan(0, (int) get_post_meta($quiz->ID, '_tgl_module_id', true), 'Tangible quiz should reference a module.');
+            $test->assertGreaterThan(0, (int) get_post_meta($quiz->ID, '_tgl_course_id', true), 'Tangible quiz should reference a course.');
         }
 
         if ($questionsPerQuiz > 0) {
             $questions = self::newestPosts(
                 $questionType,
-                $courses * $lessonsPerCourse * $quizzesPerLesson * $questionsPerQuiz,
+                $courses * $modulesPerCourse * $quizzesPerSection * $questionsPerQuiz,
                 $afterPostId,
             );
 

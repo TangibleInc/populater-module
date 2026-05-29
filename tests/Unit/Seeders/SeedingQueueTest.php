@@ -38,7 +38,7 @@ class SeedingQueueTest extends \WPTestCase
     {
         $registry = new LmsPluginRegistry();
         $seeder   = $registry->createSeeder($slug);
-        $config   = new SeedConfig($slug, 1, 1, 1, 0, 0, 0, 0, 1);
+        $config   = new SeedConfig($slug, 1, 1, 1, 0, 1, 1, 1, 1);
         $queue    = $seeder->buildSeedQueue($config);
 
         $this->assertCount($expectedCount, $queue);

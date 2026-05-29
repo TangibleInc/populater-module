@@ -74,7 +74,7 @@ class SeedController
             'plugin'             => $request->get_param('plugin'),
             'courses'            => (int) ($request->get_param('courses')            ?? 5),
             'lessons_per_course' => (int) ($request->get_param('lessons_per_course') ?? 5),
-            'quizzes_per_lesson' => (int) ($request->get_param('quizzes_per_lesson') ?? 1),
+            'quizzes_per_section' => (int) ($request->get_param('quizzes_per_section') ?? $request->get_param('quizzes_per_lesson') ?? 1),
             'questions_per_quiz' => (int) ($request->get_param('questions_per_quiz') ?? 3),
             'topics_per_lesson'  => (int) ($request->get_param('topics_per_lesson')  ?? 2),
             'sections_per_course' => (int) ($request->get_param('sections_per_course') ?? 1),
@@ -170,7 +170,7 @@ class SeedController
                 'minimum' => 0,
                 'maximum' => 100,
             ],
-            'quizzes_per_lesson' => [
+            'quizzes_per_section' => [
                 'type'    => 'integer',
                 'default' => 1,
                 'minimum' => 0,
