@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tangible\Populater\Tests\Support;
 
-use Tangible\Populater\Seeding\AbstractSeeding;
 use Tangible\Populater\Seeding\SeedingManager;
 use Tangible\Populater\Seeding\SeedingStatus;
 
@@ -15,15 +14,12 @@ final class BackgroundProcessDrainer
 {
     public static function runSeedToCompletion(SeedingManager $manager, string $pluginSlug, string $processId): SeedingStatus
     {
-        $process  = PluginTestAccessor::processForPlugin($pluginSlug);
-        $task     = new \ReflectionMethod($process, 'task');
-        $task->setAccessible(true);
-        $getBatch = new \ReflectionMethod(AbstractSeeding::class, 'get_batch');
-        $getBatch->setAccessible(true);
-        $delete   = new \ReflectionMethod(AbstractSeeding::class, 'delete');
-        $delete->setAccessible(true);
-        $update   = new \ReflectionMethod(AbstractSeeding::class, 'update');
-        $update->setAccessible(true);
+        $process = PluginTestAccessor::processForPlugin($pluginSlug);
+        $handle  = new \ReflectionMethod($process, 'handle');
+        $handle->setAccessible(true);
+
+        $queueEmpty = new \ReflectionMethod($process, 'is_queue_empty');
+        $queueEmpty->setAccessible(true);
 
         $guard = 0;
 
@@ -34,22 +30,11 @@ final class BackgroundProcessDrainer
                 return $status;
             }
 
-            $batch = $getBatch->invoke($process);
-
-            if ($batch === false || !isset($batch->data) || !is_array($batch->data) || $batch->data === []) {
+            if ($queueEmpty->invoke($process)) {
                 break;
             }
 
-            foreach ($batch->data as $key => $item) {
-                $task->invoke($process, $item);
-                unset($batch->data[$key]);
-            }
-
-            if ($batch->data !== []) {
-                $update->invoke($process, $batch->key, $batch->data);
-            } else {
-                $delete->invoke($process, $batch->key);
-            }
+            $handle->invoke($process);
         }
 
         return $manager->getStatus($processId);

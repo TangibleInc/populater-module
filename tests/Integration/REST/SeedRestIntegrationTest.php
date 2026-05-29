@@ -49,7 +49,6 @@ class SeedRestIntegrationTest extends WordPressIntegrationTestCase
         }
 
         $manager   = PluginTestAccessor::seedingManager();
-        $before    = LmsContentInspector::snapshot($plugin);
         $maxPostId = $this->maxPostId();
 
         $start = $this->restRequest('POST', '/tangible-populater/v1/seed', [
@@ -86,7 +85,7 @@ class SeedRestIntegrationTest extends WordPressIntegrationTestCase
         $this->assertSame($expectedTotal, $finalStatus->getTotal());
         $this->assertSame($expectedTotal, $finalStatus->getProcessed());
 
-        $delta = LmsContentInspector::diff($before, LmsContentInspector::snapshot($plugin));
+        $delta = LmsContentInspector::snapshotAfter($plugin, $maxPostId);
 
         LmsContentInspector::assertSeededCounts($this, $plugin, $delta, $expected);
         LmsContentInspector::assertSeededStructure(

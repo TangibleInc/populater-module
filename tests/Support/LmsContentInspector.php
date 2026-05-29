@@ -95,18 +95,18 @@ final class LmsContentInspector
     }
 
     /** @return array{courses: int, lessons: int, topics: int, quizzes: int, questions: int, sections: int, modules: int, users: int} */
-    public static function snapshot(string $pluginSlug): array
+    public static function snapshotAfter(string $pluginSlug, int $afterPostId): array
     {
         $types = self::schemaFor($pluginSlug)->postTypesForSnapshot();
 
         return [
-            'courses'   => self::countPosts($types['courses']),
-            'lessons'   => self::countPosts($types['lessons']),
-            'topics'    => isset($types['topics']) ? self::countPosts($types['topics']) : 0,
-            'quizzes'   => self::countPosts($types['quizzes']),
-            'questions' => self::countPosts($types['questions']),
-            'sections'  => isset($types['sections']) ? self::countPosts($types['sections']) : 0,
-            'modules'   => isset($types['modules']) ? self::countPosts($types['modules']) : 0,
+            'courses'   => self::countPostsAfter($types['courses'], $afterPostId),
+            'lessons'   => self::countPostsAfter($types['lessons'], $afterPostId),
+            'topics'    => isset($types['topics']) ? self::countPostsAfter($types['topics'], $afterPostId) : 0,
+            'quizzes'   => self::countPostsAfter($types['quizzes'], $afterPostId),
+            'questions' => self::countPostsAfter($types['questions'], $afterPostId),
+            'sections'  => isset($types['sections']) ? self::countPostsAfter($types['sections'], $afterPostId) : 0,
+            'modules'   => isset($types['modules']) ? self::countPostsAfter($types['modules'], $afterPostId) : 0,
             'users'     => self::countUsers($types['user_prefix']),
         ];
     }
@@ -206,9 +206,12 @@ final class LmsContentInspector
             $test->assertCount($lessonsPerCourse, $lessonSteps, 'Course should contain expected lessons in ld_course_steps.');
 
             foreach ($lessonSteps as $lessonId => $entry) {
-                $test->assertArrayHasKey($topicType, $entry, 'LearnDash lesson step should reserve topic post type.');
-                $test->assertIsArray($entry[$topicType]);
-                $test->assertCount($topicsPerLesson, $entry[$topicType], 'Lesson should contain expected topics in ld_course_steps.');
+                if ($topicsPerLesson > 0) {
+                    $test->assertArrayHasKey($topicType, $entry, 'LearnDash lesson step should reserve topic post type.');
+                    $test->assertIsArray($entry[$topicType]);
+                    $test->assertCount($topicsPerLesson, $entry[$topicType], 'Lesson should contain expected topics in ld_course_steps.');
+                }
+
                 $test->assertArrayHasKey($quizType, $entry);
                 $test->assertCount($quizzesPerLesson, $entry[$quizType], 'Lesson should contain expected quizzes in ld_course_steps.');
                 $test->assertSame($courses > 0 ? $course->ID : 0, (int) get_post_meta((int) $lessonId, 'course_id', true));
@@ -268,6 +271,13 @@ final class LmsContentInspector
                     );
                 }
             }
+
+            self::assertLearnDashQuizWorks(
+                $test,
+                (int) $quiz->ID,
+                (int) get_post_meta($quiz->ID, 'course_id', true),
+                (int) get_post_meta($quiz->ID, 'lesson_id', true),
+            );
         }
 
         if ($questionsPerQuiz > 0) {
@@ -506,16 +516,87 @@ final class LmsContentInspector
         );
     }
 
+    /**
+     * Verifies a quiz is linked to its course/lesson and has playable ProQuiz content.
+     */
+    private static function assertLearnDashQuizWorks(
+        \PHPUnit\Framework\TestCase $test,
+        int $quizPostId,
+        int $courseId,
+        int $lessonId,
+    ): void {
+        $test->assertGreaterThan(0, $courseId, 'LearnDash quiz should belong to a course.');
+        $test->assertGreaterThan(0, $lessonId, 'LearnDash quiz should belong to a lesson.');
+
+        if (!function_exists('learndash_get_courses_for_step')) {
+            return;
+        }
+
+        $coursesForStep = learndash_get_courses_for_step($quizPostId, true);
+        $test->assertArrayHasKey(
+            $courseId,
+            $coursesForStep,
+            'LearnDash should associate the quiz with its course for nested URLs.',
+        );
+
+        if (!function_exists('learndash_course_get_all_parent_step_ids')) {
+            return;
+        }
+
+        $parentStepIds = learndash_course_get_all_parent_step_ids($courseId, $quizPostId);
+        $test->assertContains(
+            $lessonId,
+            $parentStepIds,
+            'LearnDash course steps should list the quiz parent lesson.',
+        );
+
+        if (!function_exists('learndash_get_setting')) {
+            return;
+        }
+
+        $quizProId = (int) learndash_get_setting($quizPostId, 'quiz_pro');
+        $test->assertSame(
+            $quizProId,
+            (int) get_post_meta($quizPostId, 'quiz_pro_id', true),
+            'LearnDash quiz_pro setting should match quiz_pro_id meta.',
+        );
+
+        if (!class_exists(\WpProQuiz_Model_QuestionMapper::class) || $quizProId <= 0) {
+            return;
+        }
+
+        $questionMapper = new \WpProQuiz_Model_QuestionMapper();
+        $proQuestions   = $questionMapper->fetchAll($quizProId);
+        $test->assertNotEmpty($proQuestions, 'LearnDash quiz should have ProQuiz questions attached.');
+
+        foreach ($proQuestions as $proQuestion) {
+            $answers = $proQuestion->getAnswerData();
+            $test->assertNotEmpty($answers, 'LearnDash ProQuiz question should include answer choices.');
+        }
+    }
+
     private static function countPosts(string $postType): int
+    {
+        return self::countPostsAfter($postType, 0);
+    }
+
+    private static function countPostsAfter(string $postType, int $afterPostId): int
     {
         global $wpdb;
 
         return (int) $wpdb->get_var(
             $wpdb->prepare(
-                "SELECT COUNT(ID) FROM {$wpdb->posts} WHERE post_type = %s",
+                "SELECT COUNT(ID) FROM {$wpdb->posts} WHERE post_type = %s AND ID > %d",
                 $postType,
+                $afterPostId,
             ),
         );
+    }
+
+    /** @return array{courses: int, lessons: int, topics: int, quizzes: int, questions: int, sections: int, modules: int, users: int} */
+    public static function snapshot(string $pluginSlug): array
+    {
+        return self::snapshotAfter($pluginSlug, 0);
     }
 
     private static function countUsers(string $prefix): int
