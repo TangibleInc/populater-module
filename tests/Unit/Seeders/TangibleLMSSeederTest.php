@@ -176,6 +176,8 @@ class TangibleLMSSeederTest extends \WPTestCase
     {
         Functions\expect('wp_create_user')->times(3)->andReturn(1, 2, 3);
         Functions\when('is_wp_error')->justReturn(false);
+        Functions\expect('update_user_meta')->times(9)->andReturn(true);
+        Functions\expect('wp_update_user')->times(3)->andReturn(1, 2, 3);
 
         $ids = $this->seeder->seedUsers(3);
 

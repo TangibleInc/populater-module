@@ -24,6 +24,27 @@ cp "${ROOT}/composer.json" "${ROOT}/composer.lock" "${BUILD_DIR}/"
   zip -rq "${ZIP_FILE}" "${SLUG}"
 )
 
+# Guard against accidentally shipping dev/repo files in the release artifact.
+FORBIDDEN_PATHS=(
+  ".git/"
+  ".gitignore"
+  "node_modules/"
+  "tests/"
+  "docker-compose.yml"
+  ".playwright-mcp/"
+  "composer.json"
+  "composer.lock"
+)
+for path in "${FORBIDDEN_PATHS[@]}"; do
+  if unzip -l "${ZIP_FILE}" | grep -q "${SLUG}/${path}"; then
+    echo "Release zip validation failed: forbidden path ${path}" >&2
+    rm -f "${ZIP_FILE}"
+    rm -rf "${ROOT}/build"
+    exit 1
+  fi
+done
+
 rm -rf "${ROOT}/build"
 
 echo "Created ${ZIP_FILE}"
+echo "Install this zip in WordPress (Plugins → Add New → Upload). Do not copy the git repo into wp-content/plugins."

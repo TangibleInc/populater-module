@@ -6,6 +6,9 @@
 # Composer
 vendor/
 
+# Local environment (copy from .env.example)
+.env
+
 # Release artifact
 tangible-populater.zip
 build/

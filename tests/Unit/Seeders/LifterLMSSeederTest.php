@@ -276,6 +276,8 @@ class LifterLMSSeederTest extends \WPTestCase
     {
         Functions\expect('wp_create_user')->times(2)->andReturn(1, 2);
         Functions\when('is_wp_error')->justReturn(false);
+        Functions\expect('update_user_meta')->times(16)->andReturn(true);
+        Functions\expect('wp_update_user')->times(2)->andReturn(1, 2);
 
         $ids = $this->seeder->seedUsers(2);
 

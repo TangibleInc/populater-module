@@ -47,7 +47,7 @@ class SeedCommand
      * : Number of groups to create. Default: 0.
      *
      * [--password=<password>]
-     * : Shared password for all seeded users.
+     * : Shared password for all seeded users. Default: StressTest#2026
      *
      * [--wait]
      * : Wait for the process to complete, polling every second.

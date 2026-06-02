@@ -74,6 +74,19 @@ services:
       retries: 30
       start_period: 60s
 
+  # k6 load testing — use: composer k6:lifter
+  k6:
+    image: grafana/k6:1.6.1
+    profiles:
+      - k6
+    working_dir: /scripts
+    volumes:
+      - ./k6:/scripts
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - tangible-wp-network
+
 volumes:
   db-data:
 

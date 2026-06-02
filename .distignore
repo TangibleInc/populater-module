@@ -1,0 +1,28 @@
+# Files excluded from distributable plugin packages (composer zip / releases).
+# Do not deploy the repository root directly to wp-content/plugins.
+
+.git
+.gitignore
+.distignore
+.github
+.cursor
+.editorconfig
+.playwright-mcp
+.phpunit.cache
+.phpunit.result.cache
+build
+docker-compose.yml
+docs
+node_modules
+package.json
+package-lock.json
+phpunit.xml
+phpunit.integration.xml
+scripts
+test-results
+tests
+tangible-populater.zip
+vendor
+composer.json
+composer.lock
+README.md

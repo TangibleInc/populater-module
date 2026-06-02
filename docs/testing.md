@@ -29,7 +29,7 @@ Each LMS seed test uses fixed counts (`2` courses, `3` lessons/course,
 - REST status/logs report `completed` with the expected queue total
 - DB deltas match expected course/lesson/quiz/user counts
 - LearnDash: `ld_course_steps` with `sfwd-topic` slots and lesson-attached quizzes
-- LifterLMS (empty DB only): checkout page, free access plans, `section` posts with `_llms_order`, course blocks for pricing/syllabus; true/false choices labeled `correct answer` / `incorrect answer` (odd index → marker A, even → B) with `_populater_correct_choice_marker` meta
+- LifterLMS (empty DB only): checkout page, free access plans, `section` posts with `_llms_order`, course blocks for pricing/syllabus; true/false choices labeled `correct answer` / `incorrect answer` (odd index → marker A, even → B) with `_populater_correct_choice_marker` meta; seeded students have `first_name`, `last_name`, and billing address meta for checkout / free enrollment
 - Tangible LMS: `_tgl_course_id` / `_tgl_lesson_id` meta on lessons/quizzes
 
 Reset integration tests seed content via REST, then verify `POST /reset` clears it.

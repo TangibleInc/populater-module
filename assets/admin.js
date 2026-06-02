@@ -98,22 +98,8 @@
 
     const isActiveStatus = (status) => ['pending', 'running'].includes(status);
 
-    const generatePassword = (length = 16) => {
-        const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()-_=+';
-
-        if (window.crypto?.getRandomValues) {
-            const values = new Uint32Array(length);
-            crypto.getRandomValues(values);
-
-            return Array.from(values, (value) => chars[value % chars.length]).join('');
-        }
-
-        return Array.from({ length }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-    };
-
     const initPasswordField = () => {
         const input = el('tp-user-password');
-        const regenerateBtn = el('tp-password-regenerate');
         const copyBtn = el('tp-password-copy');
 
         if (!input || input.dataset.tpInitialized === '1') {
@@ -123,14 +109,7 @@
         input.dataset.tpInitialized = '1';
 
         if (!input.value.trim()) {
-            input.value = defaultPassword || generatePassword();
-        }
-
-        if (regenerateBtn && regenerateBtn.dataset.tpBound !== '1') {
-            regenerateBtn.dataset.tpBound = '1';
-            regenerateBtn.addEventListener('click', () => {
-                input.value = generatePassword();
-            });
+            input.value = defaultPassword || '';
         }
 
         if (copyBtn && copyBtn.dataset.tpBound !== '1') {
@@ -142,10 +121,8 @@
                     if (navigator.clipboard?.writeText) {
                         await navigator.clipboard.writeText(password);
                     } else {
-                        input.removeAttribute('readonly');
                         input.select();
                         document.execCommand('copy');
-                        input.setAttribute('readonly', 'readonly');
                     }
 
                     copyBtn.textContent = 'Copied!';

@@ -527,4 +527,16 @@ HTML;
             llms_enroll_student($userId, (int) $courseId, 'populater_group_' . $groupId);
         }
     }
+
+    /** @param array<string, mixed> $options */
+    protected function afterUserCreated(int $userId, int $index, array $options = []): void
+    {
+        LifterLmsStudentProfile::populate($userId, $index, 'student');
+    }
+
+    /** @param array<string, mixed> $options */
+    protected function afterGroupAdminCreated(int $userId, int $index, array $options = []): void
+    {
+        LifterLmsStudentProfile::populate($userId, $index, 'groupadmin');
+    }
 }

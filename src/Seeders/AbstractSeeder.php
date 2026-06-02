@@ -10,6 +10,7 @@ use Tangible\Populater\Seeding\SeedQueueItem;
 use Tangible\Populater\Support\DeterministicTitle;
 use Tangible\Populater\Support\DummyContent;
 use Tangible\Populater\Support\GroupIndexResolver;
+use Tangible\Populater\Support\SeededUserProfile;
 
 /**
  * Base contract for all LMS seeders.
@@ -437,7 +438,7 @@ abstract class AbstractSeeder
         $email    = $username . '@example.com';
         $password = is_string($options['password'] ?? null) && $options['password'] !== ''
             ? (string) $options['password']
-            : wp_generate_password();
+            : SeedConfig::DEFAULT_USER_PASSWORD;
 
         if (function_exists('username_exists') && username_exists($username)) {
             $username .= '_' . wp_generate_password(4, false, false);
@@ -556,13 +557,19 @@ abstract class AbstractSeeder
     protected function afterCourseCreated(int $postId, int $index, array $options = []): void {}
 
     /** @param array<string, mixed> $options */
-    protected function afterUserCreated(int $userId, int $index, array $options = []): void {}
+    protected function afterUserCreated(int $userId, int $index, array $options = []): void
+    {
+        SeededUserProfile::populate($userId, $index, 'student');
+    }
 
     /** @param array<string, mixed> $options */
     protected function afterGroupCreated(int $postId, int $index, array $options = []): void {}
 
     /** @param array<string, mixed> $options */
-    protected function afterGroupAdminCreated(int $userId, int $index, array $options = []): void {}
+    protected function afterGroupAdminCreated(int $userId, int $index, array $options = []): void
+    {
+        SeededUserProfile::populate($userId, $index, 'groupadmin');
+    }
 
     /** @param array<string, mixed> $options */
     protected function afterLessonCreated(int $postId, int $courseId, int $index, array $options = []): void {}

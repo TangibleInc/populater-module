@@ -284,6 +284,8 @@ final class LmsContentInspector
                 "student{$u} should be a group member.",
             );
 
+            self::assertSeededStudentProfile($test, (int) $student->ID, $u);
+
             $studentsByGroup[$groupIndex][] = (int) $student->ID;
         }
 
@@ -966,6 +968,18 @@ final class LmsContentInspector
     public static function snapshot(string $pluginSlug): array
     {
         return self::snapshotAfter($pluginSlug, 0);
+    }
+
+    public static function assertSeededStudentProfile(
+        \PHPUnit\Framework\TestCase $test,
+        int $userId,
+        int $index,
+    ): void {
+        $test->assertSame('Student', get_user_meta($userId, 'first_name', true));
+        $test->assertSame((string) $index, get_user_meta($userId, 'last_name', true));
+        $test->assertSame("{$index} Populater Lane", get_user_meta($userId, 'llms_billing_address_1', true));
+        $test->assertSame('Testville', get_user_meta($userId, 'llms_billing_city', true));
+        $test->assertSame('US', get_user_meta($userId, 'llms_billing_country', true));
     }
 
     private static function countUsers(string $prefix): int

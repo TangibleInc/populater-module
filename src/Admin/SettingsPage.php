@@ -6,6 +6,7 @@ namespace Tangible\Populater\Admin;
 
 use Tangible\Populater\Database\DatabaseReset;
 use Tangible\Populater\PluginDetector;
+use Tangible\Populater\Seeding\SeedConfig;
 use Tangible\Populater\Seeding\SeedingManager;
 
 /**
@@ -20,8 +21,6 @@ use Tangible\Populater\Seeding\SeedingManager;
  */
 class SettingsPage
 {
-    private ?string $defaultUserPassword = null;
-
     private const PAGE_SLUG   = 'tangible-populater';
     private const MENU_TITLE  = 'Tangible Populator';
     private const PAGE_TITLE  = 'Tangible Populator';
@@ -81,12 +80,6 @@ class SettingsPage
             'activeProcess'   => $activeProcess?->toArray(),
             'defaultPassword' => $defaultPassword,
         ]);
-
-        wp_add_inline_script(
-            'tangible-populater-admin',
-            $this->passwordFieldBootstrapScript(),
-            'before',
-        );
     }
 
     public function render(): void
@@ -155,8 +148,7 @@ class SettingsPage
                         <th scope="row"><label for="tp-user-password"><?php esc_html_e('User Password', 'tangible-populater'); ?></label></th>
                         <td>
                             <div class="tp-password-field">
-                                <input type="text" id="tp-user-password" name="user_password" class="regular-text" readonly autocomplete="off" value="<?php echo esc_attr($this->getDefaultUserPassword()); ?>">
-                                <button type="button" id="tp-password-regenerate" class="button"><?php esc_html_e('Regenerate', 'tangible-populater'); ?></button>
+                                <input type="text" id="tp-user-password" name="user_password" class="regular-text" autocomplete="off" value="<?php echo esc_attr($this->getDefaultUserPassword()); ?>">
                                 <button type="button" id="tp-password-copy" class="button"><?php esc_html_e('Copy', 'tangible-populater'); ?></button>
                             </div>
                             <p class="description"><?php esc_html_e('Shared password for all seeded users (students and group admins).', 'tangible-populater'); ?></p>
@@ -205,106 +197,6 @@ class SettingsPage
 
     private function getDefaultUserPassword(): string
     {
-        if ($this->defaultUserPassword === null) {
-            $this->defaultUserPassword = wp_generate_password(16, true, true);
-        }
-
-        return $this->defaultUserPassword;
-    }
-
-    private function passwordFieldBootstrapScript(): string
-    {
-        return <<<'JS'
-(function () {
-    function tpGeneratePassword(length) {
-        length = length || 16;
-        var chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()-_=+';
-        var out = '';
-
-        if (window.crypto && window.crypto.getRandomValues) {
-            var values = new Uint32Array(length);
-            window.crypto.getRandomValues(values);
-
-            for (var i = 0; i < length; i++) {
-                out += chars[values[i] % chars.length];
-            }
-
-            return out;
-        }
-
-        for (var j = 0; j < length; j++) {
-            out += chars[Math.floor(Math.random() * chars.length)];
-        }
-
-        return out;
-    }
-
-    function tpInitPasswordField() {
-        var input = document.getElementById('tp-user-password');
-
-        if (!input || input.dataset.tpInitialized === '1') {
-            return;
-        }
-
-        input.dataset.tpInitialized = '1';
-
-        if (!input.value.trim()) {
-            input.value = (window.tangiblePopulater && window.tangiblePopulater.defaultPassword) || tpGeneratePassword();
-        }
-
-        var regen = document.getElementById('tp-password-regenerate');
-
-        if (regen && regen.dataset.tpBound !== '1') {
-            regen.dataset.tpBound = '1';
-            regen.addEventListener('click', function () {
-                input.value = tpGeneratePassword();
-            });
-        }
-
-        var copy = document.getElementById('tp-password-copy');
-
-        if (copy && copy.dataset.tpBound !== '1') {
-            copy.dataset.tpBound = '1';
-            copy.addEventListener('click', function () {
-                var password = input.value;
-
-                if (navigator.clipboard && navigator.clipboard.writeText) {
-                    navigator.clipboard.writeText(password).then(function () {
-                        copy.textContent = 'Copied!';
-                        setTimeout(function () {
-                            copy.textContent = 'Copy';
-                        }, 1500);
-                    }).catch(function () {
-                        window.alert('Could not copy password.');
-                    });
-
-                    return;
-                }
-
-                input.removeAttribute('readonly');
-                input.select();
-
-                try {
-                    document.execCommand('copy');
-                    copy.textContent = 'Copied!';
-                    setTimeout(function () {
-                        copy.textContent = 'Copy';
-                    }, 1500);
-                } catch (err) {
-                    window.alert('Could not copy password.');
-                }
-
-                input.setAttribute('readonly', 'readonly');
-            });
-        }
-    }
-
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', tpInitPasswordField);
-    } else {
-        tpInitPasswordField();
-    }
-})();
-JS;
+        return SeedConfig::DEFAULT_USER_PASSWORD;
     }
 }

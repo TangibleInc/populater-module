@@ -9,6 +9,8 @@ namespace Tangible\Populater\Seeding;
  */
 final class SeedConfig
 {
+    public const DEFAULT_USER_PASSWORD = 'StressTest#2026';
+
     public function __construct(
         public readonly string $plugin,
         public readonly int $courses,
