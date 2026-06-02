@@ -249,12 +249,14 @@ class LearnDashSeederTest extends \WPTestCase
         ]);
         $this->meta->set(110, 'lesson_id', 10);
 
+        $questionNum = 0;
+
         Functions\expect('wp_insert_post')
             ->times(3)
-            ->andReturnUsing(static function (array $args): int {
+            ->andReturnUsing(static function (array $args) use (&$questionNum): int {
                 return match ($args['post_type'] ?? '') {
                     'sfwd-quiz'      => 20,
-                    'sfwd-question'  => 100 + (int) preg_replace('/\D/', '', (string) ($args['post_title'] ?? '1')),
+                    'sfwd-question'  => 100 + ++$questionNum,
                     default          => 0,
                 };
             });
@@ -282,12 +284,14 @@ class LearnDashSeederTest extends \WPTestCase
             'empty' => [],
         ]);
 
+        $topicNum = 0;
+
         Functions\expect('wp_insert_post')
             ->times(3)
-            ->andReturnUsing(static function (array $args): int {
+            ->andReturnUsing(static function (array $args) use (&$topicNum): int {
                 return match ($args['post_type'] ?? '') {
                     'sfwd-lessons' => 10,
-                    'sfwd-topic'   => 100 + (int) preg_replace('/\D/', '', (string) ($args['post_title'] ?? '1')),
+                    'sfwd-topic'   => 100 + ++$topicNum,
                     default        => 0,
                 };
             });

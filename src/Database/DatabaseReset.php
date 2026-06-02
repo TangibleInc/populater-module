@@ -58,6 +58,7 @@ class DatabaseReset
         $this->deleteNonAdminUsers($adminUserIds);
         $this->cleanupOptions();
         $this->resetSiteRoles();
+        $this->restorePreservedAdministrators($adminUserIds);
         $this->truncateCustomTables();
         $this->finalizeSiteState();
 
@@ -113,12 +114,27 @@ class DatabaseReset
             return [];
         }
 
-        $adminUsers = get_users([
-            'role'   => 'administrator',
+        $queryArgs = [
             'fields' => 'ID',
-        ]);
+            'number' => -1,
+        ];
 
-        return array_values(array_map('intval', $adminUsers));
+        $byRole = get_users(array_merge($queryArgs, ['role' => 'administrator']));
+        $byCapability = get_users(array_merge($queryArgs, ['capability' => 'manage_options']));
+
+        $ids = array_merge(
+            array_map('intval', $byRole),
+            array_map('intval', $byCapability),
+        );
+
+        $ids = array_values(array_unique(array_filter(
+            $ids,
+            static fn (int $id): bool => $id > 0,
+        )));
+
+        sort($ids);
+
+        return $ids;
     }
 
     // -------------------------------------------------------------------------
@@ -231,6 +247,32 @@ class DatabaseReset
         delete_option($wpdb->prefix . 'user_roles');
 
         populate_roles();
+    }
+
+    /**
+     * Re-applies the administrator role to every preserved admin account.
+     *
+     * After resetSiteRoles(), user capability meta may still reference LMS roles
+     * that no longer exist. set_role() writes a clean administrator assignment
+     * so every preserved account keeps full admin access, not just the default user.
+     *
+     * @param list<int> $adminUserIds
+     */
+    public function restorePreservedAdministrators(array $adminUserIds): void
+    {
+        if (!function_exists('get_user_by')) {
+            return;
+        }
+
+        foreach ($adminUserIds as $userId) {
+            $user = get_user_by('id', $userId);
+
+            if (!$user instanceof \WP_User) {
+                continue;
+            }
+
+            $user->set_role('administrator');
+        }
     }
 
     public function truncateCustomTables(): void

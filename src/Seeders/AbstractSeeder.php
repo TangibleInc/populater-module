@@ -7,6 +7,7 @@ namespace Tangible\Populater\Seeders;
 use Tangible\Populater\Registry\AbstractLmsPlugin;
 use Tangible\Populater\Seeding\SeedConfig;
 use Tangible\Populater\Seeding\SeedQueueItem;
+use Tangible\Populater\Support\DeterministicTitle;
 use Tangible\Populater\Support\DummyContent;
 use Tangible\Populater\Support\GroupIndexResolver;
 
@@ -76,19 +77,23 @@ abstract class AbstractSeeder
      */
     public function seedCourses(int $count, array $options = []): array
     {
-        $ids = [];
-        for ($i = 1; $i <= $count; $i++) {
-            $title = $this->defaultTitle($options['title_prefix'] ?? $this->getTitlePrefix('courses'), $i);
+        $ids        = [];
+        $prefix     = $options['title_prefix'] ?? $this->getTitlePrefix('courses');
+        $startIndex = isset($options['index']) ? (int) $options['index'] : 1;
+
+        for ($offset = 0; $offset < $count; $offset++) {
+            $index = $startIndex + $offset;
+            $title = DeterministicTitle::course((string) $prefix, $index);
             $postId = $this->insertPost([
                 'post_title'   => $title,
                 'post_type'    => $this->getPostType('courses'),
                 'post_status'  => 'publish',
-                'post_content' => DummyContent::course($title, $i),
-                'post_excerpt' => DummyContent::excerpt('course', $title, $i),
+                'post_content' => DummyContent::course($title, $index),
+                'post_excerpt' => DummyContent::excerpt('course', $title, $index),
             ]);
 
             if ($postId > 0) {
-                $this->afterCourseCreated($postId, $i, $options);
+                $this->afterCourseCreated($postId, $index, $options);
                 $this->maybeAssignCourseToGroup($postId, $options);
                 $ids[] = $postId;
             }
@@ -103,10 +108,13 @@ abstract class AbstractSeeder
      */
     public function seedLessons(int $count, int $courseId, array $options = []): array
     {
-        $ids = [];
+        $ids          = [];
+        $prefix       = $options['title_prefix'] ?? $this->getTitlePrefix('lessons');
+        $courseIndex  = DeterministicTitle::courseIndex($options);
+
         for ($i = 1; $i <= $count; $i++) {
-            $index = (int) ($options['index'] ?? $i);
-            $title = $this->defaultTitle($options['title_prefix'] ?? $this->getTitlePrefix('lessons'), $index);
+            $index = DeterministicTitle::resolveIndex($options, $i);
+            $title = DeterministicTitle::lesson((string) $prefix, $courseIndex, $index);
             $postId = $this->insertPost([
                 'post_title'   => $title,
                 'post_type'    => $this->getPostType('lessons'),
@@ -132,10 +140,13 @@ abstract class AbstractSeeder
      */
     public function seedQuizzes(int $count, int $parentId, array $options = []): array
     {
-        $ids = [];
+        $ids         = [];
+        $prefix      = $options['title_prefix'] ?? $this->getTitlePrefix('quizzes');
+        $courseIndex = DeterministicTitle::courseIndex($options);
+
         for ($i = 1; $i <= $count; $i++) {
-            $index = (int) ($options['index'] ?? $i);
-            $title = $this->defaultTitle($options['title_prefix'] ?? $this->getTitlePrefix('quizzes'), $index);
+            $index  = DeterministicTitle::resolveIndex($options, $i);
+            $title  = DeterministicTitle::quiz((string) $prefix, $courseIndex, $options);
             $postId = $this->insertPost([
                 'post_title'   => $title,
                 'post_type'    => $this->getPostType('quizzes'),
@@ -160,19 +171,24 @@ abstract class AbstractSeeder
      */
     public function seedQuestions(int $count, int $quizId, array $options = []): array
     {
-        $ids = [];
-        for ($i = 1; $i <= $count; $i++) {
-            $title = $this->defaultTitle($options['title_prefix'] ?? $this->getTitlePrefix('questions'), $i);
+        $ids         = [];
+        $prefix      = $options['title_prefix'] ?? $this->getTitlePrefix('questions');
+        $courseIndex = DeterministicTitle::courseIndex($options);
+        $startIndex  = isset($options['index']) ? (int) $options['index'] : 1;
+
+        for ($offset = 0; $offset < $count; $offset++) {
+            $index  = $startIndex + $offset;
+            $title  = DeterministicTitle::question((string) $prefix, $courseIndex, $options, $index);
             $postId = $this->insertPost([
                 'post_title'   => $title,
                 'post_type'    => $this->getPostType('questions'),
                 'post_status'  => 'publish',
-                'post_content' => DummyContent::question($title, $i),
+                'post_content' => DummyContent::question($title, $index),
             ]);
 
             if ($postId > 0) {
                 $this->applyMeta($postId, $this->getMetaFor('questions', ['quizId' => $quizId]));
-                $this->afterQuestionCreated($postId, $quizId, $i, $options);
+                $this->afterQuestionCreated($postId, $quizId, $index, $options);
                 $ids[] = $postId;
             }
         }
@@ -210,8 +226,9 @@ abstract class AbstractSeeder
         }
 
         $ids = [];
-        $index = (int) ($options['index'] ?? 1);
-        $title = $this->defaultTitle($options['title_prefix'] ?? $this->getTitlePrefix('groups'), $index);
+        $index  = DeterministicTitle::resolveIndex($options, 1);
+        $prefix = $options['title_prefix'] ?? $this->getTitlePrefix('groups');
+        $title  = DeterministicTitle::group((string) $prefix, $index);
         $postId = $this->insertPost([
             'post_title'   => $title,
             'post_type'    => $this->getPostType('groups'),
@@ -258,13 +275,18 @@ abstract class AbstractSeeder
      */
     public function seedCertificates(int $count, array $options = []): array
     {
-        $ids = [];
-        for ($i = 1; $i <= $count; $i++) {
+        $ids        = [];
+        $prefix     = $options['title_prefix'] ?? $this->getTitlePrefix('certificates');
+        $startIndex = isset($options['index']) ? (int) $options['index'] : 1;
+
+        for ($offset = 0; $offset < $count; $offset++) {
+            $index  = $startIndex + $offset;
+            $title  = DeterministicTitle::certificate((string) $prefix, $index);
             $postId = $this->insertPost([
-                'post_title'   => $this->defaultTitle($options['title_prefix'] ?? $this->getTitlePrefix('certificates'), $i),
+                'post_title'   => $title,
                 'post_type'    => $this->getPostType('certificates'),
                 'post_status'  => 'publish',
-                'post_content' => sprintf('Sample certificate %d.', $i),
+                'post_content' => sprintf('Sample certificate %d.', $index),
             ]);
 
             if ($postId > 0) {
@@ -369,6 +391,10 @@ abstract class AbstractSeeder
      */
     protected function insertPost(array $args): int
     {
+        if (!isset($args['post_name']) && isset($args['post_title']) && is_string($args['post_title'])) {
+            $args['post_name'] = DeterministicTitle::slug($args['post_title']);
+        }
+
         $postId = wp_insert_post($args);
 
         if (is_wp_error($postId) || !is_int($postId)) {
@@ -506,6 +532,9 @@ abstract class AbstractSeeder
         array $options = [],
     ): void {}
 
+    /**
+     * @deprecated Use {@see DeterministicTitle} helpers instead.
+     */
     protected function defaultTitle(string $prefix, int $index): string
     {
         return "$prefix $index";

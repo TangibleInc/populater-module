@@ -134,12 +134,14 @@ class TangibleLMSSeederTest extends \WPTestCase
 
     public function test_seed_quizzes_creates_questions_when_configured(): void
     {
+        $questionNum = 0;
+
         Functions\expect('wp_insert_post')
             ->times(3)
-            ->andReturnUsing(static function (array $args): int {
+            ->andReturnUsing(static function (array $args) use (&$questionNum): int {
                 return match ($args['post_type'] ?? '') {
                     'tgl_quiz'      => 20,
-                    'tgl_question'  => 40 + (int) preg_replace('/\D/', '', (string) ($args['post_title'] ?? '1')),
+                    'tgl_question'  => 40 + ++$questionNum,
                     default         => 0,
                 };
             });

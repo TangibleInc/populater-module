@@ -103,4 +103,20 @@ class AbstractSeederTest extends \WPTestCase
 
         $this->seeder->seedCourses(1);
     }
+
+    public function test_seed_single_course_uses_queue_index_for_title_and_slug(): void
+    {
+        Functions\expect('wp_insert_post')
+            ->once()
+            ->with(\Mockery::on(function (array $args): bool {
+                $this->assertSame('Test LMS Course 4', $args['post_title'] ?? '');
+                $this->assertSame('test-lms-course-4', $args['post_name'] ?? '');
+
+                return true;
+            }))
+            ->andReturn(1);
+        Functions\when('is_wp_error')->justReturn(false);
+
+        $this->seeder->seedCourses(1, ['index' => 4]);
+    }
 }

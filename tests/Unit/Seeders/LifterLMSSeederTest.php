@@ -222,12 +222,14 @@ class LifterLMSSeederTest extends \WPTestCase
 
     public function test_seed_quizzes_creates_questions_when_configured(): void
     {
+        $questionNum = 0;
+
         Functions\expect('wp_insert_post')
             ->times(3)
-            ->andReturnUsing(static function (array $args): int {
+            ->andReturnUsing(static function (array $args) use (&$questionNum): int {
                 return match ($args['post_type'] ?? '') {
                     'llms_quiz'      => 20,
-                    'llms_question'  => 30 + (int) preg_replace('/\D/', '', (string) ($args['post_title'] ?? '1')),
+                    'llms_question'  => 30 + ++$questionNum,
                     default          => 0,
                 };
             });

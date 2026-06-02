@@ -6,6 +6,7 @@ namespace Tangible\Populater\LMS\LearnDash;
 
 use Tangible\Populater\Seeders\AbstractSeeder;
 use Tangible\Populater\Seeding\SeedingIdMap;
+use Tangible\Populater\Support\DeterministicTitle;
 use Tangible\Populater\Support\DummyContent;
 
 /**
@@ -32,10 +33,10 @@ class LearnDashSeeder extends AbstractSeeder
 
     protected function afterQuizCreated(int $postId, int $parentId, int $index, array $options = []): void
     {
-        $title = $this->defaultTitle(
-            $options['title_prefix'] ?? $this->getTitlePrefix('quizzes'),
-            (int) ($options['index'] ?? $index),
-        );
+        $prefix      = $options['title_prefix'] ?? $this->getTitlePrefix('quizzes');
+        $courseIndex = DeterministicTitle::courseIndex($options);
+        $index       = DeterministicTitle::resolveIndex($options, $index);
+        $title       = DeterministicTitle::quiz((string) $prefix, $courseIndex, $options);
         LearnDashProQuizHelper::createProQuiz($postId, $title);
 
         $courseId = (int) ($options['course_id'] ?? 0);
@@ -57,11 +58,10 @@ class LearnDashSeeder extends AbstractSeeder
 
     protected function afterQuestionCreated(int $postId, int $quizId, int $index, array $options = []): void
     {
-        $title = $this->defaultTitle(
-            $options['title_prefix'] ?? $this->getTitlePrefix('questions'),
-            $index,
-        );
-        $content = DummyContent::question($title, $index);
+        $prefix      = $options['title_prefix'] ?? $this->getTitlePrefix('questions');
+        $courseIndex = DeterministicTitle::courseIndex($options);
+        $title       = DeterministicTitle::question((string) $prefix, $courseIndex, $options, $index);
+        $content     = DummyContent::question($title, $index);
 
         LearnDashProQuizHelper::attachQuestion($quizId, $postId, $title, $content, $index);
     }
@@ -78,10 +78,13 @@ class LearnDashSeeder extends AbstractSeeder
             $courseId = (int) get_post_meta($lessonId, 'course_id', true);
         }
 
-        $ids = [];
+        $courseIndex = DeterministicTitle::courseIndex($options);
+        $lessonIndex = DeterministicTitle::resolveIndex($options, 1);
+        $prefix      = $options['title_prefix'] ?? $this->getTitlePrefix('topics');
+        $ids         = [];
 
         for ($i = 1; $i <= $count; $i++) {
-            $title = $this->defaultTitle($options['title_prefix'] ?? $this->getTitlePrefix('topics'), $i);
+            $title  = DeterministicTitle::topic((string) $prefix, $courseIndex, $lessonIndex, $i);
             $postId = $this->insertPost([
                 'post_title'   => $title,
                 'post_type'    => $this->getPostType('topics'),
@@ -125,11 +128,13 @@ class LearnDashSeeder extends AbstractSeeder
             $courseId = (int) get_post_meta($lessonId, 'course_id', true);
         }
 
-        $ids = [];
+        $ids         = [];
+        $prefix      = $options['title_prefix'] ?? $this->getTitlePrefix('quizzes');
+        $courseIndex = DeterministicTitle::courseIndex($options);
 
         for ($i = 1; $i <= $count; $i++) {
-            $index = (int) ($options['index'] ?? $i);
-            $title = $this->defaultTitle($options['title_prefix'] ?? $this->getTitlePrefix('quizzes'), $index);
+            $index  = DeterministicTitle::resolveIndex($options, $i);
+            $title  = DeterministicTitle::quiz((string) $prefix, $courseIndex, $options);
             $postId = $this->insertPost([
                 'post_title'   => $title,
                 'post_type'    => $this->getPostType('quizzes'),

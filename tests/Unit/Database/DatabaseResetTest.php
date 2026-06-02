@@ -44,6 +44,7 @@ class DatabaseResetTest extends \WPTestCase
                 'deleteNonAdminUsers',
                 'cleanupOptions',
                 'resetSiteRoles',
+                'restorePreservedAdministrators',
                 'truncateCustomTables',
                 'finalizeSiteState',
             ])
@@ -54,6 +55,7 @@ class DatabaseResetTest extends \WPTestCase
         $reset->expects($this->once())->method('deleteNonAdminUsers')->with([1]);
         $reset->expects($this->once())->method('cleanupOptions');
         $reset->expects($this->once())->method('resetSiteRoles');
+        $reset->expects($this->once())->method('restorePreservedAdministrators')->with([1]);
         $reset->expects($this->once())->method('truncateCustomTables');
         $reset->expects($this->once())->method('finalizeSiteState');
 
@@ -108,5 +110,55 @@ class DatabaseResetTest extends \WPTestCase
         }
 
         $this->assertTrue($this->reset->isSafeEnvironment());
+    }
+
+    public function test_get_administrator_user_ids_merges_role_and_capability_queries(): void
+    {
+        Functions\when('get_users')->alias(function (array $args): array {
+            if (($args['role'] ?? '') === 'administrator') {
+                return [1, 3];
+            }
+
+            if (($args['capability'] ?? '') === 'manage_options') {
+                return [3, 5];
+            }
+
+            return [];
+        });
+
+        $this->assertSame([1, 3, 5], $this->reset->getAdministratorUserIds());
+    }
+
+    public function test_reset_preserves_all_administrators(): void
+    {
+        Functions\when('wp_get_environment_type')->justReturn('local');
+        Functions\when('get_users')->justReturn([1, 42]);
+        Functions\when('wp_insert_term')->justReturn(['term_id' => 1]);
+        Functions\when('update_option')->justReturn(true);
+        Functions\when('delete_option')->justReturn(true);
+        Functions\when('wp_cache_flush')->justReturn(true);
+        Functions\when('delete_expired_transients')->justReturn(true);
+
+        Functions\expect('do_action')
+            ->with('tangible_populater_database_reset')
+            ->once();
+
+        $reset = $this->getMockBuilder(DatabaseReset::class)
+            ->onlyMethods([
+                'deletePostsAndComments',
+                'resetTaxonomies',
+                'deleteNonAdminUsers',
+                'cleanupOptions',
+                'resetSiteRoles',
+                'restorePreservedAdministrators',
+                'truncateCustomTables',
+                'finalizeSiteState',
+            ])
+            ->getMock();
+
+        $reset->expects($this->once())->method('deleteNonAdminUsers')->with([1, 42]);
+        $reset->expects($this->once())->method('restorePreservedAdministrators')->with([1, 42]);
+
+        $this->assertTrue($reset->reset(confirmed: true));
     }
 }
