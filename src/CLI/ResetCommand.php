@@ -41,7 +41,7 @@ class ResetCommand
         $skipConfirmation = isset($assocArgs['yes']) && $assocArgs['yes'] !== false;
 
         if (!$skipConfirmation) {
-            \WP_CLI::confirm('⚠  This will delete posts, non-admin users, plugin/LMS data, and non-core options. Administrators, active plugins, and the active theme will be kept. Continue?');
+            \WP_CLI::confirm('⚠  This will delete posts, non-admin users, plugin/LMS data, custom site roles, and non-core options. Administrators, active plugins, and the active theme will be kept. Continue?');
         }
 
         \WP_CLI::line('Resetting database…');

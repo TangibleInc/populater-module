@@ -158,7 +158,7 @@ class SettingsPage
             <?php if ($isSafeEnv) : ?>
             <div class="card" style="max-width:700px; margin-top:16px; border-left:4px solid #d63638;">
                 <h2 style="color:#d63638;"><?php esc_html_e('⚠ Reset Database', 'tangible-populater'); ?></h2>
-                <p><?php esc_html_e('This removes seeded posts, non-admin users, plugin/LMS data, and non-core options. Administrator accounts, active plugins, and the active theme are preserved.', 'tangible-populater'); ?></p>
+                <p><?php esc_html_e('This removes seeded posts, non-admin users, plugin/LMS data, custom site roles, and non-core options. Administrator accounts, active plugins, and the active theme are preserved.', 'tangible-populater'); ?></p>
                 <button type="button" id="tp-reset-btn" class="button" style="background:#d63638; color:#fff; border-color:#d63638;"><?php esc_html_e('Reset Database', 'tangible-populater'); ?></button>
             </div>
             <?php endif; ?>

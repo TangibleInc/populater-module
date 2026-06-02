@@ -29,4 +29,9 @@ class WordPressCoreOptionsTest extends \WPTestCase
         $this->assertFalse(WordPressCoreOptions::shouldPreserve('_transient_timeout_foo'));
         $this->assertFalse(WordPressCoreOptions::shouldPreserve('seed_learndash_batch_123'));
     }
+
+    public function test_does_not_preserve_site_roles(): void
+    {
+        $this->assertFalse(WordPressCoreOptions::shouldPreserve('wp_user_roles'));
+    }
 }

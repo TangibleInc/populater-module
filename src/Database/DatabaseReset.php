@@ -8,7 +8,7 @@ namespace Tangible\Populater\Database;
  * Resets seeded LMS content while preserving site configuration.
  *
  * CAUTION: This is a destructive operation for posts, non-admin users, plugin
- * options, and custom LMS tables. It is intentionally gated behind:
+ * options, custom LMS roles, and custom LMS tables. It is intentionally gated behind:
  *  - An environment safety check (WP_ENVIRONMENT_TYPE or WP_DEBUG must signal non-production).
  *  - An explicit confirmed: true parameter so callers must opt in.
  */
@@ -57,6 +57,7 @@ class DatabaseReset
         $this->resetTaxonomies();
         $this->deleteNonAdminUsers($adminUserIds);
         $this->cleanupOptions();
+        $this->resetSiteRoles();
         $this->truncateCustomTables();
         $this->finalizeSiteState();
 
@@ -198,6 +199,38 @@ class DatabaseReset
                 delete_option($optionName);
             }
         }
+    }
+
+    /**
+     * Restores WordPress default roles after plugin/LMS roles were removed.
+     *
+     * The roles option ({prefix}user_roles) is not preserved during cleanupOptions,
+     * so LMS-specific roles are wiped. This repopulates core roles (administrator,
+     * editor, author, contributor, subscriber) for a clean slate.
+     */
+    public function resetSiteRoles(): void
+    {
+        global $wpdb, $wp_roles, $wp_user_roles;
+
+        if (!function_exists('populate_roles')) {
+            $schema = ABSPATH . 'wp-admin/includes/schema.php';
+
+            if (!is_readable($schema)) {
+                return;
+            }
+
+            require_once $schema;
+        }
+
+        // cleanupOptions() deletes the DB option but WordPress keeps roles in
+        // $wp_user_roles for the rest of the request. WP_Roles sets use_db=false
+        // when that global is non-empty, so populate_roles() would not persist.
+        $wp_user_roles = [];
+        $wp_roles       = null;
+
+        delete_option($wpdb->prefix . 'user_roles');
+
+        populate_roles();
     }
 
     public function truncateCustomTables(): void

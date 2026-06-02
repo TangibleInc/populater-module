@@ -43,6 +43,7 @@ class DatabaseResetTest extends \WPTestCase
                 'resetTaxonomies',
                 'deleteNonAdminUsers',
                 'cleanupOptions',
+                'resetSiteRoles',
                 'truncateCustomTables',
                 'finalizeSiteState',
             ])
@@ -52,6 +53,7 @@ class DatabaseResetTest extends \WPTestCase
         $reset->expects($this->once())->method('resetTaxonomies');
         $reset->expects($this->once())->method('deleteNonAdminUsers')->with([1]);
         $reset->expects($this->once())->method('cleanupOptions');
+        $reset->expects($this->once())->method('resetSiteRoles');
         $reset->expects($this->once())->method('truncateCustomTables');
         $reset->expects($this->once())->method('finalizeSiteState');
 

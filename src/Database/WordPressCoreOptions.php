@@ -115,7 +115,6 @@ final class WordPressCoreOptions
         'auto_update_core_minor',
         'auto_update_core_major',
         'wp_force_deactivated_plugins',
-        'wp_user_roles',
         'sidebars_widgets',
         'cron',
         'can_compress_scripts',
