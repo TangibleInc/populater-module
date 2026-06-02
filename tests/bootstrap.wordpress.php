@@ -24,6 +24,19 @@ if (is_readable($autoloader)) {
     require_once $autoloader;
 }
 
+foreach (
+    [
+        'lifterlms/lifterlms.php',
+        'lifterlms-groups/lifterlms-groups.php',
+    ] as $integrationPlugin
+) {
+    $pluginPath = WP_PLUGIN_DIR . '/' . $integrationPlugin;
+
+    if (is_readable($pluginPath) && function_exists('activate_plugin') && !is_plugin_active($integrationPlugin)) {
+        activate_plugin($pluginPath);
+    }
+}
+
 // LifterLMS ships an older WP_Background_Process that calls wp_die() directly after handle().
 add_filter('wp_die_handler', static fn(): callable => static function (): void {
     // Suppress background-process exit during synchronous test draining.

@@ -298,4 +298,47 @@ class LearnDashSeeder extends AbstractSeeder
         $steps['empty'] = false;
         update_post_meta($courseId, 'ld_course_steps', $steps);
     }
+
+    /** @param array<string, mixed> $options */
+    protected function assignCourseToGroup(
+        int $courseId,
+        int $groupId,
+        int $groupIndex,
+        array $options = [],
+    ): void {
+        if ($courseId <= 0 || $groupId <= 0) {
+            return;
+        }
+
+        if (function_exists('ld_update_course_group_access')) {
+            ld_update_course_group_access($courseId, $groupId);
+        }
+    }
+
+    /** @param array<string, mixed> $options */
+    protected function assignUserToGroup(
+        int $userId,
+        int $groupId,
+        int $groupIndex,
+        bool $isGroupAdmin,
+        array $options = [],
+    ): void {
+        if ($userId <= 0 || $groupId <= 0) {
+            return;
+        }
+
+        if ($isGroupAdmin) {
+            if (function_exists('learndash_set_groups_administrators')) {
+                learndash_set_groups_administrators($groupId, [$userId]);
+            } elseif (function_exists('ld_update_leader_group_access')) {
+                ld_update_leader_group_access($userId, $groupId);
+            }
+
+            return;
+        }
+
+        if (function_exists('ld_update_group_access')) {
+            ld_update_group_access($userId, $groupId);
+        }
+    }
 }

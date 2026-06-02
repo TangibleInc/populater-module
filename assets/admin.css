@@ -23,3 +23,15 @@
     white-space: pre-wrap;
     word-break: break-all;
 }
+
+.tp-password-field {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+
+.tp-password-field input.regular-text {
+    font-family: Consolas, Monaco, monospace;
+    max-width: 280px;
+}

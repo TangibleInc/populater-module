@@ -57,7 +57,7 @@ class ProcessRepository
             'lessons' => is_array($stored['lessons'] ?? null) ? $stored['lessons'] : [],
         ];
 
-        foreach (['topics', 'sections', 'modules', 'section_lessons'] as $entity) {
+        foreach (['topics', 'sections', 'modules', 'section_lessons', 'groups', 'group_admins'] as $entity) {
             if (isset($stored[$entity]) && is_array($stored[$entity])) {
                 $map[$entity] = $stored[$entity];
             }

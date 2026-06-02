@@ -48,11 +48,8 @@ class LifterLmsEnrollmentSetupTest extends \WPTestCase
         Functions\when('get_option')->alias(function (string $key, $default = false) {
             return $key === 'lifterlms_checkout_page_id' ? 99 : $default;
         });
-        Functions\expect('wp_insert_post')
-            ->once()
-            ->andReturn(99);
-        Functions\expect('update_option')->once()->andReturn(true);
-        Functions\when('is_wp_error')->justReturn(false);
+        Functions\when('get_post_status')->justReturn('publish');
+        Functions\expect('wp_insert_post')->never();
 
         $this->assertSame(99, LifterLmsEnrollmentSetup::ensureCheckoutPage());
         $this->assertSame(99, LifterLmsEnrollmentSetup::ensureCheckoutPage());

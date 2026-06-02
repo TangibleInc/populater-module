@@ -354,4 +354,170 @@ HTML;
 
         return (int) min($containers, max(1, (int) ceil($itemIndex * $containers / $itemsPerContainer)));
     }
+
+    protected function hasGroupSupport(): bool
+    {
+        if (function_exists('llms_create_group')) {
+            return true;
+        }
+
+        return function_exists('post_type_exists') && post_type_exists('llms_group');
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     * @return list<int>
+     */
+    public function seedGroups(int $count, array $options = []): array
+    {
+        if (!$this->hasGroupSupport() || !class_exists(\LLMS_Group::class)) {
+            return parent::seedGroups($count, $options);
+        }
+
+        $index = (int) ($options['index'] ?? 1);
+        $title = $this->defaultTitle($options['title_prefix'] ?? $this->getTitlePrefix('groups'), $index);
+        $seats = $this->resolveGroupSeatCount($options);
+        $meta  = ['_llms_seats' => $seats];
+
+        if (function_exists('llms_groups')) {
+            $integration = llms_groups()->get_integration();
+            $meta['_llms_visibility'] = $integration->get_option('visibility', 'private');
+        }
+
+        // Create without llms_create_group() so the current WP admin is not enrolled as primary admin.
+        $group = new \LLMS_Group('new', [
+            'post_title'   => $title,
+            'post_status'  => 'publish',
+            'post_content' => DummyContent::group($title, $index),
+            'post_excerpt' => DummyContent::excerpt('group', $title, $index),
+            'meta_input'   => $meta,
+        ]);
+
+        $groupId = (int) $group->get('id');
+
+        if ($groupId > 0 && (int) $group->get('seats') !== $seats) {
+            $group->set('seats', $seats);
+        }
+
+        return $groupId > 0 ? [$groupId] : [];
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     */
+    private function resolveGroupSeatCount(array $options): int
+    {
+        $totalUsers  = max(0, (int) ($options['total_users'] ?? 0));
+        $totalGroups = max(1, (int) ($options['groups'] ?? 1));
+        $perGroup    = (int) ceil($totalUsers / $totalGroups);
+
+        return max(2, $perGroup + 2);
+    }
+
+    /** @param array<string, mixed> $options */
+    protected function assignCourseToGroup(
+        int $courseId,
+        int $groupId,
+        int $groupIndex,
+        array $options = [],
+    ): void {
+        if ($courseId <= 0 || $groupId <= 0) {
+            return;
+        }
+
+        $this->trackGroupCourse($groupId, $courseId);
+
+        if (function_exists('get_llms_group')) {
+            $group = get_llms_group($groupId);
+
+            if ($group && !$group->get('post_id')) {
+                $group->set('post_id', $courseId);
+            }
+        }
+
+        $this->enrollGroupMembersInCourse($groupId, $courseId);
+    }
+
+    /** @param array<string, mixed> $options */
+    protected function assignUserToGroup(
+        int $userId,
+        int $groupId,
+        int $groupIndex,
+        bool $isGroupAdmin,
+        array $options = [],
+    ): void {
+        if ($userId <= 0 || $groupId <= 0) {
+            return;
+        }
+
+        $trigger = 'populater_group_' . $groupId;
+        $role    = $isGroupAdmin ? 'primary_admin' : 'member';
+
+        if (class_exists(\LLMS_Groups_Enrollment::class)) {
+            \LLMS_Groups_Enrollment::add($userId, $groupId, $trigger, $role);
+        } elseif (function_exists('llms_enroll_student')) {
+            llms_enroll_student($userId, $groupId, $trigger);
+        }
+
+        $this->trackGroupMember($groupId, $userId);
+        $this->enrollUserInGroupCourses($groupId, $userId);
+    }
+
+    private function trackGroupCourse(int $groupId, int $courseId): void
+    {
+        $courses = get_post_meta($groupId, '_populater_group_courses', true);
+
+        if (!is_array($courses)) {
+            $courses = [];
+        }
+
+        $courses[] = $courseId;
+        update_post_meta($groupId, '_populater_group_courses', array_values(array_unique(array_map('intval', $courses))));
+    }
+
+    private function trackGroupMember(int $groupId, int $userId): void
+    {
+        $members = get_post_meta($groupId, '_populater_group_member_ids', true);
+
+        if (!is_array($members)) {
+            $members = [];
+        }
+
+        $members[] = $userId;
+        update_post_meta($groupId, '_populater_group_member_ids', array_values(array_unique(array_map('intval', $members))));
+    }
+
+    private function enrollGroupMembersInCourse(int $groupId, int $courseId): void
+    {
+        if (!function_exists('llms_enroll_student')) {
+            return;
+        }
+
+        $members = get_post_meta($groupId, '_populater_group_member_ids', true);
+
+        if (!is_array($members)) {
+            return;
+        }
+
+        foreach ($members as $memberId) {
+            llms_enroll_student((int) $memberId, $courseId, 'populater_group_' . $groupId);
+        }
+    }
+
+    private function enrollUserInGroupCourses(int $groupId, int $userId): void
+    {
+        if (!function_exists('llms_enroll_student')) {
+            return;
+        }
+
+        $courses = get_post_meta($groupId, '_populater_group_courses', true);
+
+        if (!is_array($courses)) {
+            return;
+        }
+
+        foreach ($courses as $courseId) {
+            llms_enroll_student($userId, (int) $courseId, 'populater_group_' . $groupId);
+        }
+    }
 }

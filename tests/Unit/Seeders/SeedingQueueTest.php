@@ -7,6 +7,7 @@ namespace Tangible\Populater\Tests\Unit\Seeders;
 use Tangible\Populater\Registry\LmsPluginRegistry;
 use Tangible\Populater\Registry\LmsPlugins;
 use Tangible\Populater\Seeding\SeedConfig;
+use Brain\Monkey\Functions;
 
 /**
  * Cross-component queue tests (registry + seeder + queue) without LMS-specific mocks.
@@ -17,6 +18,7 @@ class SeedingQueueTest extends \WPTestCase
     {
         parent::setUp();
         LmsPlugins::registerBuiltIn();
+        Functions\when('post_type_exists')->justReturn(true);
     }
 
     /**
@@ -65,5 +67,39 @@ class SeedingQueueTest extends \WPTestCase
         $this->assertSame(2, $lesson->data['sections_per_course']);
         $this->assertSame(1, $lesson->data['modules_per_course']);
         $this->assertSame(4, $quiz->data['questions_per_quiz']);
+    }
+
+    public function test_build_seed_queue_adds_group_items_when_groups_configured(): void
+    {
+        $registry = new LmsPluginRegistry();
+        $seeder   = $registry->createSeeder('learndash');
+        $config   = new SeedConfig('learndash', 4, 1, 0, 0, 1, 1, 1, 6, 2);
+        $queue    = $seeder->buildSeedQueue($config);
+
+        $groupItems = array_filter($queue, static fn($item) => $item->type === 'group');
+        $adminItems = array_filter($queue, static fn($item) => $item->type === 'group_admin');
+
+        $this->assertCount(2, $groupItems);
+        $this->assertCount(2, $adminItems);
+
+        $courseItems = array_values(array_filter($queue, static fn($item) => $item->type === 'course'));
+        $this->assertSame(1, $courseItems[0]->data['group_index']);
+        $this->assertSame(1, $courseItems[1]->data['group_index']);
+        $this->assertSame(2, $courseItems[2]->data['group_index']);
+        $this->assertSame(2, $courseItems[3]->data['group_index']);
+    }
+
+    public function test_build_seed_queue_adds_lifterlms_group_items_when_groups_configured(): void
+    {
+        $registry = new LmsPluginRegistry();
+        $seeder   = $registry->createSeeder('lifterlms');
+        $config   = new SeedConfig('lifterlms', 2, 1, 0, 0, 0, 0, 0, 4, 2);
+        $queue    = $seeder->buildSeedQueue($config);
+
+        $groupItems = array_filter($queue, static fn($item) => $item->type === 'group');
+        $adminItems = array_filter($queue, static fn($item) => $item->type === 'group_admin');
+
+        $this->assertCount(2, $groupItems);
+        $this->assertCount(2, $adminItems);
     }
 }

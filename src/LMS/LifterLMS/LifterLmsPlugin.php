@@ -26,6 +26,7 @@ class LifterLmsPlugin extends AbstractLmsPlugin
                 'quizzes'      => 'llms_quiz',
                 'questions'    => 'llms_question',
                 'certificates' => 'llms_certificate',
+                'groups'       => 'llms_group',
             ],
             titlePrefixes: [
                 'courses'      => 'LifterLMS Course',
@@ -34,6 +35,7 @@ class LifterLmsPlugin extends AbstractLmsPlugin
                 'quizzes'      => 'LifterLMS Quiz',
                 'questions'    => 'LifterLMS Question',
                 'certificates' => 'LifterLMS Certificate',
+                'groups'       => 'LifterLMS Group',
             ],
             userPrefix: 'lifterlms_user',
             metaMap: [

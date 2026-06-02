@@ -19,6 +19,8 @@ final class SeedConfig
         public readonly int $sectionsPerCourse,
         public readonly int $modulesPerCourse,
         public readonly int $users,
+        public readonly int $groups = 0,
+        public readonly ?string $userPassword = null,
     ) {}
 
     /**
@@ -42,7 +44,20 @@ final class SeedConfig
             sectionsPerCourse: max(0, (int) ($config['sections_per_course'] ?? 1)),
             modulesPerCourse: max(0, (int) ($config['modules_per_course'] ?? 1)),
             users: max(0, (int) ($config['users'] ?? 0)),
+            groups: max(0, (int) ($config['groups'] ?? 0)),
+            userPassword: self::normalizePassword($config['user_password'] ?? null),
         );
+    }
+
+    private static function normalizePassword(mixed $password): ?string
+    {
+        if (!is_string($password)) {
+            return null;
+        }
+
+        $password = trim($password);
+
+        return $password !== '' ? $password : null;
     }
 
     /**
@@ -60,6 +75,8 @@ final class SeedConfig
             'sections_per_course' => $this->sectionsPerCourse,
             'modules_per_course' => $this->modulesPerCourse,
             'users'              => $this->users,
+            'groups'             => $this->groups,
+            'user_password'      => $this->userPassword,
         ];
     }
 }

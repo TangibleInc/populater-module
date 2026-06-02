@@ -28,6 +28,8 @@ class SeedConfigTest extends \WPTestCase
         $this->assertSame(1, $config->sectionsPerCourse);
         $this->assertSame(1, $config->modulesPerCourse);
         $this->assertSame(4, $config->users);
+        $this->assertSame(0, $config->groups);
+        $this->assertNull($config->userPassword);
     }
 
     public function test_from_array_requires_plugin(): void
@@ -86,5 +88,29 @@ class SeedConfigTest extends \WPTestCase
         $this->assertSame(4, $config->toArray()['topics_per_lesson']);
         $this->assertSame(2, $config->toArray()['sections_per_course']);
         $this->assertSame(3, $config->toArray()['modules_per_course']);
+    }
+
+    public function test_groups_and_password_are_normalized(): void
+    {
+        $config = SeedConfig::fromArray([
+            'plugin'        => 'learndash',
+            'groups'        => 3,
+            'user_password' => '  SecretPass1!  ',
+        ]);
+
+        $this->assertSame(3, $config->groups);
+        $this->assertSame('SecretPass1!', $config->userPassword);
+        $this->assertSame(3, $config->toArray()['groups']);
+        $this->assertSame('SecretPass1!', $config->toArray()['user_password']);
+    }
+
+    public function test_empty_password_becomes_null(): void
+    {
+        $config = SeedConfig::fromArray([
+            'plugin'        => 'learndash',
+            'user_password' => '   ',
+        ]);
+
+        $this->assertNull($config->userPassword);
     }
 }

@@ -43,6 +43,12 @@ class SeedCommand
      * [--users=<n>]
      * : Number of users to create. Default: 10.
      *
+     * [--groups=<n>]
+     * : Number of groups to create. Default: 0.
+     *
+     * [--password=<password>]
+     * : Shared password for all seeded users.
+     *
      * [--wait]
      * : Wait for the process to complete, polling every second.
      *
@@ -67,6 +73,8 @@ class SeedCommand
             'sections_per_course' => (int) ($assocArgs['sections'] ?? 1),
             'modules_per_course' => (int) ($assocArgs['modules']  ?? 1),
             'users'              => (int) ($assocArgs['users']    ?? 10),
+            'groups'             => (int) ($assocArgs['groups']   ?? 0),
+            'user_password'      => $assocArgs['password'] ?? null,
         ];
 
         try {

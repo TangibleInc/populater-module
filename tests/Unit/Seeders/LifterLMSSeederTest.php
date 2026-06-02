@@ -44,6 +44,22 @@ class LifterLMSSeederTest extends \WPTestCase
 
     public function test_seed_courses_creates_posts_with_correct_type(): void
     {
+        $checkoutPageId = 0;
+
+        Functions\when('get_option')->alias(function (string $key, $default = false) use (&$checkoutPageId) {
+            if ($key === 'lifterlms_checkout_page_id') {
+                return $checkoutPageId ?: $default;
+            }
+
+            return $default;
+        });
+        Functions\when('update_option')->alias(function (string $key, $value) use (&$checkoutPageId) {
+            if ($key === 'lifterlms_checkout_page_id') {
+                $checkoutPageId = (int) $value;
+            }
+
+            return true;
+        });
         Functions\expect('wp_insert_post')
             ->times(5)
             ->andReturnUsing(static function (array $args): int {
@@ -55,11 +71,9 @@ class LifterLMSSeederTest extends \WPTestCase
                 };
             });
         Functions\when('is_wp_error')->justReturn(false);
-        Functions\when('get_option')->justReturn(0);
         Functions\when('get_post_status')->justReturn('publish');
         Functions\when('taxonomy_exists')->justReturn(true);
         Functions\when('wp_set_object_terms')->justReturn([]);
-        Functions\when('update_option')->justReturn(true);
         Functions\when('get_post')->alias(function (int $id) {
             return (object) [
                 'ID'           => $id,
@@ -264,5 +278,18 @@ class LifterLMSSeederTest extends \WPTestCase
         $ids = $this->seeder->seedUsers(2);
 
         $this->assertCount(2, $ids);
+    }
+
+    public function test_resolve_group_seat_count_allocates_room_for_members_and_admin(): void
+    {
+        $method = new \ReflectionMethod(LifterLMSSeeder::class, 'resolveGroupSeatCount');
+        $method->setAccessible(true);
+
+        $seats = $method->invoke($this->seeder, [
+            'total_users' => 6,
+            'groups'      => 2,
+        ]);
+
+        $this->assertSame(5, $seats);
     }
 }

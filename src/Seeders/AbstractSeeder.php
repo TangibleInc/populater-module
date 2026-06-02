@@ -8,6 +8,7 @@ use Tangible\Populater\Registry\AbstractLmsPlugin;
 use Tangible\Populater\Seeding\SeedConfig;
 use Tangible\Populater\Seeding\SeedQueueItem;
 use Tangible\Populater\Support\DummyContent;
+use Tangible\Populater\Support\GroupIndexResolver;
 
 /**
  * Base contract for all LMS seeders.
@@ -21,6 +22,8 @@ use Tangible\Populater\Support\DummyContent;
  */
 abstract class AbstractSeeder
 {
+    public const USER_META_MARKER = '_tangible_populater_user';
+
     public function __construct(
         protected readonly AbstractLmsPlugin $plugin,
     ) {}
@@ -86,6 +89,7 @@ abstract class AbstractSeeder
 
             if ($postId > 0) {
                 $this->afterCourseCreated($postId, $i, $options);
+                $this->maybeAssignCourseToGroup($postId, $options);
                 $ids[] = $postId;
             }
         }
@@ -182,21 +186,70 @@ abstract class AbstractSeeder
      */
     public function seedUsers(int $count, array $options = []): array
     {
+        if (array_key_exists('index', $options)) {
+            return $this->createSeededUserAtIndex((int) $options['index'], $options);
+        }
+
         $ids = [];
-        $prefix = (string) ($options['user_prefix'] ?? strtolower(str_replace('-', '_', $this->getSlug())) . '_user');
 
         for ($i = 1; $i <= $count; $i++) {
-            $userId = $this->createWpUser([
-                'prefix' => $prefix,
-                'index'  => $i,
-            ]);
-
-            if ($userId > 0) {
-                $ids[] = $userId;
-            }
+            $ids = array_merge($ids, $this->createSeededUserAtIndex($i, $options));
         }
 
         return $ids;
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     * @return list<int>
+     */
+    public function seedGroups(int $count, array $options = []): array
+    {
+        if (!$this->hasGroupSupport()) {
+            return [];
+        }
+
+        $ids = [];
+        $index = (int) ($options['index'] ?? 1);
+        $title = $this->defaultTitle($options['title_prefix'] ?? $this->getTitlePrefix('groups'), $index);
+        $postId = $this->insertPost([
+            'post_title'   => $title,
+            'post_type'    => $this->getPostType('groups'),
+            'post_status'  => 'publish',
+            'post_content' => DummyContent::group($title, $index),
+            'post_excerpt' => DummyContent::excerpt('group', $title, $index),
+        ]);
+
+        if ($postId > 0) {
+            $this->afterGroupCreated($postId, $index, $options);
+            $ids[] = $postId;
+        }
+
+        return $ids;
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     * @return list<int>
+     */
+    public function seedGroupAdmins(int $count, array $options = []): array
+    {
+        $index = (int) ($options['index'] ?? 1);
+
+        $userId = $this->createWpUser([
+            'role_type' => 'groupadmin',
+            'index'     => $index,
+            'password'  => $options['user_password'] ?? null,
+        ]);
+
+        if ($userId <= 0) {
+            return [];
+        }
+
+        $this->afterGroupAdminCreated($userId, $index, $options);
+        $this->maybeAssignUserToGroup($userId, $options, true);
+
+        return [$userId];
     }
 
     /**
@@ -227,7 +280,15 @@ abstract class AbstractSeeder
      */
     public function getSeedableTypes(): array
     {
-        return ['courses', 'lessons', 'quizzes', 'users', 'certificates'];
+        $types = ['courses', 'lessons', 'quizzes', 'users', 'certificates'];
+
+        if ($this->hasGroupSupport()) {
+            $types[] = 'groups';
+        }
+
+        $types[] = 'group_admins';
+
+        return $types;
     }
 
     /**
@@ -238,9 +299,32 @@ abstract class AbstractSeeder
     {
         $seedConfig = $config instanceof SeedConfig ? $config : SeedConfig::fromArray($config);
         $queue      = [];
+        $shared     = $this->sharedQueueData($seedConfig);
+
+        if ($seedConfig->groups > 0) {
+            if ($this->hasGroupSupport()) {
+                for ($g = 1; $g <= $seedConfig->groups; $g++) {
+                    $queue[] = new SeedQueueItem('group', array_merge($shared, ['index' => $g]));
+                }
+            }
+
+            for ($g = 1; $g <= $seedConfig->groups; $g++) {
+                $queue[] = new SeedQueueItem('group_admin', array_merge($shared, ['index' => $g]));
+            }
+        }
 
         for ($c = 1; $c <= $seedConfig->courses; $c++) {
-            $queue[] = new SeedQueueItem('course', ['index' => $c]);
+            $courseData = array_merge($shared, ['index' => $c]);
+
+            if ($seedConfig->groups > 0) {
+                $courseData['group_index'] = GroupIndexResolver::resolve(
+                    $c,
+                    $seedConfig->courses,
+                    $seedConfig->groups,
+                );
+            }
+
+            $queue[] = new SeedQueueItem('course', $courseData);
 
             for ($l = 1; $l <= $seedConfig->lessonsPerCourse; $l++) {
                 $queue[] = new SeedQueueItem('lesson', [
@@ -250,6 +334,7 @@ abstract class AbstractSeeder
                     'topics_per_lesson'   => $seedConfig->topicsPerLesson,
                     'sections_per_course' => $seedConfig->sectionsPerCourse,
                     'modules_per_course'  => $seedConfig->modulesPerCourse,
+                    'group_index'         => $courseData['group_index'] ?? 0,
                 ]);
             }
 
@@ -259,7 +344,17 @@ abstract class AbstractSeeder
         }
 
         for ($u = 1; $u <= $seedConfig->users; $u++) {
-            $queue[] = new SeedQueueItem('user', ['index' => $u]);
+            $userData = array_merge($shared, ['index' => $u]);
+
+            if ($seedConfig->groups > 0) {
+                $userData['group_index'] = GroupIndexResolver::resolve(
+                    $u,
+                    $seedConfig->users,
+                    $seedConfig->groups,
+                );
+            }
+
+            $queue[] = new SeedQueueItem('user', $userData);
         }
 
         return $queue;
@@ -284,24 +379,132 @@ abstract class AbstractSeeder
     }
 
     /**
-     * @param array<string, mixed> $options  Keys: prefix, index
+     * @param array<string, mixed> $options
+     * @return list<int>
+     */
+    protected function createSeededUserAtIndex(int $index, array $options): array
+    {
+        $userId = $this->createWpUser([
+            'role_type' => 'student',
+            'index'     => $index,
+            'password'  => $options['user_password'] ?? null,
+        ]);
+
+        if ($userId <= 0) {
+            return [];
+        }
+
+        $this->afterUserCreated($userId, $index, $options);
+        $this->maybeAssignUserToGroup($userId, $options, false);
+
+        return [$userId];
+    }
+
+    /**
+     * @param array<string, mixed> $options  Keys: role_type, index, password
      */
     protected function createWpUser(array $options): int
     {
         $index    = (int) ($options['index'] ?? 1);
-        $prefix   = (string) ($options['prefix'] ?? 'populater_user');
-        $unique   = uniqid((string) $index, true);
-        $username = $prefix . '_' . $unique;
+        $roleType = (string) ($options['role_type'] ?? 'student');
+        $username = $roleType . $index;
         $email    = $username . '@example.com';
-        $password = wp_generate_password();
-        $userId   = wp_create_user($username, $password, $email);
+        $password = is_string($options['password'] ?? null) && $options['password'] !== ''
+            ? (string) $options['password']
+            : wp_generate_password();
+
+        if (function_exists('username_exists') && username_exists($username)) {
+            $username .= '_' . wp_generate_password(4, false, false);
+        }
+
+        $userId = wp_create_user($username, $password, $email);
 
         if (is_wp_error($userId) || !is_int($userId)) {
             return 0;
         }
 
+        if (function_exists('update_user_meta')) {
+            update_user_meta($userId, self::USER_META_MARKER, 1);
+        }
+
         return $userId;
     }
+
+    protected function hasGroupSupport(): bool
+    {
+        $schema = $this->plugin->getEntitySchema();
+
+        if (!isset($schema->postTypes['groups'])) {
+            return false;
+        }
+
+        if (!function_exists('post_type_exists')) {
+            return true;
+        }
+
+        return post_type_exists($schema->getPostType('groups'));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function sharedQueueData(SeedConfig $seedConfig): array
+    {
+        $data = [
+            'groups'       => $seedConfig->groups,
+            'total_courses' => $seedConfig->courses,
+            'total_users'  => $seedConfig->users,
+        ];
+
+        if ($seedConfig->userPassword !== null) {
+            $data['user_password'] = $seedConfig->userPassword;
+        }
+
+        return $data;
+    }
+
+    /** @param array<string, mixed> $options */
+    protected function maybeAssignCourseToGroup(int $courseId, array $options): void
+    {
+        $groupId    = (int) ($options['group_id'] ?? 0);
+        $groupIndex = (int) ($options['group_index'] ?? 0);
+
+        if ($groupId <= 0 && $groupIndex <= 0) {
+            return;
+        }
+
+        $this->assignCourseToGroup($courseId, $groupId, $groupIndex, $options);
+    }
+
+    /** @param array<string, mixed> $options */
+    protected function maybeAssignUserToGroup(int $userId, array $options, bool $isGroupAdmin): void
+    {
+        $groupId    = (int) ($options['group_id'] ?? 0);
+        $groupIndex = (int) ($options['group_index'] ?? 0);
+
+        if ($groupId <= 0 && $groupIndex <= 0) {
+            return;
+        }
+
+        $this->assignUserToGroup($userId, $groupId, $groupIndex, $isGroupAdmin, $options);
+    }
+
+    /** @param array<string, mixed> $options */
+    protected function assignCourseToGroup(
+        int $courseId,
+        int $groupId,
+        int $groupIndex,
+        array $options = [],
+    ): void {}
+
+    /** @param array<string, mixed> $options */
+    protected function assignUserToGroup(
+        int $userId,
+        int $groupId,
+        int $groupIndex,
+        bool $isGroupAdmin,
+        array $options = [],
+    ): void {}
 
     protected function defaultTitle(string $prefix, int $index): string
     {
@@ -322,6 +525,15 @@ abstract class AbstractSeeder
 
     /** @param array<string, mixed> $options */
     protected function afterCourseCreated(int $postId, int $index, array $options = []): void {}
+
+    /** @param array<string, mixed> $options */
+    protected function afterUserCreated(int $userId, int $index, array $options = []): void {}
+
+    /** @param array<string, mixed> $options */
+    protected function afterGroupCreated(int $postId, int $index, array $options = []): void {}
+
+    /** @param array<string, mixed> $options */
+    protected function afterGroupAdminCreated(int $userId, int $index, array $options = []): void {}
 
     /** @param array<string, mixed> $options */
     protected function afterLessonCreated(int $postId, int $courseId, int $index, array $options = []): void {}

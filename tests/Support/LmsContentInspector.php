@@ -7,8 +7,11 @@ namespace Tangible\Populater\Tests\Support;
 use Tangible\Populater\LMS\LifterLMS\LifterLmsTrueFalseAnswers;
 use Tangible\Populater\Registry\AbstractLmsPlugin;
 use Tangible\Populater\Registry\LmsEntitySchema;
+use Tangible\Populater\Registry\LmsPluginRegistry;
 use Tangible\Populater\Registry\LmsPlugins;
+use Tangible\Populater\Seeding\SeedConfig;
 use Tangible\Populater\Seeders\AbstractSeeder;
+use Tangible\Populater\Support\GroupIndexResolver;
 
 /**
  * Counts LMS entities in WordPress and verifies LMS-specific structure.
@@ -45,6 +48,10 @@ final class LmsContentInspector
 
         if ($pluginSlug === 'tangible-lms') {
             $test->assertSame($expected['modules'], $delta['modules'], 'Tangible module count mismatch.');
+        }
+
+        if (($expected['groups'] ?? 0) > 0) {
+            $test->assertSame($expected['groups'], $delta['groups'] ?? 0, 'Group count mismatch.');
         }
     }
 
@@ -108,6 +115,7 @@ final class LmsContentInspector
             'questions' => self::countPostsAfter($types['questions'], $afterPostId),
             'sections'  => isset($types['sections']) ? self::countPostsAfter($types['sections'], $afterPostId) : 0,
             'modules'   => isset($types['modules']) ? self::countPostsAfter($types['modules'], $afterPostId) : 0,
+            'groups'    => self::countGroupsAfter($pluginSlug, $afterPostId),
             'users'     => self::countUsers($types['user_prefix']),
         ];
     }
@@ -127,6 +135,7 @@ final class LmsContentInspector
             'questions' => $after['questions'] - $before['questions'],
             'sections'  => $after['sections'] - $before['sections'],
             'modules'   => $after['modules'] - $before['modules'],
+            'groups'    => ($after['groups'] ?? 0) - ($before['groups'] ?? 0),
             'users'     => $after['users'] - $before['users'],
         ];
     }
@@ -141,6 +150,7 @@ final class LmsContentInspector
         int $topicsPerLesson = 2,
         int $sectionsPerCourse = 1,
         int $modulesPerCourse = 1,
+        int $groups = 0,
     ): array {
         $lessons  = $courses * $lessonsPerCourse;
         $topics   = $lessons * $topicsPerLesson;
@@ -162,8 +172,225 @@ final class LmsContentInspector
             'questions' => $questions,
             'sections'  => $sections,
             'modules'   => $modules,
-            'users'     => $users,
+            'users'     => $users + ($groups > 0 ? $groups : 0),
+            'groups'    => $groups,
         ];
+    }
+
+    /**
+     * @param array<string, mixed> $config
+     */
+    public static function expectedQueueTotal(string $pluginSlug, array $config): int
+    {
+        LmsPlugins::registerBuiltIn();
+        $registry = new LmsPluginRegistry();
+        $seeder   = $registry->createSeeder($pluginSlug);
+        $seedConfig = SeedConfig::fromArray(array_merge($config, ['plugin' => $pluginSlug]));
+
+        return count($seeder->buildSeedQueue($seedConfig));
+    }
+
+    public static function groupsSupportedFor(string $pluginSlug): bool
+    {
+        return match ($pluginSlug) {
+            'lifterlms'    => function_exists('llms_create_group'),
+            'learndash'    => function_exists('post_type_exists') && post_type_exists('groups'),
+            'tangible-lms' => false,
+            default        => false,
+        };
+    }
+
+    /**
+     * Asserts groups exist and contain the expected admins, students, and roles.
+     */
+    public static function assertSeededGroups(
+        \PHPUnit\Framework\TestCase $test,
+        string $pluginSlug,
+        int $groups,
+        int $users,
+        int $afterPostId = 0,
+    ): void {
+        if ($groups <= 0) {
+            return;
+        }
+
+        match ($pluginSlug) {
+            'lifterlms' => self::assertLifterLmsGroups($test, $groups, $users, $afterPostId),
+            'learndash' => self::assertLearnDashGroups($test, $groups, $users, $afterPostId),
+            default     => null,
+        };
+    }
+
+    private static function assertLifterLmsGroups(
+        \PHPUnit\Framework\TestCase $test,
+        int $groups,
+        int $users,
+        int $afterPostId,
+    ): void {
+        if (!class_exists(\LLMS_Groups_Enrollment::class)) {
+            $test->markTestSkipped('LifterLMS Groups add-on is not active.');
+        }
+
+        $groupPosts = self::newestPosts('llms_group', $groups, $afterPostId);
+        usort(
+            $groupPosts,
+            static fn(\WP_Post $a, \WP_Post $b): int => (int) $a->ID <=> (int) $b->ID,
+        );
+        $test->assertCount($groups, $groupPosts, 'Expected seeded LifterLMS groups to exist.');
+
+        $groupIdsByIndex = [];
+
+        foreach ($groupPosts as $offset => $groupPost) {
+            $index = $offset + 1;
+            $groupIdsByIndex[$index] = (int) $groupPost->ID;
+            $group = get_llms_group($groupPost);
+
+            $test->assertInstanceOf(\LLMS_Group::class, $group);
+            $test->assertGreaterThanOrEqual(2, (int) $group->get('seats'), 'Group should have enough seats.');
+        }
+
+        for ($g = 1; $g <= $groups; $g++) {
+            $admin = get_user_by('email', 'groupadmin' . $g . '@example.com');
+            $test->assertInstanceOf(\WP_User::class, $admin, "Missing groupadmin{$g}.");
+
+            $groupId = $groupIdsByIndex[$g];
+            $test->assertTrue(
+                llms_group_is_user_primary_admin((int) $admin->ID, $groupId),
+                "groupadmin{$g} should be primary admin of group {$g}.",
+            );
+            $test->assertSame(
+                'admin',
+                \LLMS_Groups_Enrollment::get_role((int) $admin->ID, $groupId),
+                "groupadmin{$g} should have admin group role.",
+            );
+        }
+
+        $studentsByGroup = array_fill(1, $groups, []);
+
+        for ($u = 1; $u <= $users; $u++) {
+            $student = get_user_by('email', 'student' . $u . '@example.com');
+            $test->assertInstanceOf(\WP_User::class, $student, "Missing student{$u}.");
+
+            $groupIndex = GroupIndexResolver::resolve($u, $users, $groups);
+            $groupId    = $groupIdsByIndex[$groupIndex];
+
+            $test->assertTrue(
+                llms_is_user_enrolled((int) $student->ID, $groupId),
+                "student{$u} should be enrolled in group {$groupIndex}.",
+            );
+            $test->assertSame(
+                'member',
+                \LLMS_Groups_Enrollment::get_role((int) $student->ID, $groupId),
+                "student{$u} should be a group member.",
+            );
+
+            $studentsByGroup[$groupIndex][] = (int) $student->ID;
+        }
+
+        for ($g = 1; $g <= $groups; $g++) {
+            $expectedStudents = count(array_filter(
+                range(1, $users),
+                static fn(int $userIndex): bool => GroupIndexResolver::resolve($userIndex, $users, $groups) === $g,
+            ));
+
+            $test->assertCount(
+                $expectedStudents,
+                $studentsByGroup[$g],
+                "Group {$g} should contain all assigned students.",
+            );
+
+            if (!function_exists('llms_group_get_members')) {
+                continue;
+            }
+
+            $query = llms_group_get_members($groupIdsByIndex[$g], ['per_page' => 500]);
+            $test->assertSame(
+                $expectedStudents + 1,
+                (int) $query->get_query()->get_found_results(),
+                "Group {$g} should contain its admin and all assigned students.",
+            );
+        }
+    }
+
+    private static function assertLearnDashGroups(
+        \PHPUnit\Framework\TestCase $test,
+        int $groups,
+        int $users,
+        int $afterPostId,
+    ): void {
+        if (!function_exists('learndash_get_groups_administrator_ids')) {
+            $test->markTestSkipped('LearnDash groups API is not available.');
+        }
+
+        $groupPosts = self::newestPosts('groups', $groups, $afterPostId);
+        usort(
+            $groupPosts,
+            static fn(\WP_Post $a, \WP_Post $b): int => (int) $a->ID <=> (int) $b->ID,
+        );
+        $test->assertCount($groups, $groupPosts, 'Expected seeded LearnDash groups to exist.');
+
+        $groupIdsByIndex = [];
+
+        foreach ($groupPosts as $offset => $groupPost) {
+            $groupIdsByIndex[$offset + 1] = (int) $groupPost->ID;
+        }
+
+        for ($g = 1; $g <= $groups; $g++) {
+            $admin = get_user_by('email', 'groupadmin' . $g . '@example.com');
+            $test->assertInstanceOf(\WP_User::class, $admin, "Missing groupadmin{$g}.");
+
+            $groupId = $groupIdsByIndex[$g];
+            $leaderIds = array_map('intval', learndash_get_groups_administrator_ids($groupId));
+
+            $test->assertContains(
+                (int) $admin->ID,
+                $leaderIds,
+                "groupadmin{$g} should be a LearnDash group leader.",
+            );
+        }
+
+        $studentsByGroup = array_fill(1, $groups, []);
+
+        for ($u = 1; $u <= $users; $u++) {
+            $student = get_user_by('email', 'student' . $u . '@example.com');
+            $test->assertInstanceOf(\WP_User::class, $student, "Missing student{$u}.");
+
+            $groupIndex = GroupIndexResolver::resolve($u, $users, $groups);
+            $groupId    = $groupIdsByIndex[$groupIndex];
+            $memberIds  = array_map('intval', learndash_get_groups_user_ids($groupId));
+
+            $test->assertContains(
+                (int) $student->ID,
+                $memberIds,
+                "student{$u} should belong to group {$groupIndex}.",
+            );
+
+            $studentsByGroup[$groupIndex][] = (int) $student->ID;
+        }
+
+        for ($g = 1; $g <= $groups; $g++) {
+            $expectedStudents = count(array_filter(
+                range(1, $users),
+                static fn(int $userIndex): bool => GroupIndexResolver::resolve($userIndex, $users, $groups) === $g,
+            ));
+
+            $test->assertCount(
+                $expectedStudents,
+                $studentsByGroup[$g],
+                "LearnDash group {$g} should contain all assigned students.",
+            );
+        }
+    }
+
+    private static function countGroupsAfter(string $pluginSlug, int $afterPostId): int
+    {
+        $schema = self::schemaFor($pluginSlug);
+
+        if (!isset($schema->postTypes['groups'])) {
+            return 0;
+        }
+
+        return self::countPostsAfter($schema->getPostType('groups'), $afterPostId);
     }
 
     /**
@@ -745,10 +972,13 @@ final class LmsContentInspector
     {
         global $wpdb;
 
+        unset($prefix);
+
         return (int) $wpdb->get_var(
             $wpdb->prepare(
-                "SELECT COUNT(ID) FROM {$wpdb->users} WHERE user_login LIKE %s",
-                $wpdb->esc_like($prefix . '_') . '%',
+                "SELECT COUNT(DISTINCT user_id) FROM {$wpdb->usermeta} WHERE meta_key = %s AND meta_value = %s",
+                AbstractSeeder::USER_META_MARKER,
+                '1',
             ),
         );
     }

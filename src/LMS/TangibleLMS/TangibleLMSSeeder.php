@@ -169,4 +169,49 @@ class TangibleLMSSeeder extends AbstractSeeder
 
         return (int) min($containers, max(1, (int) ceil($itemIndex * $containers / $itemsPerContainer)));
     }
+
+    /** @param array<string, mixed> $options */
+    protected function assignCourseToGroup(
+        int $courseId,
+        int $groupId,
+        int $groupIndex,
+        array $options = [],
+    ): void {
+        if ($courseId <= 0) {
+            return;
+        }
+
+        if ($groupId > 0) {
+            update_post_meta($courseId, '_populater_group_id', $groupId);
+        }
+
+        if ($groupIndex > 0) {
+            update_post_meta($courseId, '_populater_group_index', $groupIndex);
+        }
+    }
+
+    /** @param array<string, mixed> $options */
+    protected function assignUserToGroup(
+        int $userId,
+        int $groupId,
+        int $groupIndex,
+        bool $isGroupAdmin,
+        array $options = [],
+    ): void {
+        if ($userId <= 0) {
+            return;
+        }
+
+        if ($groupId > 0) {
+            update_user_meta($userId, '_populater_group_id', $groupId);
+        }
+
+        if ($groupIndex > 0) {
+            update_user_meta($userId, '_populater_group_index', $groupIndex);
+        }
+
+        if ($isGroupAdmin && $groupIndex > 0) {
+            update_user_meta($userId, '_populater_group_admin_index', $groupIndex);
+        }
+    }
 }

@@ -98,4 +98,32 @@ class SeedingIdMapTest extends \WPTestCase
 
         $this->assertSame(10, $data['course_id']);
     }
+
+    public function test_enrich_resolves_group_id_for_course_and_user(): void
+    {
+        $stored = ['groups' => [1 => 501, 2 => 502]];
+
+        Functions\when('get_option')->alias(
+            static function (string $key) use (&$stored) {
+                return $key === 'tangible_populater_ids_proc-1' ? $stored : null;
+            }
+        );
+
+        $course = SeedingIdMap::enrich('proc-1', 'course', [
+            'index'       => 3,
+            'group_index' => 2,
+        ], $this->repository);
+
+        $user = SeedingIdMap::enrich('proc-1', 'user', [
+            'index'       => 7,
+            'group_index' => 1,
+        ], $this->repository);
+
+        $admin = SeedingIdMap::enrich('proc-1', 'group_admin', ['index' => 2], $this->repository);
+
+        $this->assertSame(502, $course['group_id']);
+        $this->assertSame(501, $user['group_id']);
+        $this->assertSame(502, $admin['group_id']);
+        $this->assertSame(2, $admin['group_index']);
+    }
 }

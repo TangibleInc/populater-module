@@ -34,9 +34,15 @@ final class LifterLmsEnrollmentSetup
 
     public static function ensureCheckoutPage(): int
     {
-        if (self::$checkoutCreated) {
-            return (int) get_option(self::CHECKOUT_OPTION, 0);
+        $existingId = (int) get_option(self::CHECKOUT_OPTION, 0);
+
+        if ($existingId > 0 && \get_post_status($existingId)) {
+            self::$checkoutCreated = true;
+
+            return $existingId;
         }
+
+        self::$checkoutCreated = false;
 
         if (function_exists('llms_create_page')) {
             $pageId = (int) llms_create_page(

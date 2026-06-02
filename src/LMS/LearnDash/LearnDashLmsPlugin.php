@@ -25,6 +25,7 @@ class LearnDashLmsPlugin extends AbstractLmsPlugin
                 'quizzes'      => 'sfwd-quiz',
                 'questions'    => 'sfwd-question',
                 'certificates' => 'sfwd-certificates',
+                'groups'       => 'groups',
             ],
             titlePrefixes: [
                 'courses'      => 'LearnDash Course',
@@ -33,6 +34,7 @@ class LearnDashLmsPlugin extends AbstractLmsPlugin
                 'quizzes'      => 'LearnDash Quiz',
                 'questions'    => 'LearnDash Question',
                 'certificates' => 'LearnDash Certificate',
+                'groups'       => 'LearnDash Group',
             ],
             userPrefix: 'learndash_user',
             metaMap: [

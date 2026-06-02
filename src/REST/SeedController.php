@@ -38,6 +38,13 @@ class SeedController
             'permission_callback' => [$this, 'checkAdminPermission'],
         ]);
 
+        // Legacy route kept for older admin.js builds that polled user seeding separately.
+        register_rest_route(self::NAMESPACE, '/users/active', [
+            'methods'             => \WP_REST_Server::READABLE,
+            'callback'            => [$this, 'getLegacyActiveUserSeed'],
+            'permission_callback' => [$this, 'checkAdminPermission'],
+        ]);
+
         register_rest_route(self::NAMESPACE, '/seed/(?P<id>[\w-]+)/status', [
             'methods'             => \WP_REST_Server::READABLE,
             'callback'            => [$this, 'getStatus'],
@@ -80,6 +87,8 @@ class SeedController
             'sections_per_course' => (int) ($request->get_param('sections_per_course') ?? 1),
             'modules_per_course' => (int) ($request->get_param('modules_per_course') ?? 1),
             'users'              => (int) ($request->get_param('users')              ?? 10),
+            'groups'             => (int) ($request->get_param('groups')             ?? 0),
+            'user_password'      => $request->get_param('user_password'),
         ];
 
         try {
@@ -102,6 +111,13 @@ class SeedController
 
         return rest_ensure_response([
             'process' => $active?->toArray(),
+        ]);
+    }
+
+    public function getLegacyActiveUserSeed(\WP_REST_Request $request): \WP_REST_Response
+    {
+        return rest_ensure_response([
+            'process' => null,
         ]);
     }
 
@@ -205,6 +221,16 @@ class SeedController
                 'default' => 10,
                 'minimum' => 0,
                 'maximum' => 1000,
+            ],
+            'groups' => [
+                'type'    => 'integer',
+                'default' => 0,
+                'minimum' => 0,
+                'maximum' => 100,
+            ],
+            'user_password' => [
+                'type'              => 'string',
+                'sanitize_callback' => 'sanitize_text_field',
             ],
         ];
     }

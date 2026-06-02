@@ -27,6 +27,15 @@ final class SeedingIdMap
             $data['course_id'] = (int) ($map['courses'][$courseIndex] ?? 0);
         }
 
+        if (in_array($type, ['course', 'user', 'group_admin'], true)) {
+            $groupIndex = (int) ($data['group_index'] ?? ($type === 'group_admin' ? ($data['index'] ?? 0) : 0));
+
+            if ($groupIndex > 0) {
+                $data['group_index'] = $groupIndex;
+                $data['group_id']    = (int) ($map['groups'][$groupIndex] ?? 0);
+            }
+        }
+
         if ($type === 'quiz') {
             $courseIndex       = (int) ($data['course_index'] ?? 0);
             $data['course_id'] = (int) ($map['courses'][$courseIndex] ?? 0);
@@ -75,9 +84,11 @@ final class SeedingIdMap
         $map = $repository->getIdMap($processId);
 
         match ($type) {
-            'course' => $map['courses'][(int) ($data['index'] ?? 0)] = $ids[0],
-            'lesson' => $map['lessons'][(int) ($data['course_index'] ?? 0)][(int) ($data['index'] ?? 0)] = $ids[0],
-            default  => null,
+            'course'      => $map['courses'][(int) ($data['index'] ?? 0)] = $ids[0],
+            'lesson'      => $map['lessons'][(int) ($data['course_index'] ?? 0)][(int) ($data['index'] ?? 0)] = $ids[0],
+            'group'       => $map['groups'][(int) ($data['index'] ?? 0)] = $ids[0],
+            'group_admin' => $map['group_admins'][(int) ($data['index'] ?? 0)] = $ids[0],
+            default       => null,
         };
 
         $repository->saveIdMap($processId, $map);

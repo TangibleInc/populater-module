@@ -26,6 +26,7 @@ class SeedRestIntegrationTest extends WordPressIntegrationTestCase
     private const SECTIONS  = 1;
     private const MODULES   = 1;
     private const USERS     = 4;
+    private const GROUPS    = 2;
 
     /**
      * @return array<string, array{0: string}>
@@ -50,14 +51,21 @@ class SeedRestIntegrationTest extends WordPressIntegrationTestCase
 
         $manager   = PluginTestAccessor::seedingManager();
         $maxPostId = $this->maxPostId();
+        $groups    = LmsContentInspector::groupsSupportedFor($plugin) ? self::GROUPS : 0;
 
-        $start = $this->restRequest('POST', '/tangible-populater/v1/seed', [
-            'plugin'             => $plugin,
-            'courses'            => self::COURSES,
-            'lessons_per_course' => self::LESSONS,
+        $seedParams = [
+            'plugin'              => $plugin,
+            'courses'             => self::COURSES,
+            'lessons_per_course'  => self::LESSONS,
             'quizzes_per_section' => self::QUIZZES,
-            'users'              => self::USERS,
-        ]);
+            'users'               => self::USERS,
+        ];
+
+        if ($groups > 0) {
+            $seedParams['groups'] = $groups;
+        }
+
+        $start = $this->restRequest('POST', '/tangible-populater/v1/seed', $seedParams);
 
         $startData = $this->restData($start);
         $this->assertArrayHasKey('process_id', $startData);
@@ -73,8 +81,9 @@ class SeedRestIntegrationTest extends WordPressIntegrationTestCase
             self::TOPICS,
             self::SECTIONS,
             self::MODULES,
+            $groups,
         );
-        $expectedTotal = $expected['courses'] + $expected['lessons'] + $expected['quizzes'] + $expected['users'];
+        $expectedTotal = LmsContentInspector::expectedQueueTotal($plugin, $seedParams);
 
         $finalStatus = BackgroundProcessDrainer::runSeedToCompletion($manager, $plugin, $processId);
 
@@ -100,6 +109,13 @@ class SeedRestIntegrationTest extends WordPressIntegrationTestCase
             self::TOPICS,
             self::SECTIONS,
             self::MODULES,
+        );
+        LmsContentInspector::assertSeededGroups(
+            $this,
+            $plugin,
+            $groups,
+            self::USERS,
+            $maxPostId,
         );
 
         $statusResponse = $this->restRequest('GET', '/tangible-populater/v1/seed/' . $processId . '/status');

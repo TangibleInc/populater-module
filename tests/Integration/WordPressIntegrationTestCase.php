@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tangible\Populater\Tests\Integration;
 
 use Tangible\Populater\Database\DatabaseReset;
+use Tangible\Populater\LMS\LifterLMS\LifterLmsEnrollmentSetup;
 use Tangible\Populater\Tests\Support\IntegrationTestSupport;
 use PHPUnit\Framework\TestCase;
 
@@ -22,6 +23,7 @@ abstract class WordPressIntegrationTestCase extends TestCase
         $this->assertTrue($reset->reset(confirmed: true), 'Failed to reset database before integration test.');
 
         IntegrationTestSupport::clearBackgroundSeedingState();
+        LifterLmsEnrollmentSetup::resetCheckoutState();
 
         rest_get_server();
         do_action('rest_api_init');

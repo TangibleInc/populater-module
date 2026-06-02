@@ -78,6 +78,17 @@ HTML
         );
     }
 
+    public static function group(string $label, int $index): string
+    {
+        return self::wrap(
+            $label,
+            $index,
+            <<<HTML
+<p>This group organizes learners and courses for testing cohort management, group leaders, and access control.</p>
+HTML
+        );
+    }
+
     public static function quiz(string $label, int $index): string
     {
         return self::wrap(

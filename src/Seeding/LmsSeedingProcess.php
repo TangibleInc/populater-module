@@ -36,6 +36,8 @@ class LmsSeedingProcess extends AbstractSeeding
             'lesson'      => new DelegateSeedingStep($this->repository, $this->seeder, 'lesson', $label),
             'quiz'        => new DelegateSeedingStep($this->repository, $this->seeder, 'quiz', $label),
             'user'        => new DelegateSeedingStep($this->repository, $this->seeder, 'user', $label),
+            'group'       => new DelegateSeedingStep($this->repository, $this->seeder, 'group', $label),
+            'group_admin' => new DelegateSeedingStep($this->repository, $this->seeder, 'group_admin', $label),
             'certificate' => new DelegateSeedingStep($this->repository, $this->seeder, 'certificate', $label),
         ];
     }
