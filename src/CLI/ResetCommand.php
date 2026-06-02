@@ -34,7 +34,7 @@ class ResetCommand
     public function reset(array $args, array $assocArgs): void
     {
         if (!$this->dbReset->isSafeEnvironment()) {
-            \WP_CLI::error('Database reset is only allowed in local, development, or staging environments (WP_ENVIRONMENT_TYPE).');
+            \WP_CLI::error('Database reset is disabled on this site. Set TANGIBLE_POPULATER_ALLOW_DB_RESET to true in wp-config.php to enable it.');
             return;
         }
 

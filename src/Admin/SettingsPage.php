@@ -95,8 +95,8 @@ class SettingsPage
             wp_die(esc_html__('Insufficient permissions.', 'tangible-populater'));
         }
 
-        $activePlugins  = $this->pluginDetector->getActivePlugins();
-        $isSafeEnv      = $this->databaseReset->isSafeEnvironment();
+        $activePlugins       = $this->pluginDetector->getActivePlugins();
+        $allowDatabaseReset  = $this->databaseReset->isSafeEnvironment();
 
         ?>
         <div class="wrap" id="tangible-populater-app">
@@ -183,13 +183,22 @@ class SettingsPage
             </div>
 
             <!-- Database reset -->
-            <?php if ($isSafeEnv) : ?>
             <div class="card" style="max-width:700px; margin-top:16px; border-left:4px solid #d63638;">
                 <h2 style="color:#d63638;"><?php esc_html_e('⚠ Reset Database', 'tangible-populater'); ?></h2>
                 <p><?php esc_html_e('This removes seeded posts, non-admin users, plugin/LMS data, custom site roles, and non-core options. Administrator accounts, active plugins, and the active theme are preserved.', 'tangible-populater'); ?></p>
-                <button type="button" id="tp-reset-btn" class="button" style="background:#d63638; color:#fff; border-color:#d63638;"><?php esc_html_e('Reset Database', 'tangible-populater'); ?></button>
+                <?php if (!$allowDatabaseReset) : ?>
+                    <div class="notice notice-warning inline">
+                        <p><?php esc_html_e('Database reset is disabled on this site. Define TANGIBLE_POPULATER_ALLOW_DB_RESET as true in wp-config.php, or use the tangible_populater_allow_database_reset filter to enable it.', 'tangible-populater'); ?></p>
+                    </div>
+                <?php endif; ?>
+                <button
+                    type="button"
+                    id="tp-reset-btn"
+                    class="button"
+                    style="background:#d63638; color:#fff; border-color:#d63638;"
+                    <?php disabled(!$allowDatabaseReset); ?>
+                ><?php esc_html_e('Reset Database', 'tangible-populater'); ?></button>
             </div>
-            <?php endif; ?>
         </div>
         <?php
     }

@@ -44,7 +44,7 @@ class ResetController
         if (!$this->dbReset->isSafeEnvironment()) {
             return rest_ensure_response([
                 'success' => false,
-                'message' => __('Database reset is only allowed in local, development, or staging environments.', 'tangible-populater'),
+                'message' => __('Database reset is disabled on this site.', 'tangible-populater'),
             ]);
         }
 

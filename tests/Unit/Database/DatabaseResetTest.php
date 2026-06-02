@@ -101,9 +101,16 @@ class DatabaseResetTest extends \WPTestCase
         $this->assertTrue($this->reset->isSafeEnvironment());
     }
 
-    public function test_is_safe_environment_allows_wp_debug(): void
+    public function test_is_safe_environment_allows_production(): void
     {
         Functions\when('wp_get_environment_type')->justReturn('production');
+
+        $this->assertTrue($this->reset->isSafeEnvironment());
+    }
+
+    public function test_is_safe_environment_allows_wp_debug_for_unknown_env(): void
+    {
+        Functions\when('wp_get_environment_type')->justReturn('');
 
         if (!defined('WP_DEBUG')) {
             define('WP_DEBUG', true);

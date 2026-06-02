@@ -9,7 +9,7 @@ namespace Tangible\Populater\Database;
  *
  * CAUTION: This is a destructive operation for posts, non-admin users, plugin
  * options, custom LMS roles, and custom LMS tables. It is intentionally gated behind:
- *  - An environment safety check (WP_ENVIRONMENT_TYPE or WP_DEBUG must signal non-production).
+ *  - An environment safety check (may be disabled via TANGIBLE_POPULATER_ALLOW_DB_RESET).
  *  - An explicit confirmed: true parameter so callers must opt in.
  */
 class DatabaseReset
@@ -70,26 +70,36 @@ class DatabaseReset
     /**
      * Returns true when it is safe to perform a destructive database reset.
      *
-     * Safe environments: local, development, staging, or when WP_DEBUG is true.
-     * Production is blocked unless WP_ENVIRONMENT_TYPE is explicitly overridden
-     * to one of the safe values.
+     * Allowed by default in local, development, staging, and production
+     * environments. Set TANGIBLE_POPULATER_ALLOW_DB_RESET to false in wp-config
+     * to block reset everywhere, or use the tangible_populater_allow_database_reset
+     * filter to customize.
      */
     public function isSafeEnvironment(): bool
     {
+        if (defined('TANGIBLE_POPULATER_ALLOW_DB_RESET')) {
+            return (bool) TANGIBLE_POPULATER_ALLOW_DB_RESET;
+        }
+
         $envType = function_exists('wp_get_environment_type')
             ? wp_get_environment_type()
             : (defined('WP_ENVIRONMENT_TYPE') ? WP_ENVIRONMENT_TYPE : '');
 
-        if (in_array($envType, ['local', 'development', 'staging'], true)) {
-            return true;
+        if (in_array($envType, ['local', 'development', 'staging', 'production'], true)) {
+            /**
+             * @param bool $allowed Whether database reset is allowed.
+             */
+            return (bool) apply_filters('tangible_populater_allow_database_reset', true);
         }
 
-        // Allow when debug mode is enabled (typical for dev tooling).
         if (defined('WP_DEBUG') && WP_DEBUG) {
             return true;
         }
 
-        return false;
+        /**
+         * @param bool $allowed Whether database reset is allowed.
+         */
+        return (bool) apply_filters('tangible_populater_allow_database_reset', false);
     }
 
     /**

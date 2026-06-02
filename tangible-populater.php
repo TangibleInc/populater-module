@@ -2,7 +2,7 @@
 /**
  * Plugin Name:  Tangible Populator
  * Description:  Populate a WP site with courses, lessons, quizzes and users for LearnDash LMS, LifterLMS and Tangible LMS. Includes a database reset tool for development.
- * Version:      1.2.0
+ * Version:      1.2.1
  * Requires PHP: 8.1
  * Author:       Tangible
  * License:      GPL-2.0-or-later
