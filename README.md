@@ -30,7 +30,3 @@ composer zip
 ```
 
 Upload `tangible-populater.zip` via **Plugins → Add New → Upload Plugin**.
-
-Do **not** copy the repository (or a zip of the repo) into `wp-content/plugins`. Dev files such as `.git/`, `tests/`, `node_modules/`, and `docker-compose.yml` are not part of the plugin and will break in-place WordPress updates.
-
-If a site was installed from the repo and updates fail with permission/copy errors, delete the plugin folder once (FTP, SSH, or WP-CLI), then install `tangible-populater.zip` from `composer zip`. Future updates from clean zips will work normally.

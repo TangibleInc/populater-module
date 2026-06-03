@@ -32,9 +32,14 @@ k6_export_env_args() {
     -e "RAMP_DOWN=${K6_RAMP_DOWN:-1m}"
     -e "THINK_TIME=${K6_THINK_TIME:-1}"
     -e "COURSE_INDEX=${K6_COURSE_INDEX:-1}"
+    -e "COURSE_PER_USER=${K6_COURSE_PER_USER:-0}"
     -e "LESSON_COUNT=${K6_LESSON_COUNT:-10}"
     -e "SECTION_INDEX=${K6_SECTION_INDEX:-1}"
     -e "QUIZ_INDEX=${K6_QUIZ_INDEX:-1}"
+    -e "CF_BYPASS=${K6_CF_BYPASS:-1}"
+    -e "CF_USER_AGENT=${K6_CF_USER_AGENT:-bench2.com PopulaterK6/1.0}"
+    -e "CF_BYPASS_HEADER=${K6_CF_BYPASS_HEADER:-x-reviewsignal}"
+    -e "CF_BYPASS_VALUE=${K6_CF_BYPASS_VALUE:-1}"
   )
 
   export K6_ENV_ARGS

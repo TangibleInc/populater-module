@@ -15,6 +15,7 @@
  */
 
 import { check, group, sleep } from 'k6';
+import { Counter } from 'k6/metrics';
 import http from 'k6/http';
 import execution from 'k6/execution';
 
@@ -26,7 +27,15 @@ const LESSON_COUNT = intEnv('LESSON_COUNT', 10);
 const SECTION_INDEX = intEnv('SECTION_INDEX', 1);
 const QUIZ_INDEX = intEnv('QUIZ_INDEX', 1);
 const MAX_USERS = intEnv('MAX_USERS', 20);
+const COURSE_PER_USER = intEnv('COURSE_PER_USER', 0) === 1;
 const THINK_TIME = floatEnv('THINK_TIME', 1);
+const CF_BYPASS_ENABLED = __ENV.CF_BYPASS !== '0';
+const CF_USER_AGENT = __ENV.CF_USER_AGENT ?? 'bench2.com PopulaterK6/1.0';
+const CF_BYPASS_HEADER = (__ENV.CF_BYPASS_HEADER || 'x-reviewsignal').toLowerCase();
+const CF_BYPASS_VALUE = __ENV.CF_BYPASS_VALUE ?? '1';
+
+const enrollSkippedNoForm = new Counter('enroll_skipped_no_form');
+const enrollAttempted = new Counter('enroll_attempted');
 
 export const options = {
   stages: [
@@ -80,6 +89,7 @@ function vuUser() {
   return {
     username: `${USER_PREFIX}${index}`,
     index,
+    courseIndex: COURSE_PER_USER ? index : COURSE_INDEX,
   };
 }
 
@@ -113,22 +123,40 @@ function pickCorrectAnswer(html) {
   return null;
 }
 
+function requestHeaders(extra = {}) {
+  const headers = { ...extra };
+
+  if (!CF_BYPASS_ENABLED) {
+    return headers;
+  }
+
+  if (CF_USER_AGENT !== '') {
+    headers['User-Agent'] = CF_USER_AGENT;
+  }
+
+  if (CF_BYPASS_VALUE !== '') {
+    headers[CF_BYPASS_HEADER] = CF_BYPASS_VALUE;
+  }
+
+  return headers;
+}
+
 function htmlHeaders(refererPath) {
-  return {
+  return requestHeaders({
     accept:
       'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
     referer: `${BASE_URL}${refererPath}`,
-  };
+  });
 }
 
 function ajaxHeaders(refererPath) {
-  return {
+  return requestHeaders({
     accept: 'application/json, text/javascript, */*; q=0.01',
     'content-type': 'application/x-www-form-urlencoded; charset=UTF-8',
     'x-requested-with': 'XMLHttpRequest',
     origin: BASE_URL,
     referer: `${BASE_URL}${refererPath}`,
-  };
+  });
 }
 
 function login(user, jar) {
@@ -136,6 +164,7 @@ function login(user, jar) {
     const loginUrl = `${BASE_URL}/wp-login.php`;
     const loginPage = http.get(loginUrl, {
       jar,
+      headers: requestHeaders(),
       tags: { name: 'GET /wp-login.php' },
     });
 
@@ -154,6 +183,7 @@ function login(user, jar) {
       },
       {
         jar,
+        headers: requestHeaders(),
         tags: { name: 'POST /wp-login.php' },
       },
     );
@@ -189,9 +219,15 @@ function maybeEnroll(user, courseIndex, jar) {
     });
 
     const body = String(coursePage.body);
-    if (!body.includes('free_enroll') && !body.includes('llms-free-enroll-form')) {
+    const hasEnrollForm =
+      body.includes('free_enroll') || body.includes('llms-free-enroll-form');
+
+    if (!hasEnrollForm) {
+      enrollSkippedNoForm.add(1);
       return;
     }
+
+    enrollAttempted.add(1);
 
     const checkoutNonce = extractInput(body, '_llms_checkout_nonce');
     const planId = extractInput(body, 'llms_plan_id');
@@ -403,9 +439,9 @@ export default function () {
   const jar = http.cookieJar();
 
   login(user, jar);
-  maybeEnroll(user, COURSE_INDEX, jar);
-  completeLessons(COURSE_INDEX, jar);
-  takeQuiz(COURSE_INDEX, SECTION_INDEX, QUIZ_INDEX, jar);
+  maybeEnroll(user, user.courseIndex, jar);
+  completeLessons(user.courseIndex, jar);
+  takeQuiz(user.courseIndex, SECTION_INDEX, QUIZ_INDEX, jar);
 
   sleep(THINK_TIME);
 }
