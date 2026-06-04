@@ -6,6 +6,9 @@ namespace Tangible\Populater\Tests\Unit\Seeders;
 
 use Tangible\Populater\LMS\LearnDash\LearnDashLmsPlugin;
 use Tangible\Populater\LMS\LearnDash\LearnDashSeeder;
+use Tangible\Populater\Registry\LmsPluginRegistry;
+use Tangible\Populater\Registry\LmsPlugins;
+use Tangible\Populater\Seeding\SeedConfig;
 use Tangible\Populater\Tests\Support\InMemoryPostMeta;
 use Brain\Monkey\Functions;
 
@@ -352,6 +355,28 @@ class LearnDashSeederTest extends \WPTestCase
         $ids = $this->seeder->seedUsers(3);
 
         $this->assertCount(3, $ids);
+    }
+
+    public function test_build_seed_queue_creates_one_quiz_per_lesson_not_per_topic(): void
+    {
+        LmsPlugins::registerBuiltIn();
+        $seeder = (new LmsPluginRegistry())->createSeeder('learndash');
+        $config = SeedConfig::fromArray([
+            'plugin'             => 'learndash',
+            'courses'            => 1,
+            'lessons_per_course' => 3,
+            'topics_per_lesson'  => 2,
+            'quizzes_per_lesson' => 1,
+            'users'              => 0,
+        ]);
+
+        $quizItems = array_values(array_filter(
+            $seeder->buildSeedQueue($config),
+            static fn($item) => $item->type === 'quiz',
+        ));
+
+        $this->assertCount(3, $quizItems);
+        $this->assertSame('lessons', $quizItems[0]->data['quiz_parent_entity']);
     }
 
     public function test_seed_users_skips_errors(): void

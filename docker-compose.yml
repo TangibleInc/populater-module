@@ -74,7 +74,7 @@ services:
       retries: 30
       start_period: 60s
 
-  # k6 load testing — use: composer k6:lifter
+  # k6 load testing — use: composer k6:lifter (dashboard http://127.0.0.1:5665)
   k6:
     image: grafana/k6:1.6.1
     profiles:
@@ -82,6 +82,8 @@ services:
     working_dir: /scripts
     volumes:
       - ./k6:/scripts
+    ports:
+      - "${K6_WEB_DASHBOARD_PORT:-5665}:5665"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     networks:

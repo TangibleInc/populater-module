@@ -47,6 +47,10 @@ dist/
 # JetBrains IDE
 .idea/
 
+# k6 autosaved reports
+k6/k6-report.html
+k6/reports/
+
 # Unit test reports
 TEST*.xml
 

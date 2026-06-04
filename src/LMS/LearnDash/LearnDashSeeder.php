@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tangible\Populater\LMS\LearnDash;
 
 use Tangible\Populater\Seeders\AbstractSeeder;
+use Tangible\Populater\Seeding\ProcessRepository;
 use Tangible\Populater\Seeding\SeedingIdMap;
 use Tangible\Populater\Support\DeterministicTitle;
 use Tangible\Populater\Support\DummyContent;
@@ -12,8 +13,7 @@ use Tangible\Populater\Support\DummyContent;
 /**
  * Seeder for the LearnDash LMS plugin.
  *
- * Links course steps via LearnDash APIs so nested permalinks and quiz navigation work.
- * Seeds ProQuiz records and topics for a realistic course hierarchy.
+ * Course → lessons (sfwd-lessons) → topics (sfwd-topic) → quiz per lesson (on a topic).
  */
 class LearnDashSeeder extends AbstractSeeder
 {
@@ -26,9 +26,23 @@ class LearnDashSeeder extends AbstractSeeder
         $options['course_id'] = $courseId;
         $topicIds             = $this->seedTopicsForLesson($postId, $options);
 
-        if ($topicIds !== []) {
-            SeedingIdMap::recordQuizParentsFromOptions('topics', $topicIds, $options);
+        if ($topicIds === []) {
+            return;
         }
+
+        $processId = (string) ($options['process_id'] ?? '');
+
+        if ($processId === '') {
+            return;
+        }
+
+        SeedingIdMap::recordLessonQuizTopic(
+            $processId,
+            (int) ($options['course_index'] ?? 0),
+            $index,
+            (int) end($topicIds),
+            new ProcessRepository(),
+        );
     }
 
     protected function afterQuizCreated(int $postId, int $parentId, int $index, array $options = []): void
@@ -40,8 +54,16 @@ class LearnDashSeeder extends AbstractSeeder
         LearnDashProQuizHelper::createProQuiz($postId, $title);
 
         $courseId = (int) ($options['course_id'] ?? 0);
-        $topicId  = (int) ($options['quiz_parent_id'] ?? $parentId);
+        $topicId  = (int) ($options['topic_id'] ?? 0);
         $lessonId = (int) ($options['lesson_id'] ?? 0);
+
+        if ($topicId <= 0) {
+            $topicId = (int) ($options['quiz_parent_id'] ?? $parentId);
+
+            if ($topicId > 0 && function_exists('get_post_type') && \get_post_type($topicId) !== $this->getPostType('topics')) {
+                $topicId = 0;
+            }
+        }
 
         if ($lessonId <= 0 && $topicId > 0) {
             $lessonId = (int) get_post_meta($topicId, 'lesson_id', true);
@@ -116,9 +138,17 @@ class LearnDashSeeder extends AbstractSeeder
      */
     public function seedQuizzes(int $count, int $parentId, array $options = []): array
     {
-        $topicId  = (int) ($options['quiz_parent_id'] ?? $parentId);
+        $topicId  = (int) ($options['topic_id'] ?? 0);
         $lessonId = (int) ($options['lesson_id'] ?? 0);
         $courseId = (int) ($options['course_id'] ?? 0);
+
+        if ($topicId <= 0) {
+            $candidate = (int) ($options['quiz_parent_id'] ?? $parentId);
+
+            if ($candidate > 0 && (!function_exists('get_post_type') || \get_post_type($candidate) === $this->getPostType('topics'))) {
+                $topicId = $candidate;
+            }
+        }
 
         if ($lessonId <= 0 && $topicId > 0) {
             $lessonId = (int) get_post_meta($topicId, 'lesson_id', true);
@@ -151,6 +181,7 @@ class LearnDashSeeder extends AbstractSeeder
                 $this->afterQuizCreated($postId, $topicId, $index, array_merge($options, [
                     'course_id'      => $courseId,
                     'lesson_id'      => $lessonId,
+                    'topic_id'       => $topicId,
                     'quiz_parent_id' => $topicId,
                 ]));
                 $this->seedQuestionsForQuiz($postId, $options);
@@ -191,9 +222,6 @@ class LearnDashSeeder extends AbstractSeeder
         $this->linkQuizToTopicFallback($courseId, $quizId, $lessonId, $topicId);
     }
 
-    /**
-     * Register a step in the course hierarchy using LearnDash APIs when available.
-     */
     private function linkStepToCourse(int $courseId, int $childId, int $parentId, string $childType): void
     {
         if ($courseId <= 0 || $childId <= 0 || $parentId <= 0 || $childType === '') {
@@ -209,9 +237,6 @@ class LearnDashSeeder extends AbstractSeeder
         $this->linkStepToCourseFallback($courseId, $childId, $parentId, $childType);
     }
 
-    /**
-     * Unit-test fallback when LearnDash step APIs are unavailable.
-     */
     private function linkStepToCourseFallback(int $courseId, int $childId, int $parentId, string $childType): void
     {
         $lessonType = $this->getPostType('lessons');

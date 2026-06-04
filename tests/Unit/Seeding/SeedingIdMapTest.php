@@ -54,12 +54,33 @@ class SeedingIdMapTest extends \WPTestCase
         $this->assertSame(55, $data['course_id']);
     }
 
+    public function test_enrich_resolves_quiz_lesson_topic_id(): void
+    {
+        Functions\when('get_option')->justReturn([
+            'courses' => [1 => 10],
+            'lessons' => [1 => [2 => 88]],
+            'lesson_quiz_topics' => [1 => [2 => 501]],
+        ]);
+
+        $data = SeedingIdMap::enrich('proc-1', 'quiz', [
+            'course_index'       => 1,
+            'lesson_index'       => 2,
+            'quiz_parent_entity' => 'lessons',
+            'index'              => 1,
+        ], $this->repository);
+
+        $this->assertSame(88, $data['quiz_parent_id']);
+        $this->assertSame(88, $data['lesson_id']);
+        $this->assertSame(501, $data['topic_id']);
+    }
+
     public function test_enrich_resolves_quiz_section_lesson_id(): void
     {
         Functions\when('get_option')->justReturn([
             'courses' => [1 => 10],
             'sections' => [1 => [1 => 88]],
             'section_lessons' => [1 => [1 => [11, 12, 13]]],
+            'section_quiz_topics' => [1 => [1 => 501]],
         ]);
 
         $data = SeedingIdMap::enrich('proc-1', 'quiz', [
@@ -71,6 +92,7 @@ class SeedingIdMapTest extends \WPTestCase
 
         $this->assertSame(88, $data['quiz_parent_id']);
         $this->assertSame(13, $data['lesson_id']);
+        $this->assertSame(501, $data['topic_id']);
     }
 
     public function test_record_then_enrich_lesson_uses_stored_course(): void

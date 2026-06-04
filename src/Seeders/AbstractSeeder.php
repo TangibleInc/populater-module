@@ -10,6 +10,7 @@ use Tangible\Populater\Seeding\SeedQueueItem;
 use Tangible\Populater\Support\DeterministicTitle;
 use Tangible\Populater\Support\DummyContent;
 use Tangible\Populater\Support\GroupIndexResolver;
+use Tangible\Populater\Support\SeededUsername;
 use Tangible\Populater\Support\SeededUserProfile;
 
 /**
@@ -354,6 +355,7 @@ abstract class AbstractSeeder
                     'course_index'        => $c,
                     'index'               => $l,
                     'lessons_per_course'  => $seedConfig->lessonsPerCourse,
+                    'lessons_per_section' => $seedConfig->lessonsPerSection,
                     'topics_per_lesson'   => $seedConfig->topicsPerLesson,
                     'sections_per_course' => $seedConfig->sectionsPerCourse,
                     'modules_per_course'  => $seedConfig->modulesPerCourse,
@@ -434,8 +436,8 @@ abstract class AbstractSeeder
     {
         $index    = (int) ($options['index'] ?? 1);
         $roleType = (string) ($options['role_type'] ?? 'student');
-        $username = $roleType . $index;
-        $email    = $username . '@example.com';
+        $username = SeededUsername::username($this->getSlug(), $roleType, $index);
+        $email    = SeededUsername::email($this->getSlug(), $roleType, $index);
         $password = is_string($options['password'] ?? null) && $options['password'] !== ''
             ? (string) $options['password']
             : SeedConfig::DEFAULT_USER_PASSWORD;

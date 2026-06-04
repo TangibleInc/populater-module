@@ -1,13 +1,20 @@
 /**
  * Tangible Populator — Admin UI
- *
- * Communicates with the REST API to start/cancel seeding processes and
- * displays a live progress bar + log tail.
  */
 (function () {
     'use strict';
 
-    const { restUrl, nonce, activeProcess: initialActiveProcess, defaultPassword } = window.tangiblePopulater || {};
+    const {
+        restUrl,
+        nonce,
+        activeProcess: initialActiveProcess,
+        defaultPassword,
+        defaultTab,
+        seedDefaults,
+        plugins: pluginList,
+        groupsSupported,
+        inactiveTabTitle,
+    } = window.tangiblePopulater || {};
     const PROCESS_STORAGE_KEY = 'tangiblePopulater.processId';
 
     const apiFetch = async (path, options = {}) => {
@@ -32,18 +39,143 @@
         return data;
     };
 
-    // -------------------------------------------------------------------------
-    // State
-    // -------------------------------------------------------------------------
-
     let currentProcessId = null;
     let pollTimer = null;
+    const pluginBySlug = Object.fromEntries((pluginList || []).map((plugin) => [plugin.slug, plugin]));
 
-    // -------------------------------------------------------------------------
-    // DOM helpers
-    // -------------------------------------------------------------------------
+    const firstActiveTab = () => {
+        const found = (pluginList || []).find((plugin) => plugin.active);
+
+        return found?.slug || 'learndash';
+    };
+
+    let activeTab = pluginBySlug[defaultTab]?.active ? defaultTab : firstActiveTab();
 
     const el = (id) => document.getElementById(id);
+
+    const isPluginActive = (slug) => pluginBySlug[slug]?.active === true;
+
+    const tabSupportsGroups = (slug) => groupsSupported?.[slug] === true;
+
+    const intFieldValue = (id, fallback = 0) => {
+        const node = el(id);
+
+        if (!node) {
+            return fallback;
+        }
+
+        const value = parseInt(node.value, 10);
+
+        return Number.isFinite(value) ? value : fallback;
+    };
+
+    const updateStartButton = () => {
+        const startBtn = el('tp-start-btn');
+
+        if (!startBtn) {
+            return;
+        }
+
+        const canSeed = isPluginActive(activeTab);
+        startBtn.disabled = !canSeed;
+        startBtn.title = canSeed
+            ? ''
+            : (inactiveTabTitle || 'This LMS plugin is not active. Activate it in Plugins before seeding.');
+    };
+
+    const showTab = (slug) => {
+        if (!isPluginActive(slug)) {
+            return;
+        }
+
+        activeTab = slug;
+
+        document.querySelectorAll('.tp-seed-tabs .nav-tab').forEach((tab) => {
+            const isSelected = tab.dataset.tab === slug;
+            tab.classList.toggle('nav-tab-active', isSelected);
+            tab.setAttribute('aria-selected', isSelected ? 'true' : 'false');
+        });
+
+        document.querySelectorAll('.tp-seed-panel').forEach((panel) => {
+            panel.hidden = panel.dataset.panel !== slug;
+        });
+
+        document.querySelectorAll('.tp-field-row[data-tp-tab]').forEach((row) => {
+            row.hidden = row.dataset.tpTab !== slug;
+        });
+
+        updateStartButton();
+    };
+
+    const initTabs = () => {
+        document.querySelectorAll('.tp-seed-tabs .nav-tab').forEach((tab) => {
+            const slug = tab.dataset.tab;
+            const pluginActive = tab.dataset.active === '1';
+
+            if (!pluginActive) {
+                tab.classList.add('nav-tab--inactive');
+
+                if (!tab.title && inactiveTabTitle) {
+                    tab.title = inactiveTabTitle;
+                }
+            }
+
+            tab.addEventListener('click', (event) => {
+                event.preventDefault();
+
+                if (!isPluginActive(slug)) {
+                    return;
+                }
+
+                showTab(slug);
+            });
+        });
+
+        showTab(activeTab);
+    };
+
+    const intFromTabField = (fieldName, fallback) => {
+        const input = document.querySelector(`.tp-field-row[data-tp-tab="${activeTab}"] [data-tp-field="${fieldName}"]`);
+
+        if (!input) {
+            return fallback;
+        }
+
+        const value = parseInt(input.value, 10);
+
+        return Number.isFinite(value) ? value : fallback;
+    };
+
+    const buildSeedPayload = () => {
+        const tabDefaults = seedDefaults?.[activeTab] || {};
+
+        const payload = {
+            plugin: activeTab,
+            courses: intFieldValue('tp-courses', tabDefaults.courses ?? 5),
+            questions_per_quiz: intFieldValue('tp-questions', tabDefaults.questionsPerQuiz ?? 10),
+            users: intFieldValue('tp-users', tabDefaults.users ?? 100),
+            groups: tabSupportsGroups(activeTab)
+                ? intFromTabField('groups', tabDefaults.groups ?? 0)
+                : 0,
+            user_password: el('tp-user-password')?.value || '',
+        };
+
+        if (activeTab === 'learndash') {
+            payload.lessons_per_course = intFromTabField('lessons_per_course', tabDefaults.lessonsPerCourse ?? 10);
+            payload.topics_per_lesson = intFromTabField('topics_per_lesson', tabDefaults.topicsPerLesson ?? 2);
+            payload.quizzes_per_lesson = intFromTabField('quizzes_per_lesson', tabDefaults.quizzesPerLesson ?? 1);
+        } else if (activeTab === 'lifterlms') {
+            payload.sections_per_course = intFromTabField('sections_per_course', tabDefaults.sectionsPerCourse ?? 5);
+            payload.lessons_per_section = intFromTabField('lessons_per_section', tabDefaults.lessonsPerSection ?? 10);
+            payload.quizzes_per_section = intFromTabField('quizzes_per_section', tabDefaults.quizzesPerSection ?? 1);
+        } else if (activeTab === 'tangible-lms') {
+            payload.modules_per_course = intFromTabField('modules_per_course', tabDefaults.modulesPerCourse ?? 1);
+            payload.lessons_per_course = intFromTabField('lessons_per_course', tabDefaults.lessonsPerCourse ?? 10);
+            payload.quizzes_per_section = intFromTabField('quizzes_per_section', tabDefaults.quizzesPerModule ?? 1);
+        }
+
+        return payload;
+    };
 
     const setProgress = (processed, total) => {
         const pct = total > 0 ? Math.round((processed / total) * 100) : 0;
@@ -84,7 +216,7 @@
         try {
             sessionStorage.setItem(PROCESS_STORAGE_KEY, processId);
         } catch (err) {
-            // Ignore storage failures (private mode, quota, etc.).
+            // Ignore storage failures.
         }
     };
 
@@ -135,10 +267,6 @@
             });
         }
     };
-
-    // -------------------------------------------------------------------------
-    // Polling
-    // -------------------------------------------------------------------------
 
     let lastLogCount = 0;
 
@@ -230,7 +358,7 @@
                 return data.process;
             }
         } catch (err) {
-            // Fall through silently; page still works for starting new seeds.
+            // Fall through silently.
         }
 
         return null;
@@ -247,25 +375,23 @@
         startPolling(active.id);
     };
 
-    // -------------------------------------------------------------------------
-    // Event listeners
-    // -------------------------------------------------------------------------
-
     const init = () => {
+        initTabs();
+
         const startBtn  = el('tp-start-btn');
         const cancelBtn = el('tp-cancel-btn');
         const resetBtn  = el('tp-reset-btn');
 
         if (startBtn) {
             startBtn.addEventListener('click', async () => {
-                const plugin  = el('tp-plugin').value;
-                const courses = parseInt(el('tp-courses').value, 10);
-                const lessons = parseInt(el('tp-lessons').value, 10);
-                const quizzes = parseInt(el('tp-quizzes').value, 10);
-                const questions = parseInt(el('tp-questions').value, 10);
-                const users   = parseInt(el('tp-users').value, 10);
-                const groups  = parseInt(el('tp-groups').value, 10);
-                const userPassword = el('tp-user-password')?.value || '';
+                if (!isPluginActive(activeTab)) {
+                    showStatusMessage(
+                        inactiveTabTitle || 'This LMS plugin is not active. Activate it in Plugins before seeding.',
+                        true,
+                    );
+
+                    return;
+                }
 
                 el('tp-log-output').textContent = '';
                 lastLogCount = 0;
@@ -275,16 +401,7 @@
                 try {
                     const data = await apiFetch('/seed', {
                         method: 'POST',
-                        body: JSON.stringify({
-                            plugin,
-                            courses,
-                            lessons_per_course: lessons,
-                            quizzes_per_section: quizzes,
-                            questions_per_quiz: questions,
-                            users,
-                            groups,
-                            user_password: userPassword,
-                        }),
+                        body: JSON.stringify(buildSeedPayload()),
                     });
 
                     if (data.process_id) {

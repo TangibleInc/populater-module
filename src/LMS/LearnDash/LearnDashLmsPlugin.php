@@ -43,7 +43,7 @@ class LearnDashLmsPlugin extends AbstractLmsPlugin
                 'quizzes'   => ['lesson_id' => 'lessonId', 'course_id' => 'courseId', 'topic_id' => 'topicId'],
                 'questions' => ['quiz_id' => 'quizId'],
             ],
-            quizParentEntity: 'topics',
+            quizParentEntity: 'lessons',
         );
     }
 }

@@ -23,8 +23,8 @@ class LmsContentInspectorTest extends \WPTestCase
         $this->assertSame(2, $expected['courses']);
         $this->assertSame(6, $expected['lessons']);
         $this->assertSame(12, $expected['topics']);
-        $this->assertSame(24, $expected['quizzes']);
-        $this->assertSame(72, $expected['questions']);
+        $this->assertSame(12, $expected['quizzes']);
+        $this->assertSame(36, $expected['questions']);
         $this->assertSame(5, $expected['users']);
     }
 

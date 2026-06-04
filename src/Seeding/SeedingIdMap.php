@@ -54,12 +54,14 @@ final class SeedingIdMap
                     $parentIndex,
                     (int) ($data['index'] ?? 1),
                 );
+                $data['topic_id']       = (int) ($map['section_quiz_topics'][$courseIndex][$parentIndex] ?? 0);
             } elseif ($parentEntity === 'modules' && $parentIndex > 0) {
                 $data['quiz_parent_id'] = (int) ($map['modules'][$courseIndex][$parentIndex] ?? 0);
             } elseif (isset($data['lesson_index'])) {
                 $lessonIndex            = (int) $data['lesson_index'];
                 $data['quiz_parent_id'] = (int) ($map['lessons'][$courseIndex][$lessonIndex] ?? 0);
                 $data['lesson_id']      = $data['quiz_parent_id'];
+                $data['topic_id']       = (int) ($map['lesson_quiz_topics'][$courseIndex][$lessonIndex] ?? 0);
             }
         }
 
@@ -147,6 +149,38 @@ final class SeedingIdMap
             $map[$entity][$courseIndex][$parentIndex] = $id;
         }
 
+        $repository->saveIdMap($processId, $map);
+    }
+
+    public static function recordSectionQuizTopic(
+        string $processId,
+        int $courseIndex,
+        int $sectionIndex,
+        int $topicId,
+        ProcessRepository $repository,
+    ): void {
+        if ($processId === '' || $topicId <= 0 || $courseIndex <= 0 || $sectionIndex <= 0) {
+            return;
+        }
+
+        $map = $repository->getIdMap($processId);
+        $map['section_quiz_topics'][$courseIndex][$sectionIndex] = $topicId;
+        $repository->saveIdMap($processId, $map);
+    }
+
+    public static function recordLessonQuizTopic(
+        string $processId,
+        int $courseIndex,
+        int $lessonIndex,
+        int $topicId,
+        ProcessRepository $repository,
+    ): void {
+        if ($processId === '' || $topicId <= 0 || $courseIndex <= 0 || $lessonIndex <= 0) {
+            return;
+        }
+
+        $map = $repository->getIdMap($processId);
+        $map['lesson_quiz_topics'][$courseIndex][$lessonIndex] = $topicId;
         $repository->saveIdMap($processId, $map);
     }
 

@@ -25,7 +25,7 @@ class SeedConfigTest extends \WPTestCase
         $this->assertSame(1, $config->quizzesPerSection);
         $this->assertSame(5, $config->questionsPerQuiz);
         $this->assertSame(2, $config->topicsPerLesson);
-        $this->assertSame(1, $config->sectionsPerCourse);
+        $this->assertSame(0, $config->sectionsPerCourse);
         $this->assertSame(1, $config->modulesPerCourse);
         $this->assertSame(4, $config->users);
         $this->assertSame(0, $config->groups);
@@ -48,13 +48,13 @@ class SeedConfigTest extends \WPTestCase
         $this->assertSame(0, $config->courses);
     }
 
-    public function test_questions_per_quiz_defaults_to_three(): void
+    public function test_questions_per_quiz_defaults_to_ten(): void
     {
         $config = SeedConfig::fromArray([
             'plugin' => 'learndash',
         ]);
 
-        $this->assertSame(3, $config->questionsPerQuiz);
+        $this->assertSame(10, $config->questionsPerQuiz);
     }
 
     public function test_topics_per_lesson_defaults_to_two(): void
@@ -66,28 +66,56 @@ class SeedConfigTest extends \WPTestCase
         $this->assertSame(2, $config->topicsPerLesson);
     }
 
-    public function test_sections_and_modules_default_to_one(): void
+    public function test_sections_and_modules_use_defaults(): void
     {
         $config = SeedConfig::fromArray([
             'plugin' => 'lifterlms',
         ]);
 
-        $this->assertSame(1, $config->sectionsPerCourse);
+        $this->assertSame(5, $config->sectionsPerCourse);
         $this->assertSame(1, $config->modulesPerCourse);
     }
 
-    public function test_to_array_includes_structure_settings(): void
+    public function test_to_array_includes_learndash_structure_settings(): void
+    {
+        $config = SeedConfig::fromArray([
+            'plugin'             => 'learndash',
+            'lessons_per_course' => 10,
+            'topics_per_lesson'  => 4,
+            'quizzes_per_lesson' => 2,
+        ]);
+
+        $array = $config->toArray();
+        $this->assertSame(10, $array['lessons_per_course']);
+        $this->assertSame(4, $array['topics_per_lesson']);
+        $this->assertSame(2, $array['quizzes_per_lesson']);
+    }
+
+    public function test_learndash_ignores_lifter_section_fields(): void
     {
         $config = SeedConfig::fromArray([
             'plugin'              => 'learndash',
-            'topics_per_lesson'   => 4,
-            'sections_per_course' => 2,
-            'modules_per_course'  => 3,
+            'lessons_per_course'  => 8,
+            'sections_per_course' => 3,
+            'lessons_per_section' => 4,
+            'quizzes_per_lesson'  => 2,
         ]);
 
-        $this->assertSame(4, $config->toArray()['topics_per_lesson']);
-        $this->assertSame(2, $config->toArray()['sections_per_course']);
-        $this->assertSame(3, $config->toArray()['modules_per_course']);
+        $this->assertSame(8, $config->lessonsPerCourse);
+        $this->assertSame(0, $config->sectionsPerCourse);
+        $this->assertSame(2, $config->quizzesPerSection);
+    }
+
+    public function test_lifter_multiplies_sections_and_lessons_per_section(): void
+    {
+        $config = SeedConfig::fromArray([
+            'plugin'              => 'lifterlms',
+            'sections_per_course' => 3,
+            'lessons_per_section' => 4,
+        ]);
+
+        $this->assertSame(12, $config->lessonsPerCourse);
+        $this->assertSame(4, $config->lessonsPerSection);
     }
 
     public function test_groups_and_password_are_normalized(): void

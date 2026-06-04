@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tangible\Populater\REST;
 
+use Tangible\Populater\Seeding\SeedConfig;
 use Tangible\Populater\Seeding\SeedingManager;
 
 /**
@@ -79,15 +80,17 @@ class SeedController
     {
         $config = [
             'plugin'             => $request->get_param('plugin'),
-            'courses'            => (int) ($request->get_param('courses')            ?? 5),
-            'lessons_per_course' => (int) ($request->get_param('lessons_per_course') ?? 5),
-            'quizzes_per_section' => (int) ($request->get_param('quizzes_per_section') ?? $request->get_param('quizzes_per_lesson') ?? 1),
-            'questions_per_quiz' => (int) ($request->get_param('questions_per_quiz') ?? 3),
-            'topics_per_lesson'  => (int) ($request->get_param('topics_per_lesson')  ?? 2),
-            'sections_per_course' => (int) ($request->get_param('sections_per_course') ?? 1),
-            'modules_per_course' => (int) ($request->get_param('modules_per_course') ?? 1),
-            'users'              => (int) ($request->get_param('users')              ?? 10),
-            'groups'             => (int) ($request->get_param('groups')             ?? 0),
+            'courses'            => (int) ($request->get_param('courses')            ?? SeedConfig::DEFAULT_COURSES),
+            'lessons_per_course' => (int) ($request->get_param('lessons_per_course') ?? SeedConfig::DEFAULT_LESSONS_PER_COURSE),
+            'quizzes_per_section' => (int) ($request->get_param('quizzes_per_section') ?? SeedConfig::DEFAULT_QUIZZES_PER_SECTION),
+            'quizzes_per_lesson'  => (int) ($request->get_param('quizzes_per_lesson') ?? 0),
+            'questions_per_quiz' => (int) ($request->get_param('questions_per_quiz') ?? SeedConfig::DEFAULT_QUESTIONS_PER_QUIZ),
+            'topics_per_lesson'  => (int) ($request->get_param('topics_per_lesson')  ?? SeedConfig::DEFAULT_TOPICS_PER_LESSON),
+            'sections_per_course' => (int) ($request->get_param('sections_per_course') ?? SeedConfig::DEFAULT_SECTIONS_PER_COURSE),
+            'lessons_per_section' => (int) ($request->get_param('lessons_per_section') ?? 0),
+            'modules_per_course' => (int) ($request->get_param('modules_per_course') ?? SeedConfig::DEFAULT_MODULES_PER_COURSE),
+            'users'              => (int) ($request->get_param('users')              ?? SeedConfig::DEFAULT_USERS),
+            'groups'             => (int) ($request->get_param('groups')             ?? SeedConfig::DEFAULT_GROUPS),
             'user_password'      => $request->get_param('user_password'),
         ];
 
@@ -176,55 +179,67 @@ class SeedController
             ],
             'courses' => [
                 'type'    => 'integer',
-                'default' => 5,
+                'default' => SeedConfig::DEFAULT_COURSES,
                 'minimum' => 0,
                 'maximum' => 500,
             ],
             'lessons_per_course' => [
                 'type'    => 'integer',
-                'default' => 5,
+                'default' => SeedConfig::DEFAULT_LESSONS_PER_COURSE,
                 'minimum' => 0,
                 'maximum' => 100,
             ],
             'quizzes_per_section' => [
                 'type'    => 'integer',
-                'default' => 1,
+                'default' => SeedConfig::DEFAULT_QUIZZES_PER_SECTION,
+                'minimum' => 0,
+                'maximum' => 50,
+            ],
+            'quizzes_per_lesson' => [
+                'type'    => 'integer',
+                'default' => 0,
                 'minimum' => 0,
                 'maximum' => 50,
             ],
             'questions_per_quiz' => [
                 'type'    => 'integer',
-                'default' => 3,
+                'default' => SeedConfig::DEFAULT_QUESTIONS_PER_QUIZ,
                 'minimum' => 0,
                 'maximum' => 100,
             ],
             'topics_per_lesson' => [
                 'type'    => 'integer',
-                'default' => 2,
+                'default' => SeedConfig::DEFAULT_TOPICS_PER_LESSON,
                 'minimum' => 0,
                 'maximum' => 50,
             ],
             'sections_per_course' => [
                 'type'    => 'integer',
-                'default' => 1,
+                'default' => SeedConfig::DEFAULT_SECTIONS_PER_COURSE,
                 'minimum' => 0,
                 'maximum' => 50,
             ],
+            'lessons_per_section' => [
+                'type'    => 'integer',
+                'default' => 0,
+                'minimum' => 0,
+                'maximum' => 100,
+            ],
             'modules_per_course' => [
                 'type'    => 'integer',
-                'default' => 1,
+                'default' => SeedConfig::DEFAULT_MODULES_PER_COURSE,
                 'minimum' => 0,
                 'maximum' => 50,
             ],
             'users' => [
                 'type'    => 'integer',
-                'default' => 10,
+                'default' => SeedConfig::DEFAULT_USERS,
                 'minimum' => 0,
                 'maximum' => 1000,
             ],
             'groups' => [
                 'type'    => 'integer',
-                'default' => 0,
+                'default' => SeedConfig::DEFAULT_GROUPS,
                 'minimum' => 0,
                 'maximum' => 100,
             ],

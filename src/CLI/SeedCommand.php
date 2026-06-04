@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tangible\Populater\CLI;
 
+use Tangible\Populater\Seeding\SeedConfig;
 use Tangible\Populater\Seeding\SeedingManager;
 use Tangible\Populater\Seeding\SeedingStatus;
 
@@ -32,19 +33,25 @@ class SeedCommand
      * : Number of courses to create. Default: 5.
      *
      * [--lessons=<n>]
-     * : Lessons per course. Default: 5.
+     * : Lessons per course (used when --lessons-per-section is not set). Default: 10.
+     *
+     * [--lessons-per-section=<n>]
+     * : Lessons per section. When set with --sections, total lessons = sections × lessons-per-section.
+     *
+     * [--sections=<n>]
+     * : Sections per course. Default: 1.
      *
      * [--quizzes=<n>]
      * : Quizzes per section/topic/module (depends on LMS). Default: 1.
      *
      * [--questions=<n>]
-     * : Questions per quiz. Default: 3.
+     * : Questions per quiz. Default: 10.
      *
      * [--users=<n>]
-     * : Number of users to create. Default: 10.
+     * : Number of users to create. Default: 100.
      *
      * [--groups=<n>]
-     * : Number of groups to create. Default: 0.
+     * : Number of groups to create. Default: 1.
      *
      * [--password=<password>]
      * : Shared password for all seeded users. Default: StressTest#2026
@@ -65,15 +72,16 @@ class SeedCommand
 
         $config = [
             'plugin'             => $plugin,
-            'courses'            => (int) ($assocArgs['courses']  ?? 5),
-            'lessons_per_course' => (int) ($assocArgs['lessons']  ?? 5),
-            'quizzes_per_section' => (int) ($assocArgs['quizzes']  ?? 1),
-            'questions_per_quiz' => (int) ($assocArgs['questions'] ?? 3),
-            'topics_per_lesson'  => (int) ($assocArgs['topics']   ?? 2),
-            'sections_per_course' => (int) ($assocArgs['sections'] ?? 1),
-            'modules_per_course' => (int) ($assocArgs['modules']  ?? 1),
-            'users'              => (int) ($assocArgs['users']    ?? 10),
-            'groups'             => (int) ($assocArgs['groups']   ?? 0),
+            'courses'            => (int) ($assocArgs['courses']  ?? SeedConfig::DEFAULT_COURSES),
+            'lessons_per_course' => (int) ($assocArgs['lessons']  ?? SeedConfig::DEFAULT_LESSONS_PER_COURSE),
+            'quizzes_per_section' => (int) ($assocArgs['quizzes']  ?? SeedConfig::DEFAULT_QUIZZES_PER_SECTION),
+            'questions_per_quiz' => (int) ($assocArgs['questions'] ?? SeedConfig::DEFAULT_QUESTIONS_PER_QUIZ),
+            'topics_per_lesson'  => (int) ($assocArgs['topics']   ?? SeedConfig::DEFAULT_TOPICS_PER_LESSON),
+            'sections_per_course' => (int) ($assocArgs['sections'] ?? SeedConfig::DEFAULT_SECTIONS_PER_COURSE),
+            'lessons_per_section' => (int) ($assocArgs['lessons-per-section'] ?? 0),
+            'modules_per_course' => (int) ($assocArgs['modules']  ?? SeedConfig::DEFAULT_MODULES_PER_COURSE),
+            'users'              => (int) ($assocArgs['users']    ?? SeedConfig::DEFAULT_USERS),
+            'groups'             => (int) ($assocArgs['groups']   ?? SeedConfig::DEFAULT_GROUPS),
             'user_password'      => $assocArgs['password'] ?? null,
         ];
 

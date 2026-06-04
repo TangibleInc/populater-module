@@ -35,3 +35,48 @@
     font-family: Consolas, Monaco, monospace;
     max-width: 280px;
 }
+
+.tp-seed-card {
+    max-width: 700px;
+}
+
+.tp-seed-tabs {
+    margin-bottom: 0;
+}
+
+.tp-seed-tabs .nav-tab--inactive,
+.tp-seed-tabs .nav-tab--inactive:hover {
+    color: #a7aaad;
+    cursor: not-allowed;
+    background: #f6f7f7;
+    border-color: #dcdcde #dcdcde #f6f7f7;
+}
+
+.tp-seed-tabs .nav-tab--inactive.nav-tab-active {
+    background: #f0f0f1;
+}
+
+#tp-start-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.65;
+}
+
+.tp-seed-panel {
+    margin-top: 12px;
+}
+
+.tp-seed-panel[hidden] {
+    display: none !important;
+}
+
+.tp-panel-description {
+    margin: 8px 0 0;
+}
+
+.tp-seed-fields {
+    margin-top: 0;
+}
+
+.tp-field-row[hidden] {
+    display: none;
+}

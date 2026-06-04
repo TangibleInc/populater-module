@@ -64,7 +64,7 @@ class AbstractSeederTest extends \WPTestCase
 
     public function test_build_seed_queue_accepts_seed_config(): void
     {
-        $config = new SeedConfig('test-lms', 3, 0, 0, 0, 0, 0, 0, 4);
+        $config = new SeedConfig('test-lms', 3, 0, 0, 0, 0, 0, 0, 0, 4);
         $queue  = $this->seeder->buildSeedQueue($config);
 
         $courseItems = array_filter($queue, static fn(SeedQueueItem $item) => $item->type === 'course');

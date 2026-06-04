@@ -12,6 +12,7 @@ use Tangible\Populater\Registry\LmsPlugins;
 use Tangible\Populater\Seeding\SeedConfig;
 use Tangible\Populater\Seeders\AbstractSeeder;
 use Tangible\Populater\Support\GroupIndexResolver;
+use Tangible\Populater\Support\SeededUsername;
 
 /**
  * Counts LMS entities in WordPress and verifies LMS-specific structure.
@@ -151,13 +152,18 @@ final class LmsContentInspector
         int $sectionsPerCourse = 1,
         int $modulesPerCourse = 1,
         int $groups = 0,
+        int $lessonsPerSection = 0,
     ): array {
+        if ($pluginSlug === 'lifterlms' && $lessonsPerSection > 0 && $sectionsPerCourse > 0) {
+            $lessonsPerCourse = $sectionsPerCourse * $lessonsPerSection;
+        }
+
         $lessons  = $courses * $lessonsPerCourse;
         $topics   = $lessons * $topicsPerLesson;
         $sections = $courses * $sectionsPerCourse;
         $modules  = $courses * $modulesPerCourse;
         $quizzes  = match ($pluginSlug) {
-            'learndash'    => $topics * $quizzesPerSection,
+            'learndash'    => $lessons * $quizzesPerSection,
             'lifterlms'    => $sections * $quizzesPerSection,
             'tangible-lms' => $modules * $quizzesPerSection,
             default        => $lessons * $quizzesPerSection,
@@ -192,12 +198,7 @@ final class LmsContentInspector
 
     public static function groupsSupportedFor(string $pluginSlug): bool
     {
-        return match ($pluginSlug) {
-            'lifterlms'    => function_exists('llms_create_group'),
-            'learndash'    => function_exists('post_type_exists') && post_type_exists('groups'),
-            'tangible-lms' => false,
-            default        => false,
-        };
+        return \Tangible\Populater\Support\LmsGroupsCapability::supports($pluginSlug);
     }
 
     /**
@@ -250,38 +251,38 @@ final class LmsContentInspector
         }
 
         for ($g = 1; $g <= $groups; $g++) {
-            $admin = get_user_by('email', 'groupadmin' . $g . '@example.com');
-            $test->assertInstanceOf(\WP_User::class, $admin, "Missing groupadmin{$g}.");
+            $admin = get_user_by('email', SeededUsername::email('lifterlms', 'groupadmin', $g));
+            $test->assertInstanceOf(\WP_User::class, $admin, "Missing liftergroupadmin{$g}.");
 
             $groupId = $groupIdsByIndex[$g];
             $test->assertTrue(
                 llms_group_is_user_primary_admin((int) $admin->ID, $groupId),
-                "groupadmin{$g} should be primary admin of group {$g}.",
+                "liftergroupadmin{$g} should be primary admin of group {$g}.",
             );
             $test->assertSame(
                 'admin',
                 \LLMS_Groups_Enrollment::get_role((int) $admin->ID, $groupId),
-                "groupadmin{$g} should have admin group role.",
+                "liftergroupadmin{$g} should have admin group role.",
             );
         }
 
         $studentsByGroup = array_fill(1, $groups, []);
 
         for ($u = 1; $u <= $users; $u++) {
-            $student = get_user_by('email', 'student' . $u . '@example.com');
-            $test->assertInstanceOf(\WP_User::class, $student, "Missing student{$u}.");
+            $student = get_user_by('email', SeededUsername::email('lifterlms', 'student', $u));
+            $test->assertInstanceOf(\WP_User::class, $student, "Missing lifterstudent{$u}.");
 
             $groupIndex = GroupIndexResolver::resolve($u, $users, $groups);
             $groupId    = $groupIdsByIndex[$groupIndex];
 
             $test->assertTrue(
                 llms_is_user_enrolled((int) $student->ID, $groupId),
-                "student{$u} should be enrolled in group {$groupIndex}.",
+                "lifterstudent{$u} should be enrolled in group {$groupIndex}.",
             );
             $test->assertSame(
                 'member',
                 \LLMS_Groups_Enrollment::get_role((int) $student->ID, $groupId),
-                "student{$u} should be a group member.",
+                "lifterstudent{$u} should be a group member.",
             );
 
             self::assertSeededStudentProfile($test, (int) $student->ID, $u);
@@ -338,8 +339,8 @@ final class LmsContentInspector
         }
 
         for ($g = 1; $g <= $groups; $g++) {
-            $admin = get_user_by('email', 'groupadmin' . $g . '@example.com');
-            $test->assertInstanceOf(\WP_User::class, $admin, "Missing groupadmin{$g}.");
+            $admin = get_user_by('email', SeededUsername::email('learndash', 'groupadmin', $g));
+            $test->assertInstanceOf(\WP_User::class, $admin, "Missing ldgroupadmin{$g}.");
 
             $groupId = $groupIdsByIndex[$g];
             $leaderIds = array_map('intval', learndash_get_groups_administrator_ids($groupId));
@@ -347,15 +348,15 @@ final class LmsContentInspector
             $test->assertContains(
                 (int) $admin->ID,
                 $leaderIds,
-                "groupadmin{$g} should be a LearnDash group leader.",
+                "ldgroupadmin{$g} should be a LearnDash group leader.",
             );
         }
 
         $studentsByGroup = array_fill(1, $groups, []);
 
         for ($u = 1; $u <= $users; $u++) {
-            $student = get_user_by('email', 'student' . $u . '@example.com');
-            $test->assertInstanceOf(\WP_User::class, $student, "Missing student{$u}.");
+            $student = get_user_by('email', SeededUsername::email('learndash', 'student', $u));
+            $test->assertInstanceOf(\WP_User::class, $student, "Missing ldstudent{$u}.");
 
             $groupIndex = GroupIndexResolver::resolve($u, $users, $groups);
             $groupId    = $groupIdsByIndex[$groupIndex];
@@ -364,7 +365,7 @@ final class LmsContentInspector
             $test->assertContains(
                 (int) $student->ID,
                 $memberIds,
-                "student{$u} should belong to group {$groupIndex}.",
+                "ldstudent{$u} should belong to group {$groupIndex}.",
             );
 
             $studentsByGroup[$groupIndex][] = (int) $student->ID;
@@ -432,6 +433,7 @@ final class LmsContentInspector
         $quizType    = $schema->getPostType('quizzes');
         $questionType = $schema->getPostType('questions');
         $coursePosts = self::newestPosts($courseType, $courses, $afterPostId);
+        $expectedQuizzes = $courses * $lessonsPerCourse * $quizzesPerSection;
 
         $test->assertCount($courses, $coursePosts, 'Expected newly created LearnDash courses.');
 
@@ -443,18 +445,19 @@ final class LmsContentInspector
             $lessonSteps = $steps['steps']['h'][$lessonType] ?? [];
             $test->assertCount($lessonsPerCourse, $lessonSteps, 'Course should contain expected lessons in ld_course_steps.');
 
+            if ($quizzesPerSection > 0) {
+                $test->assertSame(
+                    $expectedQuizzes,
+                    self::countQuizzesInCourseSteps($lessonSteps, $topicType, $quizType),
+                    'Course should contain expected quizzes in ld_course_steps (per lesson, not per topic).',
+                );
+            }
+
             foreach ($lessonSteps as $lessonId => $entry) {
                 if ($topicsPerLesson > 0) {
                     $test->assertArrayHasKey($topicType, $entry, 'LearnDash lesson step should reserve topic post type.');
                     $test->assertIsArray($entry[$topicType]);
                     $test->assertCount($topicsPerLesson, $entry[$topicType], 'Lesson should contain expected topics in ld_course_steps.');
-
-                    if ($quizzesPerSection > 0) {
-                        foreach ($entry[$topicType] as $topicEntry) {
-                            $test->assertArrayHasKey($quizType, $topicEntry, 'LearnDash topic step should reserve quiz post type.');
-                            $test->assertCount($quizzesPerSection, $topicEntry[$quizType], 'Topic should contain expected quizzes in ld_course_steps.');
-                        }
-                    }
                 }
 
                 $test->assertSame($courses > 0 ? $course->ID : 0, (int) get_post_meta((int) $lessonId, 'course_id', true));
@@ -484,7 +487,7 @@ final class LmsContentInspector
 
         $quizPosts = self::newestPosts(
             $quizType,
-            $courses * $lessonsPerCourse * $topicsPerLesson * $quizzesPerSection,
+            $expectedQuizzes,
             $afterPostId,
         );
 
@@ -527,7 +530,7 @@ final class LmsContentInspector
         if ($questionsPerQuiz > 0) {
             $questionPosts = self::newestPosts(
                 $questionType,
-                $courses * $lessonsPerCourse * $topicsPerLesson * $quizzesPerSection * $questionsPerQuiz,
+                $expectedQuizzes * $questionsPerQuiz,
                 $afterPostId,
             );
 
@@ -949,6 +952,30 @@ final class LmsContentInspector
     private static function countPosts(string $postType): int
     {
         return self::countPostsAfter($postType, 0);
+    }
+
+    /**
+     * @param array<int|string, mixed> $lessonSteps
+     */
+    private static function countQuizzesInCourseSteps(array $lessonSteps, string $topicType, string $quizType): int
+    {
+        $count = 0;
+
+        foreach ($lessonSteps as $entry) {
+            if (!is_array($entry) || !isset($entry[$topicType]) || !is_array($entry[$topicType])) {
+                continue;
+            }
+
+            foreach ($entry[$topicType] as $topicEntry) {
+                if (!is_array($topicEntry) || !isset($topicEntry[$quizType]) || !is_array($topicEntry[$quizType])) {
+                    continue;
+                }
+
+                $count += count($topicEntry[$quizType]);
+            }
+        }
+
+        return $count;
     }
 
     private static function countPostsAfter(string $postType, int $afterPostId): int

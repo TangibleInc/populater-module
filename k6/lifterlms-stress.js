@@ -2,16 +2,19 @@
  * LifterLMS student journey stress test.
  *
  * Based on the Grafana k6 Studio recording in lifter-1.js. Each VU logs in as a
- * different seeded student (student1, student2, …), enrolls in a course when
+ * different seeded student (lifterstudent1, lifterstudent2, …), enrolls in a course when
  * needed, completes lessons, and takes the section quiz.
  *
- * Seeded content slugs follow DeterministicTitle conventions from the Populater
- * plugin (e.g. lifterlms-course-1, lifterlms-lesson-c1-l1).
+ * Logins match Populater LifterLMS seeded users (SeededUsername: lifterstudent{N}).
+ * Content slugs follow DeterministicTitle (e.g. lifterlms-course-1, lifterlms-lesson-c1-l1).
  *
  * Usage:
- *   cp .env.example .env   # set K6_BASE_URL and K6_USER_PASSWORD
+ *   cp .env.example .env   # set K6_BASE_URL, K6_USER_PASSWORD, pacing (K6_ACTION_DELAY, K6_THINK_TIME)
  *   composer k6:lifter:smoke
  *   composer k6:lifter
+ *
+ * Live dashboard: http://127.0.0.1:5665 (enabled by default via scripts/k6-run.sh).
+ * Autosave: k6/reports/k6-report-<timestamp>.html and k6-results-<timestamp>.json.
  */
 
 import { check, group, sleep } from 'k6';
@@ -21,7 +24,8 @@ import execution from 'k6/execution';
 
 const BASE_URL = (__ENV.BASE_URL || 'http://localhost:8888').replace(/\/$/, '');
 const USER_PASSWORD = __ENV.USER_PASSWORD || 'StressTest#2026';
-const USER_PREFIX = __ENV.USER_PREFIX || 'student';
+/** Must match SeededUsername::prefix('lifterlms', 'student') in the Populater plugin. */
+const LIFTER_STUDENT_PREFIX = 'lifterstudent';
 const COURSE_INDEX = intEnv('COURSE_INDEX', 1);
 const LESSON_COUNT = intEnv('LESSON_COUNT', 10);
 const SECTION_INDEX = intEnv('SECTION_INDEX', 1);
@@ -29,6 +33,7 @@ const QUIZ_INDEX = intEnv('QUIZ_INDEX', 1);
 const MAX_USERS = intEnv('MAX_USERS', 20);
 const COURSE_PER_USER = intEnv('COURSE_PER_USER', 0) === 1;
 const THINK_TIME = floatEnv('THINK_TIME', 1);
+const ACTION_DELAY = floatEnv('ACTION_DELAY', 0);
 const CF_BYPASS_ENABLED = __ENV.CF_BYPASS !== '0';
 const CF_USER_AGENT = __ENV.CF_USER_AGENT ?? 'bench2.com PopulaterK6/1.0';
 const CF_BYPASS_HEADER = (__ENV.CF_BYPASS_HEADER || 'x-reviewsignal').toLowerCase();
@@ -70,6 +75,12 @@ function floatEnv(name, fallback) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function pauseBetweenActions() {
+  if (ACTION_DELAY > 0) {
+    sleep(ACTION_DELAY);
+  }
+}
+
 function coursePath(courseIndex) {
   return `/course/lifterlms-course-${courseIndex}/`;
 }
@@ -87,7 +98,7 @@ function vuUser() {
   const index = ((vu - 1) % MAX_USERS) + 1;
 
   return {
-    username: `${USER_PREFIX}${index}`,
+    username: `${LIFTER_STUDENT_PREFIX}${index}`,
     index,
     courseIndex: COURSE_PER_USER ? index : COURSE_INDEX,
   };
@@ -171,6 +182,7 @@ function login(user, jar) {
     check(loginPage, {
       'login page loads': (r) => r.status === 200,
     });
+    pauseBetweenActions();
 
     const response = http.post(
       loginUrl,
@@ -202,6 +214,7 @@ function login(user, jar) {
         return r.status === 200 && !body.includes('login_error') && !body.includes('Error 429');
       },
     });
+    pauseBetweenActions();
   });
 }
 
@@ -217,6 +230,7 @@ function maybeEnroll(user, courseIndex, jar) {
     check(coursePage, {
       'course page loads': (r) => r.status === 200,
     });
+    pauseBetweenActions();
 
     const body = String(coursePage.body);
     const hasEnrollForm =
@@ -271,6 +285,7 @@ function maybeEnroll(user, courseIndex, jar) {
     check(enrollResponse, {
       'enrollment submitted': (r) => r.status === 200,
     });
+    pauseBetweenActions();
   });
 }
 
@@ -287,6 +302,7 @@ function completeLessons(courseIndex, jar) {
       check(lessonPage, {
         [`lesson ${lessonIndex} loads`]: (r) => r.status === 200,
       });
+      pauseBetweenActions();
 
       const body = String(lessonPage.body);
       if (!body.includes('name="mark-complete"')) {
@@ -323,6 +339,7 @@ function completeLessons(courseIndex, jar) {
       check(completeResponse, {
         [`lesson ${lessonIndex} marked complete`]: (r) => r.status === 200,
       });
+      pauseBetweenActions();
     }
   });
 }
@@ -339,6 +356,7 @@ function takeQuiz(courseIndex, sectionIndex, quizIndex, jar) {
     check(quizPage, {
       'quiz page loads': (r) => r.status === 200,
     });
+    pauseBetweenActions();
 
     if (quizPage.status !== 200) {
       return;
@@ -378,6 +396,7 @@ function takeQuiz(courseIndex, sectionIndex, quizIndex, jar) {
     check(startResponse, {
       'quiz started': (r) => r.status === 200 && r.json('success') === true,
     });
+    pauseBetweenActions();
 
     if (startResponse.status !== 200 || startResponse.json('success') !== true) {
       return;
@@ -400,6 +419,8 @@ function takeQuiz(courseIndex, sectionIndex, quizIndex, jar) {
       if (!questionIdMatch || !questionTypeMatch || !answerId || !attemptKey) {
         break;
       }
+      pauseBetweenActions();
+
       const answerResponse = http.post(
         `${BASE_URL}/wp-admin/admin-ajax.php`,
         {
@@ -426,6 +447,7 @@ function takeQuiz(courseIndex, sectionIndex, quizIndex, jar) {
       const answerData = answerResponse.json('data');
       html = answerData && answerData.html ? answerData.html : null;
       answered++;
+      pauseBetweenActions();
     }
 
     check(null, {
