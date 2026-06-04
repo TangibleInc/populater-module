@@ -191,6 +191,14 @@ final class LmsContentInspector
         LmsPlugins::registerBuiltIn();
         $registry = new LmsPluginRegistry();
         $seeder   = $registry->createSeeder($pluginSlug);
+
+        // Mirror REST controller behaviour: when lessons_per_section is not in the
+        // request it is sent as 0, which prevents the sections×lessonsPerSection
+        // multiplication and lets an explicit lessons_per_course value win.
+        if ($pluginSlug === 'lifterlms' && !array_key_exists('lessons_per_section', $config)) {
+            $config['lessons_per_section'] = 0;
+        }
+
         $seedConfig = SeedConfig::fromArray(array_merge($config, ['plugin' => $pluginSlug]));
 
         return count($seeder->buildSeedQueue($seedConfig));

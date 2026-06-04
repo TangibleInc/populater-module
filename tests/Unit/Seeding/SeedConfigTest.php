@@ -24,7 +24,7 @@ class SeedConfigTest extends \WPTestCase
         $this->assertSame(3, $config->lessonsPerCourse);
         $this->assertSame(1, $config->quizzesPerSection);
         $this->assertSame(5, $config->questionsPerQuiz);
-        $this->assertSame(2, $config->topicsPerLesson);
+        $this->assertSame(10, $config->topicsPerLesson);
         $this->assertSame(0, $config->sectionsPerCourse);
         $this->assertSame(1, $config->modulesPerCourse);
         $this->assertSame(4, $config->users);
@@ -57,13 +57,13 @@ class SeedConfigTest extends \WPTestCase
         $this->assertSame(10, $config->questionsPerQuiz);
     }
 
-    public function test_topics_per_lesson_defaults_to_two(): void
+    public function test_topics_per_lesson_defaults_to_ten(): void
     {
         $config = SeedConfig::fromArray([
             'plugin' => 'learndash',
         ]);
 
-        $this->assertSame(2, $config->topicsPerLesson);
+        $this->assertSame(10, $config->topicsPerLesson);
     }
 
     public function test_sections_and_modules_use_defaults(): void
@@ -72,7 +72,7 @@ class SeedConfigTest extends \WPTestCase
             'plugin' => 'lifterlms',
         ]);
 
-        $this->assertSame(5, $config->sectionsPerCourse);
+        $this->assertSame(10, $config->sectionsPerCourse);
         $this->assertSame(1, $config->modulesPerCourse);
     }
 

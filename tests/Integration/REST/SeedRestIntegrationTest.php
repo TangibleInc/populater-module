@@ -58,8 +58,16 @@ class SeedRestIntegrationTest extends WordPressIntegrationTestCase
             'courses'             => self::COURSES,
             'lessons_per_course'  => self::LESSONS,
             'quizzes_per_section' => self::QUIZZES,
+            'questions_per_quiz'  => self::QUESTIONS,
             'users'               => self::USERS,
         ];
+
+        // LifterLMS uses sections to group lessons and quizzes. Pass the test's
+        // SECTIONS constant explicitly so the actual structure matches expected counts.
+        if ($plugin === 'lifterlms') {
+            $seedParams['sections_per_course'] = self::SECTIONS;
+            $seedParams['lessons_per_section']  = 0;
+        }
 
         if ($groups > 0) {
             $seedParams['groups'] = $groups;

@@ -162,11 +162,11 @@
 
         if (activeTab === 'learndash') {
             payload.lessons_per_course = intFromTabField('lessons_per_course', tabDefaults.lessonsPerCourse ?? 10);
-            payload.topics_per_lesson = intFromTabField('topics_per_lesson', tabDefaults.topicsPerLesson ?? 2);
+            payload.topics_per_lesson = intFromTabField('topics_per_lesson', tabDefaults.topicsPerLesson ?? 10);
             payload.quizzes_per_lesson = intFromTabField('quizzes_per_lesson', tabDefaults.quizzesPerLesson ?? 1);
         } else if (activeTab === 'lifterlms') {
-            payload.sections_per_course = intFromTabField('sections_per_course', tabDefaults.sectionsPerCourse ?? 5);
-            payload.lessons_per_section = intFromTabField('lessons_per_section', tabDefaults.lessonsPerSection ?? 10);
+            payload.sections_per_course = intFromTabField('sections_per_course', tabDefaults.sectionsPerCourse ?? 10);
+            payload.lessons_per_section = intFromTabField('lessons_per_section', tabDefaults.lessonsPerSection ?? 2);
             payload.quizzes_per_section = intFromTabField('quizzes_per_section', tabDefaults.quizzesPerSection ?? 1);
         } else if (activeTab === 'tangible-lms') {
             payload.modules_per_course = intFromTabField('modules_per_course', tabDefaults.modulesPerCourse ?? 1);

@@ -12,12 +12,12 @@ final class SeedConfig
     public const DEFAULT_PLUGIN              = 'learndash';
     public const DEFAULT_COURSES             = 5;
     public const DEFAULT_LESSONS_PER_COURSE  = 10;
-    public const DEFAULT_LESSONS_PER_SECTION = 10;
+    public const DEFAULT_LESSONS_PER_SECTION = 2;
     public const DEFAULT_QUIZZES_PER_SECTION = 1;
     public const DEFAULT_QUIZZES_PER_LESSON   = 1;
     public const DEFAULT_QUESTIONS_PER_QUIZ  = 10;
-    public const DEFAULT_TOPICS_PER_LESSON   = 2;
-    public const DEFAULT_SECTIONS_PER_COURSE = 5;
+    public const DEFAULT_TOPICS_PER_LESSON   = 10;
+    public const DEFAULT_SECTIONS_PER_COURSE = 10;
     public const DEFAULT_MODULES_PER_COURSE  = 1;
     public const DEFAULT_USERS               = 100;
     public const DEFAULT_GROUPS              = 1;
@@ -58,8 +58,8 @@ final class SeedConfig
             quizzesPerSection: $counts['quizzesPerSection'],
             questionsPerQuiz: max(0, (int) ($config['questions_per_quiz'] ?? self::DEFAULT_QUESTIONS_PER_QUIZ)),
             topicsPerLesson: $counts['topicsPerLesson'],
-            sectionsPerCourse: $counts['sectionsPerCourse'],
-            lessonsPerSection: $counts['lessonsPerSection'],
+            sectionsPerCourse: $counts['sectionsPerCourse'] ?? 0,
+            lessonsPerSection: $counts['lessonsPerSection'] ?? 0,
             modulesPerCourse: max(0, (int) ($config['modules_per_course'] ?? self::DEFAULT_MODULES_PER_COURSE)),
             users: max(0, (int) ($config['users'] ?? 0)),
             groups: max(0, (int) ($config['groups'] ?? 0)),
@@ -72,8 +72,8 @@ final class SeedConfig
      * @return array{
      *   lessonsPerCourse: int,
      *   topicsPerLesson: int,
-     *   sectionsPerCourse: int,
-     *   lessonsPerSection: int,
+     *   sectionsPerCourse?: int,
+     *   lessonsPerSection?: int,
      *   quizzesPerSection: int
      * }
      */
@@ -83,8 +83,6 @@ final class SeedConfig
             'learndash' => [
                 'lessonsPerCourse'  => max(0, (int) ($config['lessons_per_course'] ?? self::DEFAULT_LESSONS_PER_COURSE)),
                 'topicsPerLesson'   => max(0, (int) ($config['topics_per_lesson'] ?? self::DEFAULT_TOPICS_PER_LESSON)),
-                'sectionsPerCourse' => 0,
-                'lessonsPerSection' => 0,
                 'quizzesPerSection' => max(0, (int) ($config['quizzes_per_lesson'] ?? $config['quizzes_per_section'] ?? self::DEFAULT_QUIZZES_PER_LESSON)),
             ],
             'lifterlms' => self::resolveLifterStructureCounts($config),
