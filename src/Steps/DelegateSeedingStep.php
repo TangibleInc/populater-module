@@ -30,14 +30,15 @@ class DelegateSeedingStep extends AbstractSeedingStep
     protected function run(array $data, Logger $logger): array
     {
         $ids = match ($this->type) {
-            'course'      => $this->seeder->seedCourses(1, $data),
-            'lesson'      => $this->seeder->seedLessons(1, (int) ($data['course_id'] ?? 0), $data),
-            'quiz'        => $this->seeder->seedQuizzes(1, (int) ($data['quiz_parent_id'] ?? 0), $data),
-            'user'        => $this->seeder->seedUsers(1, $data),
-            'group'       => $this->seeder->seedGroups(1, $data),
-            'group_admin' => $this->seeder->seedGroupAdmins(1, $data),
-            'certificate' => $this->seeder->seedCertificates(1, $data),
-            default       => [],
+            'course'           => $this->seeder->seedCourses(1, $data),
+            'lesson'           => $this->seeder->seedLessons(1, (int) ($data['course_id'] ?? 0), $data),
+            'quiz'             => $this->seeder->seedQuizzes(1, (int) ($data['quiz_parent_id'] ?? 0), $data),
+            'user'             => $this->seeder->seedUsers(1, $data),
+            'group'            => $this->seeder->seedGroups(1, $data),
+            'group_admin'      => $this->seeder->seedGroupAdmins(1, $data),
+            'certificate'      => $this->seeder->seedCertificates(1, $data),
+            'course_structure' => $this->seeder->seedCourseStructure($data),
+            default            => [],
         };
 
         foreach ($ids as $id) {

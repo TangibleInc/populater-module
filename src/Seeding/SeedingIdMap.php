@@ -22,7 +22,7 @@ final class SeedingIdMap
     ): array {
         $map = $repository->getIdMap($processId);
 
-        if ($type === 'lesson') {
+        if ($type === 'lesson' || $type === 'course_structure') {
             $courseIndex       = (int) ($data['course_index'] ?? 0);
             $data['course_id'] = (int) ($map['courses'][$courseIndex] ?? 0);
         }

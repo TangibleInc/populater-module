@@ -105,6 +105,49 @@ abstract class AbstractSeeder
     }
 
     /**
+     * Embeds a machine-readable structure comment into the course post_content so that
+     * k6 stress tests can parse lesson/topic/quiz counts from the course page without
+     * making additional discovery requests.
+     *
+     * @param array<string, mixed> $data
+     * @return list<int>
+     */
+    public function seedCourseStructure(array $data): array
+    {
+        $courseId = (int) ($data['course_id'] ?? 0);
+
+        if ($courseId <= 0) {
+            return [];
+        }
+
+        $structure = [
+            'lessons'             => (int) ($data['lessons_per_course'] ?? 0),
+            'topics_per_lesson'   => (int) ($data['topics_per_lesson'] ?? 0),
+            'quizzes_per_lesson'  => (int) ($data['quizzes_per_lesson'] ?? 0),
+            'sections_per_course' => (int) ($data['sections_per_course'] ?? 0),
+            'lessons_per_section' => (int) ($data['lessons_per_section'] ?? 0),
+        ];
+
+        $structure = array_filter($structure, static fn(int $v): bool => $v > 0);
+
+        $post = function_exists('get_post') ? get_post($courseId) : null;
+
+        if (!$post instanceof \WP_Post) {
+            return [];
+        }
+
+        $comment = '<!-- populater:structure ' . json_encode($structure, JSON_THROW_ON_ERROR) . ' -->';
+        $content = (string) preg_replace('/<!--\s*populater:structure\s+[^>]*-->/', '', $post->post_content ?? '');
+
+        wp_update_post([
+            'ID'           => $courseId,
+            'post_content' => trim($content) . "\n" . $comment,
+        ]);
+
+        return [];
+    }
+
+    /**
      * @param array<string, mixed> $options
      * @return list<int>
      */
@@ -366,6 +409,15 @@ abstract class AbstractSeeder
             foreach ($this->buildQuizQueueItems($c, $seedConfig) as $item) {
                 $queue[] = $item;
             }
+
+            $queue[] = new SeedQueueItem('course_structure', [
+                'course_index'        => $c,
+                'lessons_per_course'  => $seedConfig->lessonsPerCourse,
+                'topics_per_lesson'   => $seedConfig->topicsPerLesson,
+                'quizzes_per_lesson'  => $seedConfig->quizzesPerSection,
+                'sections_per_course' => $seedConfig->sectionsPerCourse,
+                'lessons_per_section' => $seedConfig->lessonsPerSection,
+            ]);
         }
 
         for ($u = 1; $u <= $seedConfig->users; $u++) {

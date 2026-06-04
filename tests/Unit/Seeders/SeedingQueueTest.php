@@ -27,9 +27,9 @@ class SeedingQueueTest extends \WPTestCase
     public static function lmsSlugProvider(): array
     {
         return [
-            'learndash'    => ['learndash', 4],
-            'lifterlms'    => ['lifterlms', 4],
-            'tangible-lms' => ['tangible-lms', 4],
+            'learndash'    => ['learndash', 5],
+            'lifterlms'    => ['lifterlms', 5],
+            'tangible-lms' => ['tangible-lms', 5],
         ];
     }
 

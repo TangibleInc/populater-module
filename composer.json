@@ -34,7 +34,7 @@
     "k6:lifter": "bash scripts/k6-run.sh run lifterlms-stress.js",
     "k6:lifter:smoke": "bash scripts/k6-run.sh run --vus 1 --iterations 1 -e THINK_TIME=0 -e ACTION_DELAY=0 lifterlms-stress.js",
     "k6:learndash": "bash scripts/k6-run.sh run learndash-stress.js",
-    "k6:learndash:smoke": "bash scripts/k6-run.sh run --vus 1 --iterations 1 -e THINK_TIME=0 -e ACTION_DELAY=0 -e LESSON_COUNT=1 -e TOPIC_COUNT=3 -e QUIZ_TOPIC_INDEX=10 learndash-stress.js",
+    "k6:learndash:smoke": "bash scripts/k6-run.sh run --vus 1 --iterations 1 -e THINK_TIME=0 -e ACTION_DELAY=0 learndash-stress.js",
     "zip": "bash scripts/zip.sh"
   },
   "config": {

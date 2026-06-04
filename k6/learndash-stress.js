@@ -27,14 +27,7 @@ const BASE_URL = (__ENV.BASE_URL || 'http://localhost:8888').replace(/\/$/, '');
 const USER_PASSWORD = __ENV.USER_PASSWORD || 'StressTest#2026';
 /** Must match SeededUsername::prefix('learndash', 'student') in the Populater plugin. */
 const LD_STUDENT_PREFIX = 'ldstudent';
-const COURSE_INDEX = intEnv('COURSE_INDEX', 1);
-const LESSON_COUNT = intEnv('LESSON_COUNT', 10);
-const TOPIC_COUNT = intEnv('TOPIC_COUNT', 10);
-/** Topic that hosts the lesson quiz (Populater attaches it to the last topic in the lesson). */
-const QUIZ_TOPIC_INDEX = intEnv('QUIZ_TOPIC_INDEX', TOPIC_COUNT);
-const QUIZ_INDEX = intEnv('QUIZ_INDEX', 1);
 const MAX_USERS = intEnv('MAX_USERS', 20);
-const COURSE_PER_USER = intEnv('COURSE_PER_USER', 0) === 1;
 const THINK_TIME = floatEnv('THINK_TIME', 1);
 const ACTION_DELAY = floatEnv('ACTION_DELAY', 0);
 const CF_BYPASS_ENABLED = __ENV.CF_BYPASS !== '0';
@@ -95,11 +88,45 @@ function lessonPath(courseIndex, lessonIndex) {
 }
 
 function topicPath(courseIndex, lessonIndex, topicIndex) {
-  return `${lessonPath(courseIndex, lessonIndex)}topics/learndash-topic-c${courseIndex}-l${lessonIndex}-t${topicIndex}/`;
+  return `/courses/learndash-course-${courseIndex}/lessons/learndash-lesson-c${courseIndex}-l${lessonIndex}/topics/learndash-topic-c${courseIndex}-l${lessonIndex}-t${topicIndex}/`;
 }
 
 function quizPath(courseIndex, lessonIndex, topicIndex, quizIndex) {
-  return `${topicPath(courseIndex, lessonIndex, topicIndex)}quizzes/learndash-quiz-c${courseIndex}-l${lessonIndex}-q${quizIndex}/`;
+  return `/courses/learndash-course-${courseIndex}/lessons/learndash-lesson-c${courseIndex}-l${lessonIndex}/topics/learndash-topic-c${courseIndex}-l${lessonIndex}-t${topicIndex}/quizzes/learndash-quiz-c${courseIndex}-l${lessonIndex}-q${quizIndex}/`;
+}
+
+// Fetch the course page once and parse the embedded structure metadata.
+// Returns { lessons, topics_per_lesson, quizzes_per_lesson } or null on failure.
+function fetchCourseStructure(courseIndex, jar) {
+  const path = coursePath(courseIndex);
+  const res = http.get(`${BASE_URL}${path}`, {
+    jar,
+    headers: htmlHeaders(path),
+    tags: { name: 'GET course structure' },
+  });
+
+  check(res, { 'course page loads': (r) => r.status === 200 });
+
+  if (res.status !== 200) {
+    return null;
+  }
+
+  const body = String(res.body);
+  const match = body.match(/<!--\s*populater:structure\s+(\{[^>]*\})\s*-->/);
+
+  if (!match) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(match[1]);
+  } catch (_error) {
+    return null;
+  }
+}
+
+function range(n) {
+  return Array.from({ length: n }, (_, i) => i + 1);
 }
 
 function vuUser() {
@@ -109,7 +136,7 @@ function vuUser() {
   return {
     username: `${LD_STUDENT_PREFIX}${index}`,
     index,
-    courseIndex: COURSE_PER_USER ? index : COURSE_INDEX,
+    courseIndex: 1,
   };
 }
 
@@ -129,6 +156,83 @@ function extractScriptNumber(html, key) {
 function extractScriptString(html, key) {
   const match = html.match(new RegExp(`${key}:\\s*'([^']+)'`, 'i'));
   return match ? match[1] : null;
+}
+
+function extractQuizMeta(body) {
+  return {
+    quizNonce: extractScriptString(body, 'quiz_nonce'),
+    quizProId: extractScriptNumber(body, 'quizId'),
+    quizPostId: extractScriptNumber(body, 'quiz'),
+    courseId: extractScriptNumber(body, 'course_id'),
+    lessonId: extractScriptNumber(body, 'lesson_id'),
+    topicId: extractScriptNumber(body, 'topic_id'),
+    globalPoints: parseInt(extractScriptNumber(body, 'globalPoints') || '0', 10),
+  };
+}
+
+// Extract a JSON object value by key, handling nested braces.
+// Matches both JS object literal style (key:) and JSON style ("key":).
+function extractBalancedJson(html, key) {
+  const patterns = [`"${key}":`, `${key}:`];
+  let keyIdx = -1;
+  let keyLen = 0;
+
+  for (const pattern of patterns) {
+    const idx = html.indexOf(pattern);
+    if (idx !== -1) {
+      keyIdx = idx;
+      keyLen = pattern.length;
+      break;
+    }
+  }
+
+  if (keyIdx === -1) return null;
+
+  let i = keyIdx + keyLen;
+  while (i < html.length && html[i] !== '{') i++;
+  if (i >= html.length) return null;
+
+  let depth = 0;
+  const start = i;
+  for (; i < html.length; i++) {
+    if (html[i] === '{') depth++;
+    else if (html[i] === '}') {
+      depth--;
+      if (depth === 0) return html.substring(start, i + 1);
+    }
+  }
+  return null;
+}
+
+function extractQuestionIds(body) {
+  const jsonStr = extractBalancedJson(body, 'json');
+
+  if (jsonStr) {
+    try {
+      const questionMap = JSON.parse(jsonStr);
+      const ids = Object.keys(questionMap).map((id) => parseInt(id, 10));
+      if (ids.length > 0) return ids;
+    } catch (_error) {
+      // fall through to next strategy
+    }
+  }
+
+  // WPProQuiz embeds question IDs in data-question-meta HTML attributes.
+  // e.g. data-question-meta="{&quot;question_pro_id&quot;:1,...}"
+  const htmlAttrIds = [];
+  const re = /question_pro_id&quot;:(\d+)/gi;
+  let m;
+  while ((m = re.exec(body))) htmlAttrIds.push(parseInt(m[1], 10));
+  if (htmlAttrIds.length > 0) return htmlAttrIds;
+
+  // Last fallback: hidden input fields.
+  const inputIds = [];
+  const re1 = /name=["']question_pro_id["'][^>]*value=["'](\d+)["']/gi;
+  const re2 = /value=["'](\d+)["'][^>]*name=["']question_pro_id["']/gi;
+  while ((m = re1.exec(body))) inputIds.push(parseInt(m[1], 10));
+  if (inputIds.length > 0) return inputIds;
+  while ((m = re2.exec(body))) inputIds.push(parseInt(m[1], 10));
+  return inputIds;
 }
 
 function requestHeaders(extra = {}) {
@@ -280,10 +384,14 @@ function markTopicComplete(courseIndex, lessonIndex, topicIndex, jar) {
   });
   pauseBetweenActions();
 
+  if (topicPage.status !== 200) {
+    return false;
+  }
+
   const body = String(topicPage.body);
   if (!body.includes('sfwd-mark-complete')) {
     topicSkippedNoForm.add(1);
-    return;
+    return true;
   }
 
   const postId = extractInput(body, 'post');
@@ -295,7 +403,7 @@ function markTopicComplete(courseIndex, lessonIndex, topicIndex, jar) {
   });
 
   if (!nonce || !postId) {
-    return;
+    return true;
   }
 
   const payload = {
@@ -326,12 +434,13 @@ function markTopicComplete(courseIndex, lessonIndex, topicIndex, jar) {
   }
 
   pauseBetweenActions();
+  return true;
 }
 
-function completeLessons(courseIndex, jar) {
+function completeLessons(courseIndex, structure, jar) {
   group('lessons', () => {
-    for (let lessonIndex = 1; lessonIndex <= LESSON_COUNT; lessonIndex++) {
-      for (let topicIndex = 1; topicIndex <= TOPIC_COUNT; topicIndex++) {
+    for (const lessonIndex of range(structure.lessons)) {
+      for (const topicIndex of range(structure.topics_per_lesson)) {
         markTopicComplete(courseIndex, lessonIndex, topicIndex, jar);
       }
     }
@@ -397,9 +506,9 @@ function buildQuizResults(checked, globalPoints) {
   return results;
 }
 
-function takeQuiz(courseIndex, lessonIndex, jar) {
+function takeQuiz(courseIndex, lessonIndex, topicIndex, quizIndex, jar) {
   group('quiz', () => {
-    const path = quizPath(courseIndex, lessonIndex, QUIZ_TOPIC_INDEX, QUIZ_INDEX);
+    const path = quizPath(courseIndex, lessonIndex, topicIndex, quizIndex);
     const quizPage = http.get(`${BASE_URL}${path}`, {
       jar,
       headers: htmlHeaders(path),
@@ -420,25 +529,9 @@ function takeQuiz(courseIndex, lessonIndex, jar) {
       return;
     }
 
-    const quizNonce = extractScriptString(body, 'quiz_nonce');
-    const quizProId = extractScriptNumber(body, 'quizId');
-    const quizPostId = extractScriptNumber(body, 'quiz');
-    const courseId = extractScriptNumber(body, 'course_id');
-    const lessonId = extractScriptNumber(body, 'lesson_id');
-    const topicId = extractScriptNumber(body, 'topic_id');
-    const globalPoints = parseInt(extractScriptNumber(body, 'globalPoints') || '0', 10);
-
-    const jsonMatch = body.match(/json:\s*(\{[^}]+\})/);
-    let questionIds = [];
-
-    if (jsonMatch) {
-      try {
-        const questionMap = JSON.parse(jsonMatch[1]);
-        questionIds = Object.keys(questionMap).map((id) => parseInt(id, 10));
-      } catch (_error) {
-        questionIds = [];
-      }
-    }
+    const { quizNonce, quizProId, quizPostId, courseId, lessonId, topicId, globalPoints } =
+      extractQuizMeta(body);
+    const questionIds = extractQuestionIds(body);
 
     check(null, {
       'quiz nonce present': () => quizNonce !== null,
@@ -525,10 +618,15 @@ function takeQuiz(courseIndex, lessonIndex, jar) {
   });
 }
 
-function takeLessonQuizzes(courseIndex, jar) {
+function takeLessonQuizzes(courseIndex, structure, jar) {
   group('quizzes', () => {
-    for (let lessonIndex = 1; lessonIndex <= LESSON_COUNT; lessonIndex++) {
-      takeQuiz(courseIndex, lessonIndex, jar);
+    const quizTopicIndex = structure.topics_per_lesson;
+
+    for (const lessonIndex of range(structure.lessons)) {
+      for (const quizIndex of range(structure.quizzes_per_lesson)) {
+        takeQuiz(courseIndex, lessonIndex, quizTopicIndex, quizIndex, jar);
+        pauseBetweenActions();
+      }
     }
   });
 }
@@ -538,9 +636,20 @@ export default function () {
   const jar = http.cookieJar();
 
   login(user, jar);
+
+  const structure = fetchCourseStructure(user.courseIndex, jar);
+
+  check(null, {
+    'course structure present': () => structure !== null,
+  });
+
+  if (!structure) {
+    return;
+  }
+
   maybeEnroll(user, user.courseIndex, jar);
-  completeLessons(user.courseIndex, jar);
-  takeLessonQuizzes(user.courseIndex, jar);
+  completeLessons(user.courseIndex, structure, jar);
+  takeLessonQuizzes(user.courseIndex, structure, jar);
 
   sleep(THINK_TIME);
 }

@@ -26,12 +26,7 @@ const BASE_URL = (__ENV.BASE_URL || 'http://localhost:8888').replace(/\/$/, '');
 const USER_PASSWORD = __ENV.USER_PASSWORD || 'StressTest#2026';
 /** Must match SeededUsername::prefix('lifterlms', 'student') in the Populater plugin. */
 const LIFTER_STUDENT_PREFIX = 'lifterstudent';
-const COURSE_INDEX = intEnv('COURSE_INDEX', 1);
-const LESSON_COUNT = intEnv('LESSON_COUNT', 10);
-const SECTION_INDEX = intEnv('SECTION_INDEX', 1);
-const QUIZ_INDEX = intEnv('QUIZ_INDEX', 1);
 const MAX_USERS = intEnv('MAX_USERS', 20);
-const COURSE_PER_USER = intEnv('COURSE_PER_USER', 0) === 1;
 const THINK_TIME = floatEnv('THINK_TIME', 1);
 const ACTION_DELAY = floatEnv('ACTION_DELAY', 0);
 const CF_BYPASS_ENABLED = __ENV.CF_BYPASS !== '0';
@@ -93,6 +88,40 @@ function quizPath(courseIndex, sectionIndex, quizIndex) {
   return `/quiz/lifterlms-quiz-c${courseIndex}-s${sectionIndex}-q${quizIndex}/`;
 }
 
+// Fetch the course page once and parse the embedded structure metadata.
+// Returns { lessons, sections_per_course, lessons_per_section, quizzes_per_lesson } or null.
+function fetchCourseStructure(courseIndex, jar) {
+  const path = coursePath(courseIndex);
+  const res = http.get(`${BASE_URL}${path}`, {
+    jar,
+    headers: htmlHeaders(path),
+    tags: { name: 'GET course structure' },
+  });
+
+  check(res, { 'course page loads': (r) => r.status === 200 });
+
+  if (res.status !== 200) {
+    return null;
+  }
+
+  const body = String(res.body);
+  const match = body.match(/<!--\s*populater:structure\s+(\{[^>]*\})\s*-->/);
+
+  if (!match) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(match[1]);
+  } catch (_error) {
+    return null;
+  }
+}
+
+function range(n) {
+  return Array.from({ length: n }, (_, i) => i + 1);
+}
+
 function vuUser() {
   const vu = execution.vu.idInTest;
   const index = ((vu - 1) % MAX_USERS) + 1;
@@ -100,7 +129,7 @@ function vuUser() {
   return {
     username: `${LIFTER_STUDENT_PREFIX}${index}`,
     index,
-    courseIndex: COURSE_PER_USER ? index : COURSE_INDEX,
+    courseIndex: 1,
   };
 }
 
@@ -289,15 +318,19 @@ function maybeEnroll(user, courseIndex, jar) {
   });
 }
 
-function completeLessons(courseIndex, jar) {
+function completeLessons(courseIndex, structure, jar) {
   group('lessons', () => {
-    for (let lessonIndex = 1; lessonIndex <= LESSON_COUNT; lessonIndex++) {
+    for (const lessonIndex of range(structure.lessons)) {
       const path = lessonPath(courseIndex, lessonIndex);
       const lessonPage = http.get(`${BASE_URL}${path}`, {
         jar,
         headers: htmlHeaders(path),
         tags: { name: 'GET lesson' },
       });
+
+      if (lessonPage.status !== 200) {
+        continue;
+      }
 
       check(lessonPage, {
         [`lesson ${lessonIndex} loads`]: (r) => r.status === 200,
@@ -461,9 +494,28 @@ export default function () {
   const jar = http.cookieJar();
 
   login(user, jar);
+
+  const structure = fetchCourseStructure(user.courseIndex, jar);
+
+  check(null, {
+    'course structure present': () => structure !== null,
+  });
+
+  if (!structure) {
+    return;
+  }
+
   maybeEnroll(user, user.courseIndex, jar);
-  completeLessons(user.courseIndex, jar);
-  takeQuiz(user.courseIndex, SECTION_INDEX, QUIZ_INDEX, jar);
+  completeLessons(user.courseIndex, structure, jar);
+
+  group('quizzes', () => {
+    for (const sectionIndex of range(structure.sections_per_course)) {
+      for (const quizIndex of range(structure.quizzes_per_lesson)) {
+        takeQuiz(user.courseIndex, sectionIndex, quizIndex, jar);
+        pauseBetweenActions();
+      }
+    }
+  });
 
   sleep(THINK_TIME);
 }
