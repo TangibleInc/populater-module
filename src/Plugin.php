@@ -10,7 +10,6 @@ use Tangible\Populater\CLI\SeedCommand;
 use Tangible\Populater\Database\DatabaseReset;
 use Tangible\Populater\REST\ResetController;
 use Tangible\Populater\REST\SeedController;
-use Tangible\Populater\LMS\LifterLMS\LifterLmsCourseRewriteFix;
 use Tangible\Populater\Registry\LmsPlugins;
 use Tangible\Populater\Seeding\SeedingManager;
 
@@ -45,7 +44,6 @@ class Plugin
     public function init(): void
     {
         $this->seedingManager->registerBackgroundProcesses();
-        LifterLmsCourseRewriteFix::register();
 
         add_action('admin_menu', [$this, 'registerAdminMenu']);
         add_action('rest_api_init', [$this, 'registerRestRoutes']);

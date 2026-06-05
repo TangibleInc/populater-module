@@ -72,7 +72,7 @@ class SeedConfigTest extends \WPTestCase
             'plugin' => 'lifterlms',
         ]);
 
-        $this->assertSame(10, $config->sectionsPerCourse);
+        $this->assertSame(5, $config->sectionsPerCourse);
         $this->assertSame(1, $config->modulesPerCourse);
     }
 

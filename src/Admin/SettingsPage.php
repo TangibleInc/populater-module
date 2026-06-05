@@ -77,44 +77,21 @@ class SettingsPage
             'activeProcess'   => $activeProcess?->toArray(),
             'defaultPassword' => $defaultPassword,
             'defaultTab'      => $defaultTab,
-            'groupsSupported' => [
-                'learndash'    => LmsGroupsCapability::supports('learndash'),
-                'lifterlms'    => LmsGroupsCapability::supports('lifterlms'),
-                'tangible-lms' => false,
-            ],
+            'groupsSupported' => array_map(
+                fn($plugin) => \Tangible\Populater\LMS\LmsRegistry::supportsGroups($plugin['slug']),
+                $plugins
+            ),
             'inactiveTabTitle' => __(
                 'This LMS plugin is not active. Activate it in Plugins before seeding.',
                 'tangible-populater',
             ),
-            'seedDefaults'    => [
-                'learndash' => [
-                    'courses'           => SeedConfig::DEFAULT_COURSES,
-                    'lessonsPerCourse'  => SeedConfig::DEFAULT_LESSONS_PER_COURSE,
-                    'topicsPerLesson'   => SeedConfig::DEFAULT_TOPICS_PER_LESSON,
-                    'quizzesPerLesson'  => SeedConfig::DEFAULT_QUIZZES_PER_LESSON,
-                    'questionsPerQuiz'  => SeedConfig::DEFAULT_QUESTIONS_PER_QUIZ,
-                    'users'             => SeedConfig::DEFAULT_USERS,
-                    'groups'            => SeedConfig::DEFAULT_GROUPS,
-                ],
-                'lifterlms' => [
-                    'courses'           => SeedConfig::DEFAULT_COURSES,
-                    'sectionsPerCourse' => SeedConfig::DEFAULT_SECTIONS_PER_COURSE,
-                    'lessonsPerSection' => SeedConfig::DEFAULT_LESSONS_PER_SECTION,
-                    'quizzesPerSection' => SeedConfig::DEFAULT_QUIZZES_PER_SECTION,
-                    'questionsPerQuiz'  => SeedConfig::DEFAULT_QUESTIONS_PER_QUIZ,
-                    'users'             => SeedConfig::DEFAULT_USERS,
-                    'groups'            => SeedConfig::DEFAULT_GROUPS,
-                ],
-                'tangible-lms' => [
-                    'courses'          => SeedConfig::DEFAULT_COURSES,
-                    'modulesPerCourse' => SeedConfig::DEFAULT_MODULES_PER_COURSE,
-                    'lessonsPerCourse' => SeedConfig::DEFAULT_LESSONS_PER_COURSE,
-                    'quizzesPerModule' => SeedConfig::DEFAULT_QUIZZES_PER_SECTION,
-                    'questionsPerQuiz' => SeedConfig::DEFAULT_QUESTIONS_PER_QUIZ,
-                    'users'            => SeedConfig::DEFAULT_USERS,
-                    'groups'           => SeedConfig::DEFAULT_GROUPS,
-                ],
-            ],
+            'seedDefaults'    => array_combine(
+                array_column($plugins, 'slug'),
+                array_map(
+                    fn($plugin) => \Tangible\Populater\LMS\LmsRegistry::getDefaultConfig($plugin['slug']),
+                    $plugins
+                )
+            ),
         ]);
     }
 
@@ -135,7 +112,7 @@ class SettingsPage
 
             <?php if (empty($activePlugins)) : ?>
                 <div class="notice notice-warning">
-                    <p><?php esc_html_e('No supported LMS plugins are currently active. Please activate LearnDash LMS, LifterLMS, or Tangible LMS.', 'tangible-populater'); ?></p>
+                    <p><?php esc_html_e('No supported LMS plugins are currently active. Please activate a supported LMS plugin.', 'tangible-populater'); ?></p>
                 </div>
             <?php endif; ?>
 
@@ -180,11 +157,15 @@ class SettingsPage
 
                 <table class="form-table tp-seed-fields" role="presentation">
                     <?php $this->renderCoursesField(); ?>
-                    <?php $this->renderLearnDashFields(); ?>
-                    <?php $this->renderGroupsField('learndash'); ?>
-                    <?php $this->renderLifterFields(); ?>
-                    <?php $this->renderGroupsField('lifterlms'); ?>
-                    <?php $this->renderTangibleFields(); ?>
+                    <?php 
+                    foreach (\Tangible\Populater\LMS\LmsRegistry::getPlugins() as $slug => $plugin) {
+                        $renderer = \Tangible\Populater\LMS\LmsRegistry::getFieldsRenderer($slug);
+                        if ($renderer) {
+                            $renderer();
+                        }
+                        $this->renderGroupsField($slug);
+                    }
+                    ?>
                     <?php $this->renderAssessmentAndUserFields(); ?>
                 </table>
 
@@ -232,7 +213,8 @@ class SettingsPage
             }
         }
 
-        return 'learndash';
+        $plugins = \Tangible\Populater\LMS\LmsRegistry::getPlugins();
+        return !empty($plugins) ? (string) array_key_first($plugins) : 'default';
     }
 
     /**
@@ -254,20 +236,7 @@ class SettingsPage
      */
     private function tabDefinitions(): array
     {
-        return [
-            'learndash' => [
-                'label'       => __('LearnDash', 'tangible-populater'),
-                'description' => __('Course → lessons → topics → quiz. One quiz per lesson (attached to a topic).', 'tangible-populater'),
-            ],
-            'lifterlms' => [
-                'label'       => __('LifterLMS', 'tangible-populater'),
-                'description' => __('Course → sections → lessons → quiz. One quiz per section.', 'tangible-populater'),
-            ],
-            'tangible-lms' => [
-                'label'       => __('Tangible LMS', 'tangible-populater'),
-                'description' => __('Course → modules → lessons → quiz. One quiz per module.', 'tangible-populater'),
-            ],
-        ];
+        return \Tangible\Populater\LMS\LmsRegistry::getPlugins();
     }
 
     private function renderCoursesField(): void
@@ -280,71 +249,13 @@ class SettingsPage
         <?php
     }
 
-    private function renderLearnDashFields(): void
-    {
-        ?>
-        <tr class="tp-field-row" data-tp-tab="learndash">
-            <th scope="row"><label for="tp-ld-lessons"><?php esc_html_e('Lessons per Course', 'tangible-populater'); ?></label></th>
-            <td><input type="number" id="tp-ld-lessons" data-tp-field="lessons_per_course" value="<?php echo esc_attr((string) SeedConfig::DEFAULT_LESSONS_PER_COURSE); ?>" min="0" max="100" class="small-text"></td>
-        </tr>
-        <tr class="tp-field-row" data-tp-tab="learndash">
-            <th scope="row"><label for="tp-ld-topics"><?php esc_html_e('Topics per Lesson', 'tangible-populater'); ?></label></th>
-            <td><input type="number" id="tp-ld-topics" data-tp-field="topics_per_lesson" value="<?php echo esc_attr((string) SeedConfig::DEFAULT_TOPICS_PER_LESSON); ?>" min="0" max="50" class="small-text"></td>
-        </tr>
-        <tr class="tp-field-row" data-tp-tab="learndash">
-            <th scope="row"><label for="tp-ld-quizzes"><?php esc_html_e('Quizzes per Lesson', 'tangible-populater'); ?></label></th>
-            <td><input type="number" id="tp-ld-quizzes" data-tp-field="quizzes_per_lesson" value="<?php echo esc_attr((string) SeedConfig::DEFAULT_QUIZZES_PER_LESSON); ?>" min="0" max="50" class="small-text"></td>
-        </tr>
-        <?php
-    }
-
-    private function renderLifterFields(): void
-    {
-        ?>
-        <tr class="tp-field-row" data-tp-tab="lifterlms">
-            <th scope="row"><label for="tp-llms-sections"><?php esc_html_e('Sections per Course', 'tangible-populater'); ?></label></th>
-            <td><input type="number" id="tp-llms-sections" data-tp-field="sections_per_course" value="<?php echo esc_attr((string) SeedConfig::DEFAULT_SECTIONS_PER_COURSE); ?>" min="0" max="50" class="small-text"></td>
-        </tr>
-        <tr class="tp-field-row" data-tp-tab="lifterlms">
-            <th scope="row"><label for="tp-llms-lessons"><?php esc_html_e('Lessons per Section', 'tangible-populater'); ?></label></th>
-            <td><input type="number" id="tp-llms-lessons" data-tp-field="lessons_per_section" value="<?php echo esc_attr((string) SeedConfig::DEFAULT_LESSONS_PER_SECTION); ?>" min="0" max="100" class="small-text"></td>
-        </tr>
-        <tr class="tp-field-row" data-tp-tab="lifterlms">
-            <th scope="row"><label for="tp-llms-quizzes"><?php esc_html_e('Quizzes per Section', 'tangible-populater'); ?></label></th>
-            <td><input type="number" id="tp-llms-quizzes" data-tp-field="quizzes_per_section" value="<?php echo esc_attr((string) SeedConfig::DEFAULT_QUIZZES_PER_SECTION); ?>" min="0" max="50" class="small-text"></td>
-        </tr>
-        <?php
-    }
-
-    private function renderTangibleFields(): void
-    {
-        ?>
-        <tr class="tp-field-row" data-tp-tab="tangible-lms">
-            <th scope="row"><label for="tp-tgl-modules"><?php esc_html_e('Modules per Course', 'tangible-populater'); ?></label></th>
-            <td><input type="number" id="tp-tgl-modules" data-tp-field="modules_per_course" value="<?php echo esc_attr((string) SeedConfig::DEFAULT_MODULES_PER_COURSE); ?>" min="0" max="50" class="small-text"></td>
-        </tr>
-        <tr class="tp-field-row" data-tp-tab="tangible-lms">
-            <th scope="row"><label for="tp-tgl-lessons"><?php esc_html_e('Lessons per Course', 'tangible-populater'); ?></label></th>
-            <td><input type="number" id="tp-tgl-lessons" data-tp-field="lessons_per_course" value="<?php echo esc_attr((string) SeedConfig::DEFAULT_LESSONS_PER_COURSE); ?>" min="0" max="100" class="small-text"></td>
-        </tr>
-        <tr class="tp-field-row" data-tp-tab="tangible-lms">
-            <th scope="row"><label for="tp-tgl-quizzes"><?php esc_html_e('Quizzes per Module', 'tangible-populater'); ?></label></th>
-            <td><input type="number" id="tp-tgl-quizzes" data-tp-field="quizzes_per_section" value="<?php echo esc_attr((string) SeedConfig::DEFAULT_QUIZZES_PER_SECTION); ?>" min="0" max="50" class="small-text"></td>
-        </tr>
-        <?php
-    }
-
     private function renderGroupsField(string $slug): void
     {
         if (!LmsGroupsCapability::supports($slug)) {
             return;
         }
 
-        $inputId = match ($slug) {
-            'learndash' => 'tp-ld-groups',
-            'lifterlms' => 'tp-llms-groups',
-            default     => 'tp-groups',
-        };
+        $inputId = "tp-groups-{$slug}";
         ?>
         <tr class="tp-field-row" data-tp-tab="<?php echo esc_attr($slug); ?>">
             <th scope="row"><label for="<?php echo esc_attr($inputId); ?>"><?php esc_html_e('Create Groups', 'tangible-populater'); ?></label></th>
