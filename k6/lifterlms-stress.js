@@ -23,12 +23,16 @@ import http from 'k6/http';
 import execution from 'k6/execution';
 
 const BASE_URL = (__ENV.BASE_URL || 'http://localhost:8888').replace(/\/$/, '');
-const USER_PASSWORD = __ENV.USER_PASSWORD || 'StressTest#2026';
+const USER_PASSWORD = __ENV.LIFTER_USER_PASSWORD || __ENV.USER_PASSWORD || 'StressTest#2026';
 /** Must match SeededUsername::prefix('lifterlms', 'student') in the Populater plugin. */
 const LIFTER_STUDENT_PREFIX = 'lifterstudent';
+const LIFTER_USERNAME = __ENV.LIFTER_USERNAME || '';
 const MAX_USERS = intEnv('MAX_USERS', 20);
 const THINK_TIME = floatEnv('THINK_TIME', 1);
 const ACTION_DELAY = floatEnv('ACTION_DELAY', 0);
+const LESSON_COUNT = intEnv('LESSON_COUNT', 10);
+const SECTIONS_PER_COURSE = intEnv('SECTIONS_PER_COURSE', 5);
+const QUIZZES_PER_SECTION = intEnv('QUIZZES_PER_SECTION', 1);
 const CF_BYPASS_ENABLED = __ENV.CF_BYPASS !== '0';
 const CF_USER_AGENT = __ENV.CF_USER_AGENT ?? 'bench2.com PopulaterK6/1.0';
 const CF_BYPASS_HEADER = (__ENV.CF_BYPASS_HEADER || 'x-reviewsignal').toLowerCase();
@@ -108,14 +112,26 @@ function fetchCourseStructure(courseIndex, jar) {
   const match = body.match(/<!--\s*populater:structure\s+(\{[^>]*\})\s*-->/);
 
   if (!match) {
-    return null;
+    return fallbackCourseStructure();
   }
 
   try {
     return JSON.parse(match[1]);
   } catch (_error) {
-    return null;
+    return fallbackCourseStructure();
   }
+}
+
+function fallbackCourseStructure() {
+  const lessons = Math.max(1, LESSON_COUNT);
+  const sectionsPerCourse = Math.max(1, SECTIONS_PER_COURSE);
+
+  return {
+    lessons,
+    sections_per_course: sectionsPerCourse,
+    lessons_per_section: Math.max(1, Math.ceil(lessons / sectionsPerCourse)),
+    quizzes_per_lesson: Math.max(1, QUIZZES_PER_SECTION),
+  };
 }
 
 function range(n) {
@@ -123,6 +139,14 @@ function range(n) {
 }
 
 function vuUser() {
+  if (LIFTER_USERNAME !== '') {
+    return {
+      username: LIFTER_USERNAME,
+      index: 1,
+      courseIndex: 1,
+    };
+  }
+
   const vu = execution.vu.idInTest;
   const index = ((vu - 1) % MAX_USERS) + 1;
 

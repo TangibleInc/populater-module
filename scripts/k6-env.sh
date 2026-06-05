@@ -14,7 +14,7 @@ k6_load_dotenv() {
 }
 
 k6_resolve_env() {
-  K6_RESOLVED_BASE_URL="${K6_BASE_URL:-http://host.docker.internal:${PORT:-8888}}"
+  K6_RESOLVED_BASE_URL="${K6_BASE_URL:-http://localhost:${PORT:-8888}}"
   K6_RESOLVED_USER_PASSWORD="${K6_USER_PASSWORD:-StressTest#2026}"
 
   export K6_RESOLVED_BASE_URL K6_RESOLVED_USER_PASSWORD
@@ -31,6 +31,8 @@ k6_export_env_args() {
     -e "RAMP_DOWN=${K6_RAMP_DOWN:-1m}"
     -e "THINK_TIME=${K6_THINK_TIME:-1}"
     -e "ACTION_DELAY=${K6_ACTION_DELAY:-0}"
+    -e "SECTIONS_PER_COURSE=${K6_SECTIONS_PER_COURSE:-5}"
+    -e "QUIZZES_PER_SECTION=${K6_QUIZZES_PER_SECTION:-1}"
     -e "COURSE_INDEX=${K6_COURSE_INDEX:-1}"
     -e "COURSE_PER_USER=${K6_COURSE_PER_USER:-0}"
     -e "LESSON_COUNT=${K6_LESSON_COUNT:-10}"
@@ -38,6 +40,8 @@ k6_export_env_args() {
     -e "QUIZ_TOPIC_INDEX=${K6_QUIZ_TOPIC_INDEX:-${K6_TOPIC_COUNT:-10}}"
     -e "SECTION_INDEX=${K6_SECTION_INDEX:-1}"
     -e "QUIZ_INDEX=${K6_QUIZ_INDEX:-1}"
+    -e "LIFTER_USERNAME=${K6_LIFTER_USERNAME:-}"
+    -e "LIFTER_USER_PASSWORD=${K6_LIFTER_USER_PASSWORD:-}"
     -e "CF_BYPASS=${K6_CF_BYPASS:-1}"
     -e "CF_USER_AGENT=${K6_CF_USER_AGENT:-bench2.com PopulaterK6/1.0}"
     -e "CF_BYPASS_HEADER=${K6_CF_BYPASS_HEADER:-x-reviewsignal}"
@@ -94,10 +98,9 @@ k6_export_dashboard_docker_args() {
   local port="${K6_WEB_DASHBOARD_PORT:-5665}"
 
   K6_DASHBOARD_DOCKER_ARGS=(
-    -p "${port}:5665"
     -e K6_WEB_DASHBOARD=true
     -e K6_WEB_DASHBOARD_HOST=0.0.0.0
-    -e K6_WEB_DASHBOARD_PORT=5665
+    -e "K6_WEB_DASHBOARD_PORT=${port}"
   )
 
   if k6_report_autosave_enabled && [[ -n "${K6_REPORT_HTML_PATH:-}" ]]; then
@@ -116,6 +119,6 @@ k6_prepare_k6_args() {
     return
   fi
 
-  K6_FINAL_ARGS=(run --out "json=${K6_REPORT_JSON_PATH}" "${@:2}")
+  K6_FINAL_ARGS=(run --address "${K6_API_ADDRESS:-127.0.0.1:6566}" --out "json=${K6_REPORT_JSON_PATH}" "${@:2}")
   export K6_FINAL_ARGS
 }

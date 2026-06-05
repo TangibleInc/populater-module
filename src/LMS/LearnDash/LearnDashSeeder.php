@@ -17,6 +17,18 @@ use Tangible\Populater\Support\DummyContent;
  */
 class LearnDashSeeder extends AbstractSeeder
 {
+    /** @param array<string, mixed> $options */
+    protected function afterUserCreated(int $userId, int $index, array $options = []): void
+    {
+        parent::afterUserCreated($userId, $index, $options);
+
+        if ((int) ($options['groups'] ?? 0) > 0 || (int) ($options['group_id'] ?? 0) > 0 || (int) ($options['group_index'] ?? 0) > 0) {
+            return;
+        }
+
+        $this->grantUserCourseAccess($userId, (int) ($options['total_courses'] ?? 0));
+    }
+
     protected function afterLessonCreated(int $postId, int $courseId, int $index, array $options = []): void
     {
         if ($courseId > 0) {
@@ -214,7 +226,7 @@ class LearnDashSeeder extends AbstractSeeder
         }
 
         if (function_exists('learndash_course_add_child_to_parent')) {
-            learndash_course_add_child_to_parent($courseId, $quizId, $topicId);
+            \learndash_course_add_child_to_parent($courseId, $quizId, $topicId);
 
             return;
         }
@@ -229,7 +241,7 @@ class LearnDashSeeder extends AbstractSeeder
         }
 
         if (function_exists('learndash_course_add_child_to_parent')) {
-            learndash_course_add_child_to_parent($courseId, $childId, $parentId);
+            \learndash_course_add_child_to_parent($courseId, $childId, $parentId);
 
             return;
         }
@@ -341,7 +353,7 @@ class LearnDashSeeder extends AbstractSeeder
         }
 
         if (function_exists('ld_update_course_group_access')) {
-            ld_update_course_group_access($courseId, $groupId);
+            \ld_update_course_group_access($courseId, $groupId);
         }
     }
 
@@ -359,16 +371,34 @@ class LearnDashSeeder extends AbstractSeeder
 
         if ($isGroupAdmin) {
             if (function_exists('learndash_set_groups_administrators')) {
-                learndash_set_groups_administrators($groupId, [$userId]);
+                \learndash_set_groups_administrators($groupId, [$userId]);
             } elseif (function_exists('ld_update_leader_group_access')) {
-                ld_update_leader_group_access($userId, $groupId);
+                \ld_update_leader_group_access($userId, $groupId);
             }
 
             return;
         }
 
         if (function_exists('ld_update_group_access')) {
-            ld_update_group_access($userId, $groupId);
+            \ld_update_group_access($userId, $groupId);
+        }
+    }
+
+    private function grantUserCourseAccess(int $userId, int $totalCourses): void
+    {
+        if ($userId <= 0 || $totalCourses <= 0 || !function_exists('ld_update_course_access')) {
+            return;
+        }
+
+        $prefix = $this->getTitlePrefix('courses');
+
+        for ($courseIndex = 1; $courseIndex <= $totalCourses; $courseIndex++) {
+            $slug = DeterministicTitle::slug(DeterministicTitle::course($prefix, $courseIndex));
+            $course = get_page_by_path($slug, OBJECT, $this->getPostType('courses'));
+
+            if ($course instanceof \WP_Post) {
+                \ld_update_course_access($userId, (int) $course->ID);
+            }
         }
     }
 }

@@ -82,12 +82,8 @@ services:
     working_dir: /scripts
     volumes:
       - ./k6:/scripts
-    ports:
-      - "${K6_WEB_DASHBOARD_PORT:-5665}:5665"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    networks:
-      - tangible-wp-network
+    network_mode: host
+    ipc: host
 
 volumes:
   db-data:
