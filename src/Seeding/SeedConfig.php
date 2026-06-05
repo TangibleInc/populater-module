@@ -11,13 +11,13 @@ final class SeedConfig
 {
     public const DEFAULT_PLUGIN              = 'learndash';
     public const DEFAULT_COURSES             = 5;
-    public const DEFAULT_LESSONS_PER_COURSE  = 10;
-    public const DEFAULT_LESSONS_PER_SECTION = 2;
+    public const DEFAULT_LESSONS_PER_COURSE  = 5;
+    public const DEFAULT_LESSONS_PER_SECTION = 10;
     public const DEFAULT_QUIZZES_PER_SECTION = 1;
     public const DEFAULT_QUIZZES_PER_LESSON   = 1;
     public const DEFAULT_QUESTIONS_PER_QUIZ  = 10;
     public const DEFAULT_TOPICS_PER_LESSON   = 10;
-    public const DEFAULT_SECTIONS_PER_COURSE = 10;
+    public const DEFAULT_SECTIONS_PER_COURSE = 5;
     public const DEFAULT_MODULES_PER_COURSE  = 1;
     public const DEFAULT_USERS               = 100;
     public const DEFAULT_GROUPS              = 1;
