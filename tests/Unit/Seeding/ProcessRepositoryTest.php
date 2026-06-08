@@ -109,4 +109,56 @@ class ProcessRepositoryTest extends \WPTestCase
 
         $this->assertNull($this->repository->getStoredActiveProcessId());
     }
+
+    public function test_find_active_process_with_multiple_active_seedings_prefers_newer_by_timestamp(): void
+    {
+        global $wpdb;
+
+        $this->repository->saveStatus('proc-old', ['status' => 'running', 'processed' => 15, 'timestamp' => 1000]);
+        $this->repository->saveStatus('proc-new', ['status' => 'pending', 'processed' => 0, 'timestamp' => 2000]);
+
+        $wpdb = \Mockery::mock('wpdb');
+        $wpdb->options = 'wp_options';
+        $wpdb->shouldReceive('esc_like')->andReturnUsing(static fn(string $text) => $text);
+        $wpdb->shouldReceive('prepare')->andReturnUsing(static fn(string $query) => $query);
+        $wpdb->shouldReceive('get_results')->andReturn([
+            [
+                'option_name'  => ProcessRepository::PREFIX_STATUS . 'proc-old',
+                'option_value' => serialize(['status' => 'running', 'processed' => 15, 'timestamp' => 1000]),
+            ],
+            [
+                'option_name'  => ProcessRepository::PREFIX_STATUS . 'proc-new',
+                'option_value' => serialize(['status' => 'pending', 'processed' => 0, 'timestamp' => 2000]),
+            ],
+        ]);
+
+        $this->assertSame('proc-new', $this->repository->findActiveProcessId());
+        $this->assertSame('proc-new', $this->repository->getStoredActiveProcessId());
+    }
+
+    public function test_find_active_process_prefers_newer_with_timestamp_over_older_no_timestamp(): void
+    {
+        global $wpdb;
+
+        $this->repository->saveStatus('proc-legacy', ['status' => 'running', 'processed' => 12]);
+        $this->repository->saveStatus('proc-modern', ['status' => 'pending', 'processed' => 0, 'timestamp' => 1000]);
+
+        $wpdb = \Mockery::mock('wpdb');
+        $wpdb->options = 'wp_options';
+        $wpdb->shouldReceive('esc_like')->andReturnUsing(static fn(string $text) => $text);
+        $wpdb->shouldReceive('prepare')->andReturnUsing(static fn(string $query) => $query);
+        $wpdb->shouldReceive('get_results')->andReturn([
+            [
+                'option_name'  => ProcessRepository::PREFIX_STATUS . 'proc-legacy',
+                'option_value' => serialize(['status' => 'running', 'processed' => 12]),
+            ],
+            [
+                'option_name'  => ProcessRepository::PREFIX_STATUS . 'proc-modern',
+                'option_value' => serialize(['status' => 'pending', 'processed' => 0, 'timestamp' => 1000]),
+            ],
+        ]);
+
+        $this->assertSame('proc-modern', $this->repository->findActiveProcessId());
+        $this->assertSame('proc-modern', $this->repository->getStoredActiveProcessId());
+    }
 }

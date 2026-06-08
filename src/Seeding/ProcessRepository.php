@@ -116,8 +116,9 @@ class ProcessRepository
             ARRAY_A
         );
 
-        $activeId       = null;
-        $latestProgress = -1;
+        $activeId        = null;
+        $latestTimestamp = -1;
+        $latestProgress  = -1;
 
         foreach ($rows as $row) {
             $data = maybe_unserialize($row['option_value']);
@@ -127,11 +128,19 @@ class ProcessRepository
             }
 
             $processId = substr((string) $row['option_name'], strlen(self::PREFIX_STATUS));
+            $timestamp = (int) ($data['timestamp'] ?? 0);
             $progress  = (int) ($data['processed'] ?? 0);
 
-            if ($progress >= $latestProgress) {
-                $latestProgress = $progress;
-                $activeId       = $processId;
+            if ($timestamp > 0 || $latestTimestamp > 0) {
+                if ($timestamp >= $latestTimestamp) {
+                    $latestTimestamp = $timestamp;
+                    $activeId        = $processId;
+                }
+            } else {
+                if ($progress >= $latestProgress) {
+                    $latestProgress = $progress;
+                    $activeId       = $processId;
+                }
             }
         }
 

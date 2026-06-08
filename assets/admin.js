@@ -397,6 +397,7 @@
                 lastLogCount = 0;
                 showStatusMessage('');
                 setRunning(true);
+                setProgress(0, 0);
 
                 try {
                     const data = await apiFetch('/seed', {

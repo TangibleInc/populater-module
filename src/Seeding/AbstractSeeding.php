@@ -47,6 +47,7 @@ abstract class AbstractSeeding extends \WP_Background_Process
             'processed' => 0,
             'errors'    => 0,
             'error'     => null,
+            'timestamp' => time(),
         ]);
         $this->repository->setActiveProcess($processId);
 
