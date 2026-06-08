@@ -8,7 +8,7 @@ namespace Tangible\Populater\Registry;
  * Post types, title prefixes, relationship meta, and optional container entities
  * for an LMS integration.
  */
-final readonly class LmsEntitySchema
+final class LmsEntitySchema
 {
     /**
      * @param array<string, string> $postTypes Entity key => WordPress post type slug
@@ -16,13 +16,13 @@ final readonly class LmsEntitySchema
      * @param array<string, array<string, string>> $metaMap Entity key => [meta key => context key]
      */
     public function __construct(
-        public array $postTypes,
-        public array $titlePrefixes = [],
-        public string $userPrefix = '',
-        public array $metaMap = [],
-        public ?LmsContainerEntity $container = null,
+        public readonly array $postTypes,
+        public readonly array $titlePrefixes = [],
+        public readonly string $userPrefix = '',
+        public readonly array $metaMap = [],
+        public readonly ?LmsContainerEntity $container = null,
         /** Entity key quizzes attach to: topics, sections, modules, etc. */
-        public ?string $quizParentEntity = null,
+        public readonly ?string $quizParentEntity = null,
     ) {}
 
     public function getPostType(string $entity): string
@@ -81,12 +81,12 @@ final readonly class LmsEntitySchema
 /**
  * Intermediate entity between course and lesson (section, module, etc.).
  */
-final readonly class LmsContainerEntity
+final class LmsContainerEntity
 {
     public function __construct(
-        public string $entity,
-        public string $cacheMetaKey,
-        public string $parentMetaKey,
-        public string $lessonParentMetaKey = '',
+        public readonly string $entity,
+        public readonly string $cacheMetaKey,
+        public readonly string $parentMetaKey,
+        public readonly string $lessonParentMetaKey = '',
     ) {}
 }
