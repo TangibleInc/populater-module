@@ -80,8 +80,11 @@ services:
     profiles:
       - k6
     working_dir: /scripts
+    environment:
+      XDG_CONFIG_HOME: /k6-config
     volumes:
       - ./k6:/scripts
+      - ${K6_HOST_CONFIG_DIR:-${HOME}/.config/k6}:/k6-config/k6:ro
     network_mode: host
     ipc: host
 

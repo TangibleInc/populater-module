@@ -442,7 +442,7 @@ HTML;
             }
         }
 
-        $this->enrollGroupMembersInCourse($groupId, $courseId);
+        // Course enrollment is intentionally left to the student journey.
     }
 
     /** @param array<string, mixed> $options */
@@ -467,7 +467,6 @@ HTML;
         }
 
         $this->trackGroupMember($groupId, $userId);
-        $this->enrollUserInGroupCourses($groupId, $userId);
     }
 
     private function trackGroupCourse(int $groupId, int $courseId): void
@@ -492,40 +491,6 @@ HTML;
 
         $members[] = $userId;
         update_post_meta($groupId, '_populater_group_member_ids', array_values(array_unique(array_map('intval', $members))));
-    }
-
-    private function enrollGroupMembersInCourse(int $groupId, int $courseId): void
-    {
-        if (!function_exists('llms_enroll_student')) {
-            return;
-        }
-
-        $members = get_post_meta($groupId, '_populater_group_member_ids', true);
-
-        if (!is_array($members)) {
-            return;
-        }
-
-        foreach ($members as $memberId) {
-            llms_enroll_student((int) $memberId, $courseId, 'populater_group_' . $groupId);
-        }
-    }
-
-    private function enrollUserInGroupCourses(int $groupId, int $userId): void
-    {
-        if (!function_exists('llms_enroll_student')) {
-            return;
-        }
-
-        $courses = get_post_meta($groupId, '_populater_group_courses', true);
-
-        if (!is_array($courses)) {
-            return;
-        }
-
-        foreach ($courses as $courseId) {
-            llms_enroll_student($userId, (int) $courseId, 'populater_group_' . $groupId);
-        }
     }
 
     /** @param array<string, mixed> $options */

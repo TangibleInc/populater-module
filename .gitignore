@@ -49,6 +49,7 @@ dist/
 
 # k6 autosaved reports
 k6/k6-report.html
+k6/.runtime/
 k6/reports/
 
 # Unit test reports

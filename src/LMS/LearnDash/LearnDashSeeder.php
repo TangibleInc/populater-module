@@ -18,15 +18,9 @@ use Tangible\Populater\Support\DummyContent;
 class LearnDashSeeder extends AbstractSeeder
 {
     /** @param array<string, mixed> $options */
-    protected function afterUserCreated(int $userId, int $index, array $options = []): void
+    protected function afterCourseCreated(int $postId, int $index, array $options = []): void
     {
-        parent::afterUserCreated($userId, $index, $options);
-
-        if ((int) ($options['groups'] ?? 0) > 0 || (int) ($options['group_id'] ?? 0) > 0 || (int) ($options['group_index'] ?? 0) > 0) {
-            return;
-        }
-
-        $this->grantUserCourseAccess($userId, (int) ($options['total_courses'] ?? 0));
+        $this->configureFreeEnrollment($postId);
     }
 
     protected function afterLessonCreated(int $postId, int $courseId, int $index, array $options = []): void
@@ -227,8 +221,6 @@ class LearnDashSeeder extends AbstractSeeder
 
         if (function_exists('learndash_course_add_child_to_parent')) {
             \learndash_course_add_child_to_parent($courseId, $quizId, $topicId);
-
-            return;
         }
 
         $this->linkQuizToTopicFallback($courseId, $quizId, $lessonId, $topicId);
@@ -242,8 +234,6 @@ class LearnDashSeeder extends AbstractSeeder
 
         if (function_exists('learndash_course_add_child_to_parent')) {
             \learndash_course_add_child_to_parent($courseId, $childId, $parentId);
-
-            return;
         }
 
         $this->linkStepToCourseFallback($courseId, $childId, $parentId, $childType);
@@ -384,21 +374,31 @@ class LearnDashSeeder extends AbstractSeeder
         }
     }
 
-    private function grantUserCourseAccess(int $userId, int $totalCourses): void
+    private function configureFreeEnrollment(int $courseId): void
     {
-        if ($userId <= 0 || $totalCourses <= 0 || !function_exists('ld_update_course_access')) {
+        if ($courseId <= 0) {
             return;
         }
 
-        $prefix = $this->getTitlePrefix('courses');
-
-        for ($courseIndex = 1; $courseIndex <= $totalCourses; $courseIndex++) {
-            $slug = DeterministicTitle::slug(DeterministicTitle::course($prefix, $courseIndex));
-            $course = get_page_by_path($slug, OBJECT, $this->getPostType('courses'));
-
-            if ($course instanceof \WP_Post) {
-                \ld_update_course_access($userId, (int) $course->ID);
-            }
+        if (function_exists('learndash_update_setting')) {
+            \learndash_update_setting($courseId, 'course_price_type', 'free');
+            \learndash_update_setting($courseId, 'course_disable_content_table', '');
         }
+
+        if (!function_exists('get_post_meta') || !function_exists('update_post_meta')) {
+            return;
+        }
+
+        $settings = get_post_meta($courseId, '_sfwd-courses', true);
+        if (!is_array($settings)) {
+            $settings = [];
+        }
+
+        $settings['sfwd-courses_course_price_type'] = 'free';
+        $settings['sfwd-courses_custom_button_url'] = '';
+        $settings['sfwd-courses_course_price'] = '';
+        $settings['sfwd-courses_course_disable_content_table'] = '';
+        update_post_meta($courseId, '_sfwd-courses', $settings);
     }
+
 }

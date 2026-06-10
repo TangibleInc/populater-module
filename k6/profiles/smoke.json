@@ -1,0 +1,23 @@
+{
+  "scenarios": {
+    "student_journey": {
+      "executor": "per-vu-iterations",
+      "exec": "default",
+      "vus": 1,
+      "iterations": 1,
+      "maxDuration": "5m",
+      "tags": {
+        "workload": "student_journey",
+        "profile": "smoke"
+      }
+    }
+  },
+  "summaryTrendStats": ["avg", "min", "med", "p(90)", "p(95)", "max", "count"],
+  "thresholds": {
+    "http_req_failed": ["rate<0.05"],
+    "http_req_duration": ["p(95)<8000"],
+    "checks": ["rate==1.00"],
+    "iterations": ["count>0"],
+    "group_duration{group:::course}": ["p(95)<3600000"]
+  }
+}

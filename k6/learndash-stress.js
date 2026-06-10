@@ -1,83 +1,53 @@
 /**
  * LearnDash student journey stress test.
  *
- * Each VU logs in as a seeded student (ldstudent1, ldstudent2, …), enrolls in a
- * course when needed, marks topics complete in order, and submits the lesson quiz
- * (wpProQuiz via admin-ajax).
+ * Each VU iteration logs in as the next seeded student (`ldstudent1`, `ldstudent2`, ...),
+ * walks every course once (default 5), then never reuses that user on a later iteration.
  *
  * Logins match Populater LearnDash seeded users (SeededUsername: ldstudent{N}).
  * Content slugs follow DeterministicTitle (e.g. learndash-course-1,
  * learndash-topic-c1-l1-t1, learndash-quiz-c1-l1-q1).
  *
  * Usage:
- *   cp .env.example .env   # set K6_BASE_URL, K6_USER_PASSWORD, pacing (K6_ACTION_DELAY, K6_THINK_TIME)
+ *   cp .env.example .env   # set K6_BASE_URL, K6_USER_PASSWORD, pacing (K6_STEP_THINK_TIME, K6_THINK_TIME)
  *   composer k6:learndash:smoke
  *   composer k6:learndash
  *
  * Live dashboard: http://127.0.0.1:5665 (enabled by default via scripts/k6-run.sh).
- * Autosave: k6/reports/k6-report-<timestamp>.html and k6-results-<timestamp>.json.
+ * Autosave: k6/reports/k6-report-<timestamp>.html and k6-summary-<timestamp>.json.
  */
 
-import { check, group, sleep } from 'k6';
-import { Counter } from 'k6/metrics';
+import { group } from 'k6';
 import http from 'k6/http';
-import execution from 'k6/execution';
+import {
+  intEnv,
+  logLoadProfile,
+  must,
+  parseCourseStructure,
+  pacedGet,
+  pacedPost,
+  seededUser,
+  stopIfUserPoolExhausted,
+  studentLoadOptions,
+  thinkBetweenCourses,
+} from './student-load.js';
 
 const BASE_URL = (__ENV.BASE_URL || 'http://localhost:8888').replace(/\/$/, '');
 const USER_PASSWORD = __ENV.USER_PASSWORD || 'StressTest#2026';
 /** Must match SeededUsername::prefix('learndash', 'student') in the Populater plugin. */
 const LD_STUDENT_PREFIX = 'ldstudent';
 const MAX_USERS = intEnv('MAX_USERS', 20);
-const THINK_TIME = floatEnv('THINK_TIME', 1);
-const ACTION_DELAY = floatEnv('ACTION_DELAY', 0);
+const COURSE_INDEX = intEnv('COURSE_INDEX', 1);
+const COURSE_COUNT = intEnv('COURSE_COUNT', 5);
+const COURSE_PER_USER = intEnv('COURSE_PER_USER', 0) === 1;
 const CF_BYPASS_ENABLED = __ENV.CF_BYPASS !== '0';
 const CF_USER_AGENT = __ENV.CF_USER_AGENT ?? 'bench2.com PopulaterK6/1.0';
 const CF_BYPASS_HEADER = (__ENV.CF_BYPASS_HEADER || 'x-reviewsignal').toLowerCase();
 const CF_BYPASS_VALUE = __ENV.CF_BYPASS_VALUE ?? '1';
 
-const enrollSkippedNoForm = new Counter('enroll_skipped_no_form');
-const enrollAttempted = new Counter('enroll_attempted');
-const topicSkippedNoForm = new Counter('topic_skipped_no_form');
-const topicMarkedComplete = new Counter('topic_marked_complete');
+const QUIZ_TOPIC_INDEX = intEnv('QUIZ_TOPIC_INDEX', 0);
 
-export const options = {
-  stages: [
-    { target: intEnv('VUS', 20), duration: __ENV.RAMP_UP || '1m' },
-    { target: intEnv('VUS', 20), duration: __ENV.HOLD || '3m30s' },
-    { target: 0, duration: __ENV.RAMP_DOWN || '1m' },
-  ],
-  thresholds: {
-    http_req_failed: ['rate<0.05'],
-    http_req_duration: ['p(95)<8000'],
-    checks: ['rate>0.90'],
-  },
-};
-
-function intEnv(name, fallback) {
-  const value = __ENV[name];
-  if (value === undefined || value === '') {
-    return fallback;
-  }
-
-  const parsed = parseInt(value, 10);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
-function floatEnv(name, fallback) {
-  const value = __ENV[name];
-  if (value === undefined || value === '') {
-    return fallback;
-  }
-
-  const parsed = parseFloat(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
-function pauseBetweenActions() {
-  if (ACTION_DELAY > 0) {
-    sleep(ACTION_DELAY);
-  }
-}
+export const options = studentLoadOptions('learndash');
 
 function coursePath(courseIndex) {
   return `/courses/learndash-course-${courseIndex}/`;
@@ -95,49 +65,50 @@ function quizPath(courseIndex, lessonIndex, topicIndex, quizIndex) {
   return `/courses/learndash-course-${courseIndex}/lessons/learndash-lesson-c${courseIndex}-l${lessonIndex}/topics/learndash-topic-c${courseIndex}-l${lessonIndex}-t${topicIndex}/quizzes/learndash-quiz-c${courseIndex}-l${lessonIndex}-q${quizIndex}/`;
 }
 
-// Fetch the course page once and parse the embedded structure metadata.
-// Returns { lessons, topics_per_lesson, quizzes_per_lesson } or null on failure.
 function fetchCourseStructure(courseIndex, jar) {
   const path = coursePath(courseIndex);
-  const res = http.get(`${BASE_URL}${path}`, {
+  const res = pacedGet(`${BASE_URL}${path}`, {
     jar,
     headers: htmlHeaders(path),
     tags: { name: 'GET course structure' },
   });
 
-  check(res, { 'course page loads': (r) => r.status === 200 });
+  must(res.status === 200, 'course page loads');
 
-  if (res.status !== 200) {
-    return null;
-  }
-
-  const body = String(res.body);
-  const match = body.match(/<!--\s*populater:structure\s+(\{[^>]*\})\s*-->/);
-
-  if (!match) {
-    return null;
-  }
-
-  try {
-    return JSON.parse(match[1]);
-  } catch (_error) {
-    return null;
-  }
+  return parseCourseStructure(String(res.body));
 }
 
 function range(n) {
   return Array.from({ length: n }, (_, i) => i + 1);
 }
 
-function vuUser() {
-  const vu = execution.vu.idInTest;
-  const index = ((vu - 1) % MAX_USERS) + 1;
+function courseIndices() {
+  return range(COURSE_COUNT).map((offset) => COURSE_INDEX + offset - 1);
+}
 
-  return {
-    username: `${LD_STUDENT_PREFIX}${index}`,
-    index,
-    courseIndex: 1,
-  };
+function vuUser() {
+  return seededUser(LD_STUDENT_PREFIX);
+}
+
+function quizTopicIndexFor(structure) {
+  return QUIZ_TOPIC_INDEX > 0 ? QUIZ_TOPIC_INDEX : structure.topics_per_lesson;
+}
+
+function contentTopicIndices(structure) {
+  const quizTopic = quizTopicIndexFor(structure);
+  if (quizTopic <= 1) {
+    return [];
+  }
+
+  return range(quizTopic - 1);
+}
+
+function hasQuizEmbed(body) {
+  return body.includes('quiz_nonce') || body.includes('wpProQuiz') || body.includes('learndash-quiz');
+}
+
+export function setup() {
+  return logLoadProfile('LearnDash', MAX_USERS);
 }
 
 function extractInput(html, name) {
@@ -173,7 +144,7 @@ function extractQuizMeta(body) {
 // Extract a JSON object value by key, handling nested braces.
 // Matches both JS object literal style (key:) and JSON style ("key":).
 function extractBalancedJson(html, key) {
-  const patterns = [`"${key}":`, `${key}:`];
+  const patterns = [`${key}:`, `"${key}":`];
   let keyIdx = -1;
   let keyLen = 0;
 
@@ -206,33 +177,18 @@ function extractBalancedJson(html, key) {
 
 function extractQuestionIds(body) {
   const jsonStr = extractBalancedJson(body, 'json');
+  must(jsonStr !== null, 'quiz question JSON present');
 
-  if (jsonStr) {
-    try {
-      const questionMap = JSON.parse(jsonStr);
-      const ids = Object.keys(questionMap).map((id) => parseInt(id, 10));
-      if (ids.length > 0) return ids;
-    } catch (_error) {
-      // fall through to next strategy
-    }
+  let questionMap;
+  try {
+    questionMap = JSON.parse(jsonStr);
+  } catch (error) {
+    must(false, `quiz question JSON is valid: ${error.message}`);
   }
 
-  // WPProQuiz embeds question IDs in data-question-meta HTML attributes.
-  // e.g. data-question-meta="{&quot;question_pro_id&quot;:1,...}"
-  const htmlAttrIds = [];
-  const re = /question_pro_id&quot;:(\d+)/gi;
-  let m;
-  while ((m = re.exec(body))) htmlAttrIds.push(parseInt(m[1], 10));
-  if (htmlAttrIds.length > 0) return htmlAttrIds;
-
-  // Last fallback: hidden input fields.
-  const inputIds = [];
-  const re1 = /name=["']question_pro_id["'][^>]*value=["'](\d+)["']/gi;
-  const re2 = /value=["'](\d+)["'][^>]*name=["']question_pro_id["']/gi;
-  while ((m = re1.exec(body))) inputIds.push(parseInt(m[1], 10));
-  if (inputIds.length > 0) return inputIds;
-  while ((m = re2.exec(body))) inputIds.push(parseInt(m[1], 10));
-  return inputIds;
+  const ids = Object.keys(questionMap).map((id) => parseInt(id, 10));
+  must(ids.length > 0, 'quiz has questions');
+  return ids;
 }
 
 function requestHeaders(extra = {}) {
@@ -271,151 +227,117 @@ function ajaxHeaders(refererPath) {
   });
 }
 
-function login(user, jar) {
-  group('login', () => {
-    const loginUrl = `${BASE_URL}/wp-login.php`;
-    const loginPage = http.get(loginUrl, {
-      jar,
-      headers: requestHeaders(),
-      tags: { name: 'GET /wp-login.php' },
-    });
+function loginResponseOk(response) {
+  if (response.status === 429 || response.status === 503) {
+    return false;
+  }
 
-    check(loginPage, {
-      'login page loads': (r) => r.status === 200,
-    });
-    pauseBetweenActions();
+  if (response.status === 302) {
+    return true;
+  }
 
-    const response = http.post(
-      loginUrl,
-      {
-        log: user.username,
-        pwd: USER_PASSWORD,
-        'wp-submit': 'Log In',
-        redirect_to: `${BASE_URL}/`,
-        testcookie: '1',
-      },
-      {
-        jar,
-        headers: requestHeaders(),
-        redirects: 0,
-        tags: { name: 'POST /wp-login.php' },
-      },
-    );
-
-    check(response, {
-      'login succeeded': (r) => {
-        if (r.status === 429 || r.status === 503) {
-          return false;
-        }
-
-        if (r.status === 302) {
-          return true;
-        }
-
-        const body = String(r.body);
-        return r.status === 200 && !body.includes('login_error') && !body.includes('Error 429');
-      },
-    });
-    pauseBetweenActions();
-  });
+  const body = String(response.body);
+  return response.status === 200 && !body.includes('login_error') && !body.includes('Error 429');
 }
 
-function maybeEnroll(user, courseIndex, jar) {
-  group('enroll', () => {
-    const path = coursePath(courseIndex);
-    const coursePage = http.get(`${BASE_URL}${path}`, {
-      jar,
-      headers: htmlHeaders(path),
-      tags: { name: 'GET course' },
-    });
+function login(user, jar) {
+  const loginUrl = `${BASE_URL}/wp-login.php`;
 
-    check(coursePage, {
-      'course page loads': (r) => r.status === 200,
-    });
-    pauseBetweenActions();
-
-    const body = String(coursePage.body);
-    const hasAccess =
-      body.includes('user_has_access') || body.includes('ld-course-status-enrolled');
-    const joinNonce = extractInput(body, 'course_join');
-    const courseId = extractInput(body, 'course_id');
-
-    if (hasAccess || !joinNonce || !courseId) {
-      enrollSkippedNoForm.add(1);
-      return;
-    }
-
-    enrollAttempted.add(1);
-
-    const enrollResponse = http.post(
-      `${BASE_URL}${path}`,
-      {
-        course_id: courseId,
-        course_join: joinNonce,
-      },
-      {
-        jar,
-        headers: {
-          ...htmlHeaders(path),
-          'content-type': 'application/x-www-form-urlencoded',
-          origin: BASE_URL,
-        },
-        tags: { name: 'POST course enroll' },
-      },
-    );
-
-    check(enrollResponse, {
-      'enrollment submitted': (r) => r.status === 200,
-    });
-    pauseBetweenActions();
+  const loginPage = pacedGet(loginUrl, {
+    jar,
+    headers: requestHeaders(),
+    tags: { name: 'GET /wp-login.php' },
   });
+
+  must(loginPage.status === 200, 'login page loads');
+
+  const response = pacedPost(
+    loginUrl,
+    {
+      log: user.username,
+      pwd: USER_PASSWORD,
+      'wp-submit': 'Log In',
+      redirect_to: `${BASE_URL}/`,
+      testcookie: '1',
+    },
+    {
+      jar,
+      headers: requestHeaders(),
+      redirects: 0,
+      tags: { name: 'POST /wp-login.php' },
+    },
+  );
+
+  must(loginResponseOk(response), 'login succeeded');
+}
+
+function enroll(user, courseIndex, jar) {
+  const path = coursePath(courseIndex);
+  const coursePage = pacedGet(`${BASE_URL}${path}`, {
+    jar,
+    headers: htmlHeaders(path),
+    tags: { name: 'GET course' },
+  });
+
+  must(coursePage.status === 200, 'course page loads');
+
+  const body = String(coursePage.body);
+  const hasAccess =
+    body.includes('user_has_access') || body.includes('ld-course-status-enrolled');
+  const joinNonce = extractInput(body, 'course_join');
+  const courseId = extractInput(body, 'course_id');
+
+  must(!hasAccess, 'student is not already enrolled');
+  must(joinNonce !== null, 'course join nonce present');
+  must(courseId !== null, 'course id present');
+
+  const enrollResponse = pacedPost(
+    `${BASE_URL}${path}`,
+    {
+      course_id: courseId,
+      course_join: joinNonce,
+    },
+    {
+      jar,
+      headers: {
+        ...htmlHeaders(path),
+        'content-type': 'application/x-www-form-urlencoded',
+        origin: BASE_URL,
+      },
+      tags: { name: 'POST course enroll' },
+    },
+  );
+
+  must(enrollResponse.status === 200, 'enrollment submitted');
 }
 
 function markTopicComplete(courseIndex, lessonIndex, topicIndex, jar) {
   const path = topicPath(courseIndex, lessonIndex, topicIndex);
-  const topicPage = http.get(`${BASE_URL}${path}`, {
+  const topicPage = pacedGet(`${BASE_URL}${path}`, {
     jar,
     headers: htmlHeaders(path),
     tags: { name: 'GET topic' },
   });
 
-  check(topicPage, {
-    [`topic L${lessonIndex} T${topicIndex} loads`]: (r) => r.status === 200,
-  });
-  pauseBetweenActions();
-
-  if (topicPage.status !== 200) {
-    return false;
-  }
+  must(topicPage.status === 200, `topic L${lessonIndex} T${topicIndex} loads`);
 
   const body = String(topicPage.body);
-  if (!body.includes('sfwd-mark-complete')) {
-    topicSkippedNoForm.add(1);
-    return true;
-  }
-
   const postId = extractInput(body, 'post');
   const courseId = extractInput(body, 'course_id');
   const nonce = extractInput(body, 'sfwd_mark_complete');
 
-  check(null, {
-    [`topic L${lessonIndex} T${topicIndex} mark-complete nonce`]: () => nonce !== null,
-  });
-
-  if (!nonce || !postId) {
-    return true;
-  }
+  must(nonce !== null, `topic L${lessonIndex} T${topicIndex} is incomplete`);
+  must(nonce !== null, `topic L${lessonIndex} T${topicIndex} mark-complete nonce present`);
+  must(postId !== null, `topic L${lessonIndex} T${topicIndex} post id present`);
+  must(courseId !== null, `topic L${lessonIndex} T${topicIndex} course id present`);
 
   const payload = {
     post: postId,
     sfwd_mark_complete: nonce,
+    course_id: courseId,
   };
 
-  if (courseId) {
-    payload.course_id = courseId;
-  }
-
-  const completeResponse = http.post(`${BASE_URL}${path}`, payload, {
+  const completeResponse = pacedPost(`${BASE_URL}${path}`, payload, {
     jar,
     headers: {
       ...htmlHeaders(path),
@@ -425,52 +347,40 @@ function markTopicComplete(courseIndex, lessonIndex, topicIndex, jar) {
     tags: { name: 'POST mark topic complete' },
   });
 
-  check(completeResponse, {
-    [`topic L${lessonIndex} T${topicIndex} marked complete`]: (r) => r.status === 200,
-  });
-
-  if (completeResponse.status === 200) {
-    topicMarkedComplete.add(1);
-  }
-
-  pauseBetweenActions();
-  return true;
+  must(
+    completeResponse.status === 200,
+    `topic L${lessonIndex} T${topicIndex} marked complete`,
+  );
 }
 
-function completeLessons(courseIndex, structure, jar) {
-  group('lessons', () => {
-    for (const lessonIndex of range(structure.lessons)) {
-      for (const topicIndex of range(structure.topics_per_lesson)) {
-        markTopicComplete(courseIndex, lessonIndex, topicIndex, jar);
-      }
-    }
-  });
-}
-
-function buildCheckResponses(questionIds) {
-  const responses = {};
-
-  for (const questionId of questionIds) {
-    responses[String(questionId)] = {
+// Populater seeds single-choice questions with index 0 as the correct answer.
+function buildQuestionResponse(questionId) {
+  return {
+    [String(questionId)]: {
       response: { 0: true, 1: false, 2: false },
       question_pro_id: questionId,
       question_post_id: 0,
-    };
-  }
-
-  return responses;
+    },
+  };
 }
 
-function buildQuizResults(checked, globalPoints) {
+function parseCheckedAnswers(response) {
+  must(response.status === 200, 'quiz answer response is 200');
+  const checked = response.json();
+  must(checked !== null && typeof checked === 'object', 'quiz answer response is JSON');
+  return checked;
+}
+
+function buildQuizResults(checked, globalPoints, timeSpentSeconds) {
   const now = Math.floor(Date.now() / 1000);
   const results = {
     comp: {
       points: 0,
       correctQuestions: 0,
       result: 0,
-      quizTime: 5,
+      quizTime: timeSpentSeconds,
       quizEndTimestamp: now,
-      quizStartTimestamp: now - 5,
+      quizStartTimestamp: now - timeSpentSeconds,
       cats: {},
     },
   };
@@ -507,149 +417,132 @@ function buildQuizResults(checked, globalPoints) {
 }
 
 function takeQuiz(courseIndex, lessonIndex, topicIndex, quizIndex, jar) {
-  group('quiz', () => {
-    const path = quizPath(courseIndex, lessonIndex, topicIndex, quizIndex);
-    const quizPage = http.get(`${BASE_URL}${path}`, {
-      jar,
-      headers: htmlHeaders(path),
-      tags: { name: 'GET quiz' },
-    });
+  const path = quizPath(courseIndex, lessonIndex, topicIndex, quizIndex);
+  const quizPage = pacedGet(`${BASE_URL}${path}`, {
+    jar,
+    headers: htmlHeaders(path),
+    tags: { name: 'GET quiz' },
+  });
 
-    check(quizPage, {
-      'quiz page loads': (r) => r.status === 200,
-    });
-    pauseBetweenActions();
+  must(quizPage.status === 200, 'quiz page loads');
 
-    if (quizPage.status !== 200) {
-      return;
-    }
+  const body = String(quizPage.body);
+  must(!body.includes('complete the previous topic'), 'quiz prerequisites are complete');
+  must(hasQuizEmbed(body), 'quiz embed present');
 
-    const body = String(quizPage.body);
-    if (body.includes('complete the previous topic')) {
-      return;
-    }
+  const { quizNonce, quizProId, quizPostId, courseId, lessonId, topicId, globalPoints } =
+    extractQuizMeta(body);
+  const questionIds = extractQuestionIds(body);
 
-    const { quizNonce, quizProId, quizPostId, courseId, lessonId, topicId, globalPoints } =
-      extractQuizMeta(body);
-    const questionIds = extractQuestionIds(body);
+  must(quizNonce !== null, 'quiz nonce present');
+  must(quizProId !== null, 'quiz pro id present');
+  must(quizPostId !== null, 'quiz post id present');
+  must(courseId !== null, 'quiz course id present');
+  must(lessonId !== null, 'quiz lesson id present');
+  must(topicId !== null, 'quiz topic id present');
 
-    check(null, {
-      'quiz nonce present': () => quizNonce !== null,
-      'quiz pro id present': () => quizProId !== null,
-      'quiz post id present': () => quizPostId !== null,
-      'quiz has questions': () => questionIds.length > 0,
-    });
+  const quizStarted = Date.now();
+  const checked = {};
 
-    if (!quizNonce || !quizProId || !quizPostId || questionIds.length === 0) {
-      return;
-    }
-
-    const responses = buildCheckResponses(questionIds);
-    const quizStarted = Date.now();
-
-    const checkPayload = {
-      action: 'ld_adv_quiz_pro_ajax',
-      func: 'checkAnswers',
-      'data[course_id]': courseId || '',
-      'data[quiz_nonce]': quizNonce,
-      'data[quiz_started]': String(quizStarted),
-      'data[quiz]': quizPostId,
-      'data[quizId]': quizProId,
-      'data[responses]': JSON.stringify(responses),
-      'data[quiz_resume_data]': '[]',
-    };
-
-    const checkResponse = http.post(`${BASE_URL}/wp-admin/admin-ajax.php`, checkPayload, {
-      jar,
-      headers: ajaxHeaders(path),
-      tags: { name: 'POST quiz checkAnswers' },
-    });
-
-    let checked = null;
-
-    check(checkResponse, {
-      'quiz answers checked': (r) => {
-        if (r.status !== 200) {
-          return false;
-        }
-
-        try {
-          checked = r.json();
-          return checked !== null && typeof checked === 'object';
-        } catch (_error) {
-          return false;
-        }
-      },
-    });
-    pauseBetweenActions();
-
-    if (!checked || checkResponse.status !== 200) {
-      return;
-    }
-
-    const results = buildQuizResults(checked, globalPoints || questionIds.length);
-    const completePayload = {
-      action: 'wp_pro_quiz_completed_quiz',
-      course_id: courseId || '',
-      lesson_id: lessonId || '',
-      topic_id: topicId || '',
-      quiz: quizPostId,
-      quizId: quizProId,
-      results: JSON.stringify(results),
-      timespent: '5',
-      forms: '[]',
-      quiz_nonce: quizNonce,
-    };
-
-    const completeResponse = http.post(
+  for (let i = 0; i < questionIds.length; i++) {
+    const questionId = questionIds[i];
+    const checkResponse = pacedPost(
       `${BASE_URL}/wp-admin/admin-ajax.php`,
-      completePayload,
+      {
+        action: 'ld_adv_quiz_pro_ajax',
+        func: 'checkAnswers',
+        'data[course_id]': courseId,
+        'data[quiz_nonce]': quizNonce,
+        'data[quiz_started]': String(quizStarted),
+        'data[quiz]': quizPostId,
+        'data[quizId]': quizProId,
+        'data[responses]': JSON.stringify(buildQuestionResponse(questionId)),
+        'data[quiz_resume_data]': '[]',
+      },
       {
         jar,
         headers: ajaxHeaders(path),
-        tags: { name: 'POST quiz completed' },
+        tags: { name: 'POST quiz_answer' },
       },
     );
 
-    check(completeResponse, {
-      'quiz completed': (r) => r.status === 200 && String(r.body).length > 2,
-    });
-    pauseBetweenActions();
-  });
+    const partial = parseCheckedAnswers(checkResponse);
+    must(partial !== null, `question ${i + 1} answered`);
+
+    Object.assign(checked, partial);
+  }
+
+  must(Object.keys(checked).length === questionIds.length, 'all quiz questions answered');
+
+  const timeSpentSeconds = Math.max(1, Math.round((Date.now() - quizStarted) / 1000));
+  const results = buildQuizResults(checked, globalPoints || questionIds.length, timeSpentSeconds);
+  const completeResponse = pacedPost(
+    `${BASE_URL}/wp-admin/admin-ajax.php`,
+    {
+      action: 'wp_pro_quiz_completed_quiz',
+      course_id: courseId,
+      lesson_id: lessonId,
+      topic_id: topicId,
+      quiz: quizPostId,
+      quizId: quizProId,
+      results: JSON.stringify(results),
+      timespent: String(timeSpentSeconds),
+      forms: '[]',
+      quiz_nonce: quizNonce,
+    },
+    {
+      jar,
+      headers: ajaxHeaders(path),
+      tags: { name: 'POST quiz completed' },
+    },
+  );
+
+  must(completeResponse.status === 200 && String(completeResponse.body).length > 2, 'quiz completed');
 }
 
-function takeLessonQuizzes(courseIndex, structure, jar) {
-  group('quizzes', () => {
-    const quizTopicIndex = structure.topics_per_lesson;
+function completeLesson(courseIndex, lessonIndex, structure, jar) {
+  for (const topicIndex of contentTopicIndices(structure)) {
+    markTopicComplete(courseIndex, lessonIndex, topicIndex, jar);
+  }
+
+  const quizTopicIndex = quizTopicIndexFor(structure);
+
+  for (const quizIndex of range(structure.quizzes_per_lesson)) {
+    takeQuiz(courseIndex, lessonIndex, quizTopicIndex, quizIndex, jar);
+  }
+}
+
+function completeCourse(user, courseIndex, jar) {
+  group('course', () => {
+    const structure = fetchCourseStructure(courseIndex, jar);
+
+    enroll(user, courseIndex, jar);
 
     for (const lessonIndex of range(structure.lessons)) {
-      for (const quizIndex of range(structure.quizzes_per_lesson)) {
-        takeQuiz(courseIndex, lessonIndex, quizTopicIndex, quizIndex, jar);
-        pauseBetweenActions();
-      }
+      completeLesson(courseIndex, lessonIndex, structure, jar);
     }
   });
 }
 
 export default function () {
   const user = vuUser();
+
+  if (stopIfUserPoolExhausted(user, MAX_USERS)) {
+    return;
+  }
+
   const jar = http.cookieJar();
 
   login(user, jar);
 
-  const structure = fetchCourseStructure(user.courseIndex, jar);
+  const courses = courseIndices().filter(
+    (courseIndex) => !COURSE_PER_USER || courseIndex === user.index,
+  );
 
-  check(null, {
-    'course structure present': () => structure !== null,
-  });
-
-  if (!structure) {
-    return;
+  for (let i = 0; i < courses.length; i++) {
+    completeCourse(user, courses[i], jar);
+    if (i < courses.length - 1) {
+      thinkBetweenCourses();
+    }
   }
-
-  maybeEnroll(user, user.courseIndex, jar);
-  completeLessons(user.courseIndex, structure, jar);
-  takeLessonQuizzes(user.courseIndex, structure, jar);
-
-  sleep(THINK_TIME);
 }

@@ -136,12 +136,21 @@ abstract class AbstractSeeder
             return [];
         }
 
-        $comment = '<!-- populater:structure ' . json_encode($structure, JSON_THROW_ON_ERROR) . ' -->';
+        $json = json_encode(
+            $structure,
+            JSON_THROW_ON_ERROR | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT,
+        );
+        $comment = '<!-- populater:structure ' . $json . ' -->';
+        $script  = '<script type="application/json" id="populater-structure">' . $json . '</script>';
+        $excerptMarker = '[populater:structure ' . $json . ']';
         $content = (string) preg_replace('/<!--\s*populater:structure\s+[^>]*-->/', '', $post->post_content ?? '');
+        $content = (string) preg_replace('/<script[^>]+id=["\']populater-structure["\'][^>]*>.*?<\/script>/s', '', $content);
+        $excerpt = (string) preg_replace('/\[populater:structure\s+\{[^]]*}]/', '', $post->post_excerpt ?? '');
 
         wp_update_post([
             'ID'           => $courseId,
-            'post_content' => trim($content) . "\n" . $comment,
+            'post_content' => trim($content) . "\n" . $comment . "\n" . $script,
+            'post_excerpt' => trim($excerpt) . "\n" . $excerptMarker,
         ]);
 
         return [];
@@ -506,6 +515,11 @@ abstract class AbstractSeeder
 
         if (function_exists('update_user_meta')) {
             update_user_meta($userId, self::USER_META_MARKER, 1);
+        }
+
+        $user = function_exists('get_user_by') ? get_user_by('id', $userId) : false;
+        if ($user instanceof \WP_User && function_exists('get_role') && get_role('subscriber') !== null) {
+            $user->set_role('subscriber');
         }
 
         return $userId;

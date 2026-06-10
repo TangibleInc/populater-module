@@ -32,9 +32,9 @@
     "docker:test:coverage": "docker compose exec -e XDEBUG_MODE=coverage wp-test bash -c 'composer test:coverage'",
     "docker:test:integration": "docker compose exec wp-test bash -c 'composer test:integration'",
     "k6:lifter": "bash scripts/k6-run.sh run lifterlms-stress.js",
-    "k6:lifter:smoke": "bash scripts/k6-run.sh run --vus 1 --iterations 1 -e THINK_TIME=0 -e ACTION_DELAY=0 lifterlms-stress.js",
+    "k6:lifter:smoke": "K6_PROFILE=smoke bash scripts/k6-run.sh run lifterlms-stress.js",
     "k6:learndash": "bash scripts/k6-run.sh run learndash-stress.js",
-    "k6:learndash:smoke": "bash scripts/k6-run.sh run --vus 1 --iterations 1 -e THINK_TIME=0 -e ACTION_DELAY=0 learndash-stress.js",
+    "k6:learndash:smoke": "K6_PROFILE=smoke bash scripts/k6-run.sh run learndash-stress.js",
     "zip": "bash scripts/zip.sh"
   },
   "config": {

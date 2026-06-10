@@ -24,14 +24,23 @@ See [docs/testing.md](docs/testing.md) and [plan.md](plan.md) for architecture a
 ## k6 stress tests (LifterLMS & LearnDash)
 
 Load-test seeded student journeys against local WordPress or a bench host.
-Configure targets and load in `.env` (`cp .env.example .env`).
+Configure targets in `.env` (`cp .env.example .env`). Load shape comes from
+JSON profiles under `k6/profiles/`; set `K6_PROFILE` to switch profiles.
 
 ```bash
 composer k6:lifter:smoke      # LifterLMS — one VU
-composer k6:lifter              # LifterLMS — full profile (~5.5m+)
+composer k6:lifter              # LifterLMS — full ramping profile
 composer k6:learndash:smoke     # LearnDash — one VU, 1 lesson × 3 topics
 composer k6:learndash           # LearnDash — full profile
+K6_PROFILE=bench-100 composer k6:lifter
+K6_PROFILE=clean-race-100 composer k6:lifter
+K6_PROFILE=breaking-point-arrival composer k6:learndash
+K6_PROFILE=stress-knee K6_VUS=180 composer k6:lifter
 ```
+
+Set `K6_EXECUTION=cloud` to run the same commands with `k6 cloud run` inside the
+Docker k6 image. Cloud auth works with `K6_CLOUD_TOKEN` or a host `k6 cloud login`,
+which is mounted into the container.
 
 ### Web dashboard and HTML report
 
@@ -42,16 +51,22 @@ Summary). The terminal prints the URL when the container starts.
 **Autosave** is on by default: each run writes timestamped files under **`k6/reports/`**:
 
 - `k6-report-<timestamp>.html` — visual HTML report (full runs; very short smoke may skip HTML)
-- `k6-results-<timestamp>.json` — raw metrics (always saved when autosave is on)
+- `k6-summary-<timestamp>.json` — end-of-test metric aggregates (small). Set `K6_JSON_STREAM=1` for full per-sample NDJSON instead (multi-GB on long runs).
 
 You can also use **Report** in the live dashboard UI while the test runs.
+The stress scripts use one k6 `course` group per course flow. Login runs before
+that group, and lesson/quiz steps run inside it without nested groups, so
+`group_duration` represents one student passing one course.
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
+| `K6_PROFILE` | `default` | JSON profile under `k6/profiles/` (`smoke`, `clean-race-100`, `breaking-point-arrival`, `stress-knee`, etc.) |
+| `K6_EXECUTION` | `local` | Set `cloud` to use `k6 cloud run` |
 | `K6_REPORT_AUTOSAVE` | `1` | Set `0` to disable HTML + JSON autosave |
 | `K6_WEB_DASHBOARD` | `1` | Set `0` to disable live dashboard on port `5665` |
 | `K6_WEB_DASHBOARD_PORT` | `5665` | Host port mapped to the dashboard in Docker |
 | `K6_WEB_DASHBOARD_EXPORT` | *(timestamped)* | Override HTML path in container (under `k6/reports/`) |
+| `K6_STEP_THINK_TIME` | `1` | Seconds between student actions within a journey |
 
 Seed LifterLMS content first (Populater admin UI or WP-CLI), align `K6_MAX_USERS` /
 `K6_VUS` with seeded students (`lifterstudent1`, …), and match `K6_USER_PASSWORD` to the Populater setting.

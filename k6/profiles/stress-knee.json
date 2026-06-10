@@ -1,0 +1,23 @@
+{
+  "scenarios": {
+    "student_journey": {
+      "executor": "constant-vus",
+      "exec": "default",
+      "vus": 150,
+      "duration": "5m",
+      "tags": {
+        "workload": "student_journey",
+        "profile": "stress-knee",
+        "benchmark_phase": "stress-past-knee"
+      }
+    }
+  },
+  "summaryTrendStats": ["avg", "min", "med", "p(90)", "p(95)", "max", "count"],
+  "thresholds": {
+    "http_req_failed": ["rate<0.05"],
+    "http_req_duration": ["p(95)<1000"],
+    "checks": ["rate>=0.99"],
+    "iterations": ["count>0"],
+    "group_duration{group:::course}": ["p(95)<3600000"]
+  }
+}
