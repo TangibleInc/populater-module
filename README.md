@@ -23,6 +23,34 @@ See [docs/testing.md](docs/testing.md) and [plan.md](plan.md) for architecture a
 
 ## k6 stress tests (LifterLMS & LearnDash)
 
+k6 runs **directly on the host machine** (not in Docker), so the dashboard, network
+access to the local WordPress containers, and all k6 CLI features work without
+workarounds.
+
+### Install k6
+
+```bash
+# macOS
+brew install k6
+
+# Debian / Ubuntu (including WSL2)
+sudo gpg -k
+sudo gpg --no-default-keyring \
+  --keyring /usr/share/keyrings/k6-archive-keyring.gpg \
+  --keyserver hkp://keyserver.ubuntu.com:80 \
+  --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" \
+  | sudo tee /etc/apt/sources.list.d/k6.list
+sudo apt-get update && sudo apt-get install k6
+
+# Windows (winget)
+winget install k6 --source winget
+```
+
+Verify: `k6 version`
+
+### Run load tests
+
 Load-test seeded student journeys against local WordPress or a bench host.
 Configure targets in `.env` (`cp .env.example .env`). Load shape comes from
 JSON profiles under `k6/profiles/`; set `K6_PROFILE` to switch profiles.
@@ -38,15 +66,25 @@ K6_PROFILE=breaking-point-arrival composer k6:learndash
 K6_PROFILE=stress-knee K6_VUS=180 composer k6:lifter
 ```
 
-Set `K6_EXECUTION=cloud` to run the same commands with `k6 cloud run` inside the
-Docker k6 image. Cloud auth works with `K6_CLOUD_TOKEN` or a host `k6 cloud login`,
-which is mounted into the container.
+Set `K6_EXECUTION=cloud` to run the same commands with `k6 cloud run`. Cloud auth
+works with `K6_CLOUD_TOKEN` or a prior `k6 cloud login` on the host.
 
 ### Web dashboard and HTML report
 
-`composer k6:lifter*` enables k6’s **built-in web dashboard** by default. While a run
+`composer k6:lifter*` enables k6's **built-in web dashboard** by default. While a run
 is in progress, open **http://127.0.0.1:5665** for live charts (Overview, Timings,
-Summary). The terminal prints the URL when the container starts.
+Summary). The terminal prints the URL when the run starts.
+
+**WSL2 note:** Windows Firewall sometimes blocks the `localhost` port forwarding from
+WSL2. If `http://127.0.0.1:PORT` is unreachable, use the WSL2 VM IP printed by the
+run script instead (e.g. `http://172.x.x.x:PORT`). You can also add a permanent
+Windows Firewall inbound rule for the dashboard port, or enable WSL2 mirrored
+networking in `%USERPROFILE%\.wslconfig`:
+```ini
+[wsl2]
+networkingMode=mirrored
+```
+Then restart WSL (`wsl --shutdown`) — after that `localhost` always works.
 
 **Autosave** is on by default: each run writes timestamped files under **`k6/reports/`**:
 
@@ -64,15 +102,14 @@ that group, and lesson/quiz steps run inside it without nested groups, so
 | `K6_EXECUTION` | `local` | Set `cloud` to use `k6 cloud run` |
 | `K6_REPORT_AUTOSAVE` | `1` | Set `0` to disable HTML + JSON autosave |
 | `K6_WEB_DASHBOARD` | `1` | Set `0` to disable live dashboard on port `5665` |
-| `K6_WEB_DASHBOARD_PORT` | `5665` | Host port mapped to the dashboard in Docker |
-| `K6_WEB_DASHBOARD_EXPORT` | *(timestamped)* | Override HTML path in container (under `k6/reports/`) |
+| `K6_WEB_DASHBOARD_PORT` | `5665` | Dashboard port |
+| `K6_WEB_DASHBOARD_EXPORT` | *(timestamped)* | Override HTML path (under `k6/reports/`) |
 | `K6_STEP_THINK_TIME` | `1` | Seconds between student actions within a journey |
 
 Seed LifterLMS content first (Populater admin UI or WP-CLI), align `K6_MAX_USERS` /
 `K6_VUS` with seeded students (`lifterstudent1`, …), and match `K6_USER_PASSWORD` to the Populater setting.
 See [docs/testing.md](docs/testing.md#k6-lifterlms-stress-test) for Cloudflare bypass,
 course-per-user mode, and troubleshooting.
-
 ## Deploying to WordPress
 
 Build a clean installable package (plugin PHP, assets, production `vendor/` only):

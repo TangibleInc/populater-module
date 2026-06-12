@@ -87,8 +87,11 @@ composer k6:lifter:smoke
 composer k6:lifter     # full ramping profile; COMPOSER_PROCESS_TIMEOUT=0 avoids Composer's 300s limit
 ```
 
-While a run is active, open **http://127.0.0.1:5665** for k6's built-in web dashboard
-(live metrics). **Autosave** (`K6_REPORT_AUTOSAVE=1`, default) writes timestamped
+While a run is active, open **http://127.0.0.1:5665** for k6’s built-in web dashboard
+(live metrics; k6 runs on the host so the port is always directly reachable).
+On WSL2, if `localhost` is blocked by Windows Firewall use the WSL2 VM IP printed
+by the run script, or switch to mirrored networking (see README).
+**Autosave** (`K6_REPORT_AUTOSAVE=1`, default) writes timestamped
 **`k6/reports/k6-report-<timestamp>.html`** and **`k6-summary-<timestamp>.json`**
 (end-of-test aggregates). The stress scripts use one k6 `course` group per
 course flow. Login runs before the group, and lesson/quiz steps run inside it
@@ -122,7 +125,7 @@ K6_PROFILE=bench-100 K6_EXECUTION=cloud composer k6:lifter
 ```
 
 The wrapper compiles the selected profile plus any `K6_*` load overrides into
-`k6/.runtime/<profile>-effective.json` before starting Docker.
+`k6/.runtime/<profile>-effective.json` before running k6.
 
 ### Benchmark routine
 
@@ -165,15 +168,13 @@ K6_PROFILE=stress-knee K6_VUS=180 K6_MAX_USERS=500 composer k6:learndash
 
 ### k6 Cloud
 
-Set `K6_EXECUTION=cloud` to run the same Composer commands with `k6 cloud run`
-through the Docker wrapper. Cloud runs must target a public URL; the runner
-rejects `localhost` targets in cloud mode.
+Set `K6_EXECUTION=cloud` to run the same Composer commands with `k6 cloud run`.
+Cloud runs must target a public URL; the runner rejects `localhost` targets in cloud mode.
 
 Cloud auth works in either of these ways:
 
 1. Set `K6_CLOUD_TOKEN` in the shell, CI secret, or `.env`.
-2. Run `k6 cloud login` on the host. Docker mounts `${K6_HOST_CONFIG_DIR:-$HOME/.config/k6}`
-   into the container and sets `XDG_CONFIG_HOME` so container k6 sees that login.
+2. Run `k6 cloud login` on the host (`~/.config/k6/config.json` is used automatically).
 
 Optionally set `K6_CLOUD_PROJECT_ID` when the account has multiple projects. Local
 dashboard and autosaved report files are skipped for cloud runs.
@@ -202,10 +203,10 @@ dashboard and autosaved report files are skipped for cloud runs.
 | `K6_REPORT_AUTOSAVE` | `1` = save HTML + summary JSON under `k6/reports/` each run; `0` = no files |
 | `K6_JSON_STREAM` | `1` = full per-sample NDJSON via `--out json=…` (multi-GB on long runs); default off |
 | `K6_WEB_DASHBOARD` | `1` = live dashboard on port 5665; `0` = no live UI (HTML autosave still runs if autosave on) |
-| `K6_WEB_DASHBOARD_PORT` | Host port for http://127.0.0.1:PORT (default `5665`) |
+| `K6_WEB_DASHBOARD_PORT` | Dashboard port (default `5665`) |
 | `K6_WEB_DASHBOARD_EXPORT` | Optional fixed HTML path in container (default: timestamped under `k6/reports/`) |
-| `K6_CLOUD_TOKEN` | Grafana Cloud token for Docker k6 auth |
-| `K6_HOST_CONFIG_DIR` | Host k6 config directory to mount when using `k6 cloud login` auth |
+| `K6_CLOUD_TOKEN` | Grafana Cloud token for `k6 cloud run` auth |
+| `K6_HOST_CONFIG_DIR` | Override k6 config directory for cloud login (default: `~/.config/k6`) |
 
 ### Cloudflare Skip rule (bench / rate limits)
 

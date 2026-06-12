@@ -235,7 +235,7 @@ function enroll(user, courseIndex, jar) {
   const hasEnrollForm =
     body.includes('free_enroll') || body.includes('llms-free-enroll-form');
 
-  must(hasEnrollForm, 'course enrollment form present');
+  must(hasEnrollForm, 'course enrollment form available for fresh un-enrolled student');
 
   const checkoutNonce = extractInput(body, '_llms_checkout_nonce');
   const planId = extractInput(body, 'llms_plan_id');

@@ -74,19 +74,6 @@ services:
       retries: 30
       start_period: 60s
 
-  # k6 load testing — use: composer k6:lifter (dashboard http://127.0.0.1:5665)
-  k6:
-    image: grafana/k6:1.6.1
-    profiles:
-      - k6
-    working_dir: /scripts
-    environment:
-      XDG_CONFIG_HOME: /k6-config
-    volumes:
-      - ./k6:/scripts
-      - ${K6_HOST_CONFIG_DIR:-${HOME}/.config/k6}:/k6-config/k6:ro
-    network_mode: host
-    ipc: host
 
 volumes:
   db-data:

@@ -25,6 +25,15 @@ export function floatEnv(name, fallback) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+export function boolEnv(name, fallback = false) {
+  const value = __ENV[name];
+  if (value === undefined || value === '') {
+    return fallback;
+  }
+
+  return ['1', 'true', 'yes', 'on'].includes(String(value).toLowerCase());
+}
+
 export const STEP_THINK_TIME = Math.max(
   0,
   floatEnv('STEP_THINK_TIME', floatEnv('ACTION_DELAY', 1)),
@@ -85,9 +94,14 @@ export function stopIfUserPoolExhausted(user, maxUsers) {
   }
 
   userPoolExhausted.add(1);
-  execution.test.abort(
-    `Seeded user pool exhausted at ${user.username}; increase K6_MAX_USERS or shorten the run.`,
-  );
+  const message = `Seeded user pool exhausted at ${user.username}; increase K6_MAX_USERS or shorten the run.`;
+
+  if (boolEnv('ABORT_ON_USER_POOL_EXHAUSTED', true)) {
+    execution.test.abort(message);
+  } else {
+    console.warn(message);
+  }
+
   return true;
 }
 

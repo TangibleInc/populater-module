@@ -1,4 +1,7 @@
 {
+  "xEnv": {
+    "ABORT_ON_USER_POOL_EXHAUSTED": "0"
+  },
   "scenarios": {
     "student_journey": {
       "executor": "constant-arrival-rate",

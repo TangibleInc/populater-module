@@ -11,6 +11,14 @@ The routine assumes:
 Important: reset and reseed between every run. Each k6 journey expects fresh
 students and uncompleted courses.
 
+If Grafana Cloud shows "Aborted (by user)" but you did not abort it, check the
+terminal output. k6 reports script-triggered aborts that way. Common causes are
+exhausting `K6_MAX_USERS` or reusing students who are already enrolled/completed.
+
+For LifterLMS, `course enrollment form available for fresh un-enrolled student`
+means the course page did not show the free enrollment form. Reset and reseed
+fresh LifterLMS students/courses before rerunning.
+
 ## Grafana Cloud Token
 
 For cloud runs, put your Grafana k6 token in `.env`:
@@ -122,7 +130,7 @@ Activate LifterLMS, reset the DB, and seed fresh LifterLMS content with at least
 `KNEE_USERS` students.
 
 ```bash
-K6_PROFILE=stress-knee K6_VUS="$KNEE_VUS" K6_MAX_USERS="$KNEE_USERS" K6_COURSE_COUNT=1 composer k6:lifter
+K6_PROFILE=stress-knee K6_VUS=150 K6_MAX_USERS=600 K6_COURSE_COUNT=1 composer k6:lifter
 ```
 
 ### LearnDash

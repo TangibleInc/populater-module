@@ -49,18 +49,13 @@ k6_resolve_profile() {
     exit 1
   fi
 
-  case "$profile_file" in
-    "${root}/k6/"*)
-      K6_RESOLVED_PROFILE_FILE="$profile_file"
-      K6_CONTAINER_PROFILE_FILE="/scripts/${profile_file#"${root}/k6/"}"
-      ;;
-    *)
-      echo "K6_PROFILE_FILE must point inside ${root}/k6 so it is visible in the Docker k6 container." >&2
-      exit 1
-      ;;
-  esac
+  if [[ "$profile_file" != "${root}/k6/"* ]]; then
+    echo "K6_PROFILE_FILE must point inside ${root}/k6 so it is accessible." >&2
+    exit 1
+  fi
 
-  export K6_RESOLVED_PROFILE_FILE K6_CONTAINER_PROFILE_FILE
+  K6_RESOLVED_PROFILE_FILE="$profile_file"
+  export K6_RESOLVED_PROFILE_FILE
 }
 
 k6_generate_effective_profile() {
@@ -74,7 +69,6 @@ k6_generate_effective_profile() {
 
   K6_EFFECTIVE_PROFILE_FILE="$output_file"
   K6_EFFECTIVE_PROFILE_ENV_FILE="${output_file}.env"
-  K6_CONTAINER_PROFILE_FILE="/scripts/.runtime/${profile_slug}-effective.json"
   K6_EFFECTIVE_VUS="$(php -r '
     $profile = json_decode(file_get_contents($argv[1]), true);
     $scenario = reset($profile["scenarios"]);
@@ -91,7 +85,7 @@ k6_generate_effective_profile() {
     }
   ' "$output_file")"
 
-  export K6_EFFECTIVE_PROFILE_FILE K6_EFFECTIVE_PROFILE_ENV_FILE K6_CONTAINER_PROFILE_FILE K6_EFFECTIVE_VUS
+  export K6_EFFECTIVE_PROFILE_FILE K6_EFFECTIVE_PROFILE_ENV_FILE K6_EFFECTIVE_VUS
 }
 
 k6_preflight_cloud() {
@@ -112,8 +106,7 @@ k6_preflight_cloud() {
     return
   fi
 
-  echo "Grafana Cloud auth not found for Docker k6." >&2
-  echo "Set K6_CLOUD_TOKEN, or run 'k6 cloud login' on the host so ${K6_HOST_CONFIG_DIR}/config.json exists." >&2
+  echo "Grafana Cloud auth not found. Set K6_CLOUD_TOKEN or run 'k6 cloud login' first (config: ${K6_HOST_CONFIG_DIR}/config.json)." >&2
   exit 1
 }
 
@@ -160,26 +153,7 @@ k6_export_env_args() {
   )
   K6_SCRIPT_ENV_ARGS+=("${K6_PROFILE_ENV_ARGS[@]}")
 
-  K6_ENV_ARGS=("${K6_SCRIPT_ENV_ARGS[@]}")
-
-  if [[ -n "${K6_REPORT_STAMP:-}" ]]; then
-    K6_ENV_ARGS+=(-e "K6_REPORT_STAMP=${K6_REPORT_STAMP}")
-  fi
-
-  export K6_PROFILE_ENV_ARGS K6_SCRIPT_ENV_ARGS K6_ENV_ARGS
-}
-
-k6_export_cloud_docker_args() {
-  K6_CLOUD_DOCKER_ARGS=()
-
-  local name
-  while IFS= read -r name; do
-    if [[ -n "${!name:-}" ]]; then
-      K6_CLOUD_DOCKER_ARGS+=(-e "${name}=${!name}")
-    fi
-  done < <(compgen -A variable K6_CLOUD_)
-
-  export K6_CLOUD_DOCKER_ARGS
+  export K6_PROFILE_ENV_ARGS K6_SCRIPT_ENV_ARGS
 }
 
 # k6 built-in web dashboard (https://grafana.com/docs/k6/latest/results-output/web-dashboard/)
@@ -192,6 +166,9 @@ k6_report_autosave_enabled() {
 }
 
 k6_resolve_report_paths() {
+  local root="${1:-.}"
+  local test_name="${2:-k6}"
+  local slug="${test_name}-${K6_PROFILE}"
   K6_REPORT_HTML_PATH=""
   K6_REPORT_JSON_PATH=""
   K6_REPORT_STAMP=""
@@ -206,45 +183,59 @@ k6_resolve_report_paths() {
   if [[ -n "${K6_WEB_DASHBOARD_EXPORT:-}" ]]; then
     K6_REPORT_HTML_PATH="${K6_WEB_DASHBOARD_EXPORT}"
   else
-    K6_REPORT_HTML_PATH="/scripts/reports/k6-report-${K6_REPORT_STAMP}.html"
+    K6_REPORT_HTML_PATH="${root}/k6/reports/k6-report-${slug}-${K6_REPORT_STAMP}.html"
   fi
 
   if [[ -n "${K6_JSON_OUTPUT:-}" ]]; then
     K6_REPORT_JSON_PATH="${K6_JSON_OUTPUT}"
   else
-    K6_REPORT_JSON_PATH="/scripts/reports/k6-summary-${K6_REPORT_STAMP}.json"
+    K6_REPORT_JSON_PATH="${root}/k6/reports/k6-summary-${slug}-${K6_REPORT_STAMP}.json"
   fi
 
   export K6_REPORT_HTML_PATH K6_REPORT_JSON_PATH K6_REPORT_STAMP
+}
+
+# Patch a k6 HTML dashboard export: update <title> and inject a metadata banner.
+k6_annotate_report() {
+  local html_file="$1" test_name="$2" profile="$3" stamp="$4"
+  [[ -f "$html_file" ]] || return 0
+  python3 "${ROOT}/scripts/k6-annotate-report.py" \
+    "$html_file" "$test_name" "$profile" "$stamp" \
+    && echo "k6 report annotated: ${html_file}"
 }
 
 k6_json_stream_enabled() {
   [[ "${K6_JSON_STREAM:-0}" == "1" ]]
 }
 
-k6_export_dashboard_docker_args() {
-  K6_DASHBOARD_DOCKER_ARGS=()
+# Export k6 built-in dashboard env vars to the host shell so that a locally
+# invoked k6 process picks them up (these are k6 options, not script __ENV vars).
+k6_export_dashboard_env() {
+  if [[ "$K6_EXECUTION" == "cloud" ]]; then
+    return
+  fi
 
   if ! k6_dashboard_enabled; then
-    export K6_DASHBOARD_DOCKER_ARGS
+    export K6_WEB_DASHBOARD=false
+    K6_WEB_DASHBOARD_URL=""
+    export K6_WEB_DASHBOARD_URL
     return
   fi
 
   local port="${K6_WEB_DASHBOARD_PORT:-5665}"
 
-  K6_DASHBOARD_DOCKER_ARGS=(
-    -e K6_WEB_DASHBOARD=true
-    -e K6_WEB_DASHBOARD_HOST=0.0.0.0
-    -e "K6_WEB_DASHBOARD_PORT=${port}"
-  )
+  export K6_WEB_DASHBOARD=true
+  export K6_WEB_DASHBOARD_HOST=0.0.0.0
+  export K6_WEB_DASHBOARD_PORT="${port}"
 
   if k6_report_autosave_enabled && [[ -n "${K6_REPORT_HTML_PATH:-}" ]]; then
-    K6_DASHBOARD_DOCKER_ARGS+=(-e "K6_WEB_DASHBOARD_EXPORT=${K6_REPORT_HTML_PATH}")
+    export K6_WEB_DASHBOARD_EXPORT="${K6_REPORT_HTML_PATH}"
   elif [[ -n "${K6_WEB_DASHBOARD_EXPORT:-}" ]]; then
-    K6_DASHBOARD_DOCKER_ARGS+=(-e "K6_WEB_DASHBOARD_EXPORT=${K6_WEB_DASHBOARD_EXPORT}")
+    export K6_WEB_DASHBOARD_EXPORT
   fi
 
-  export K6_DASHBOARD_DOCKER_ARGS K6_WEB_DASHBOARD_URL="http://127.0.0.1:${port}"
+  K6_WEB_DASHBOARD_URL="http://127.0.0.1:${port}"
+  export K6_WEB_DASHBOARD_URL
 }
 
 k6_prepare_k6_args() {
@@ -260,7 +251,7 @@ k6_prepare_k6_args() {
     return
   fi
 
-  local profile_args=(--config "$K6_CONTAINER_PROFILE_FILE")
+  local profile_args=(--config "$K6_EFFECTIVE_PROFILE_FILE")
 
   if [[ "$K6_EXECUTION" == "cloud" ]]; then
     K6_FINAL_ARGS=(cloud run "${profile_args[@]}" "${K6_SCRIPT_ENV_ARGS[@]}" "$@")
@@ -280,6 +271,6 @@ k6_prepare_k6_args() {
     fi
   fi
 
-  K6_FINAL_ARGS=("${run_args[@]}" "$@")
+  K6_FINAL_ARGS=("${run_args[@]}" "${K6_SCRIPT_ENV_ARGS[@]}" "$@")
   export K6_FINAL_ARGS
 }
