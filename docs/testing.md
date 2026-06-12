@@ -137,8 +137,8 @@ pool. For cloud runs, add `K6_EXECUTION=cloud`.
    Run it three times per platform for stability.
 
 ```bash
-K6_PROFILE=clean-race-100 K6_MAX_USERS=100 composer k6:lifter
-K6_PROFILE=clean-race-100 K6_MAX_USERS=100 composer k6:learndash
+K6_MAX_USERS=100 K6_COURSE_COUNT=1 composer k6:lifter:clean-race
+K6_MAX_USERS=100 K6_COURSE_COUNT=1 composer k6:learndash:clean-race
 ```
 
 2. Breaking point: ramping arrival-rate, not fixed VUs. This starts 20, 50, 100,
@@ -147,8 +147,8 @@ K6_PROFILE=clean-race-100 K6_MAX_USERS=100 composer k6:learndash
    or errors first appear.
 
 ```bash
-K6_PROFILE=breaking-point-arrival K6_MAX_USERS=800 composer k6:lifter
-K6_PROFILE=breaking-point-arrival K6_MAX_USERS=800 composer k6:learndash
+K6_MAX_USERS=800 K6_COURSE_COUNT=1 composer k6:lifter:breakpoint
+K6_MAX_USERS=800 K6_COURSE_COUNT=1 composer k6:learndash:breakpoint
 ```
 
 Override the step list when needed:
@@ -162,8 +162,8 @@ K6_PROFILE=breaking-point-arrival K6_RATE_TARGETS=50,100,200,300,500 K6_MAX_VUS=
    to roughly 150% of the weaker knee.
 
 ```bash
-K6_PROFILE=stress-knee K6_VUS=180 K6_MAX_USERS=500 composer k6:lifter
-K6_PROFILE=stress-knee K6_VUS=180 K6_MAX_USERS=500 composer k6:learndash
+K6_MAX_USERS=500 K6_COURSE_COUNT=1 composer k6:lifter:knee
+K6_MAX_USERS=500 K6_COURSE_COUNT=1 composer k6:learndash:knee
 ```
 
 ### k6 Cloud

@@ -30,9 +30,8 @@ K6_CLOUD_TOKEN=your_grafana_k6_token_here
 
 Do not commit `.env`. It is already ignored by git.
 
-Alternative: run `k6 cloud login` on this machine. The Docker k6 container mounts
-your host k6 config from `${K6_HOST_CONFIG_DIR:-$HOME/.config/k6}` and uses that
-login when `K6_CLOUD_TOKEN` is not set.
+Alternative: run `k6 cloud login` on the host. The stored credentials in
+`~/.config/k6/config.json` are used automatically when `K6_CLOUD_TOKEN` is not set.
 
 ## 1. Start Docker
 
@@ -69,7 +68,7 @@ Activate LifterLMS, reset the DB, and seed fresh LifterLMS content with at least
 100 students.
 
 ```bash
-K6_PROFILE=clean-race-100 K6_MAX_USERS=100 K6_COURSE_COUNT=1 composer k6:lifter
+K6_MAX_USERS=100 K6_COURSE_COUNT=1 composer k6:lifter:clean-race
 ```
 
 ### LearnDash
@@ -78,13 +77,16 @@ Activate LearnDash, reset the DB, and seed fresh LearnDash content with at least
 100 students.
 
 ```bash
-K6_PROFILE=clean-race-100 K6_MAX_USERS=100 K6_COURSE_COUNT=1 composer k6:learndash
+K6_MAX_USERS=100 K6_COURSE_COUNT=1 composer k6:learndash:clean-race
 ```
 
 ## 4. Find The Breaking Point
 
-Ramping arrival-rate test. This steps 20 -> 50 -> 100 -> 200 -> 400 starts/min,
+Ramping arrival-rate test. This steps 20 → 50 → 100 → 200 → 400 starts/min,
 about 1 minute per step. Watch where p95 first breaks the SLA or errors appear.
+
+Rate targets and VU capacity live in `k6/profiles/breaking-point-arrival.json`.
+Edit them there instead of passing env overrides.
 
 ### LifterLMS
 
@@ -92,7 +94,7 @@ Activate LifterLMS, reset the DB, and seed fresh LifterLMS content with at least
 1000 students.
 
 ```bash
-K6_PROFILE=breaking-point-arrival K6_MAX_USERS=1000 K6_COURSE_COUNT=1 composer k6:lifter
+K6_MAX_USERS=1000 K6_COURSE_COUNT=1 composer k6:lifter:breakpoint
 ```
 
 ### LearnDash
@@ -101,45 +103,26 @@ Activate LearnDash, reset the DB, and seed fresh LearnDash content with at least
 1000 students.
 
 ```bash
-K6_PROFILE=breaking-point-arrival K6_MAX_USERS=1000 K6_COURSE_COUNT=1 composer k6:learndash
+K6_MAX_USERS=1000 K6_COURSE_COUNT=1 composer k6:learndash:breakpoint
 ```
-
-Optional custom step sequence:
-
-```bash
-K6_PROFILE=breaking-point-arrival K6_RATE_TARGETS=50,100,200,300,500 K6_MAX_VUS=650 K6_MAX_USERS=1200 K6_COURSE_COUNT=1 composer k6:lifter
-```
-
-Before running a custom sequence, reset the DB and reseed enough fresh students
-for the chosen `K6_MAX_USERS`.
 
 ## 5. Stress Past The Knee
 
-After the breaking-point run, set `KNEE_VUS` to roughly 150% of the weaker
-platform's knee and hold that load for 5 minutes. Set `KNEE_USERS` to the number
-of fresh students seeded for each run.
+After the breaking-point run, set `"vus"` in `k6/profiles/stress-knee.json` to
+roughly 150 % of the weaker platform's knee VU count. Default is `100`.
 
-```bash
-export KNEE_VUS=180
-export KNEE_USERS=600
-```
+Seed at least as many fresh students as the VU count you chose.
 
 ### LifterLMS
 
-Activate LifterLMS, reset the DB, and seed fresh LifterLMS content with at least
-`KNEE_USERS` students.
-
 ```bash
-K6_PROFILE=stress-knee K6_VUS=150 K6_MAX_USERS=600 K6_COURSE_COUNT=1 composer k6:lifter
+K6_MAX_USERS=600 K6_COURSE_COUNT=1 composer k6:lifter:knee
 ```
 
 ### LearnDash
 
-Activate LearnDash, reset the DB, and seed fresh LearnDash content with at least
-`KNEE_USERS` students.
-
 ```bash
-K6_PROFILE=stress-knee K6_VUS="$KNEE_VUS" K6_MAX_USERS="$KNEE_USERS" K6_COURSE_COUNT=1 composer k6:learndash
+K6_MAX_USERS=600 K6_COURSE_COUNT=1 composer k6:learndash:knee
 ```
 
 ## Reset Reminder
@@ -150,4 +133,3 @@ Before every single k6 run:
 2. Activate only the LMS being tested.
 3. Reseed fresh courses and users for that LMS.
 4. Run the matching `composer k6:*` command.
-

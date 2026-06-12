@@ -3,7 +3,7 @@
     "student_journey": {
       "executor": "constant-vus",
       "exec": "default",
-      "vus": 150,
+      "vus": 100,
       "duration": "5m",
       "tags": {
         "workload": "student_journey",

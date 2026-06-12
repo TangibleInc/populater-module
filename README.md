@@ -60,10 +60,10 @@ composer k6:lifter:smoke      # LifterLMS — one VU
 composer k6:lifter              # LifterLMS — full ramping profile
 composer k6:learndash:smoke     # LearnDash — one VU, 1 lesson × 3 topics
 composer k6:learndash           # LearnDash — full profile
-K6_PROFILE=bench-100 composer k6:lifter
-K6_PROFILE=clean-race-100 composer k6:lifter
-K6_PROFILE=breaking-point-arrival composer k6:learndash
-K6_PROFILE=stress-knee K6_VUS=180 composer k6:lifter
+K6_MAX_USERS=100 K6_COURSE_COUNT=1 composer k6:lifter:clean-race
+K6_MAX_USERS=1000 K6_COURSE_COUNT=1 composer k6:lifter:breakpoint
+K6_MAX_USERS=600 K6_COURSE_COUNT=1 composer k6:lifter:knee
+K6_MAX_USERS=1000 K6_COURSE_COUNT=1 composer k6:learndash:breakpoint
 ```
 
 Set `K6_EXECUTION=cloud` to run the same commands with `k6 cloud run`. Cloud auth
