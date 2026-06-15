@@ -25,7 +25,8 @@ use Tangible\Populater\Support\SeededUserProfile;
  */
 abstract class AbstractSeeder
 {
-    public const USER_META_MARKER = '_tangible_populater_user';
+    public const USER_META_MARKER   = '_tangible_populater_user';
+    public const COURSE_META_MARKER = '_tangible_populater_course';
 
     public function __construct(
         protected readonly AbstractLmsPlugin $plugin,
@@ -95,6 +96,7 @@ abstract class AbstractSeeder
             ]);
 
             if ($postId > 0) {
+                update_post_meta($postId, self::COURSE_META_MARKER, $this->getSlug());
                 $this->afterCourseCreated($postId, $index, $options);
                 $this->maybeAssignCourseToGroup($postId, $options);
                 $ids[] = $postId;
@@ -352,6 +354,20 @@ abstract class AbstractSeeder
     }
 
     /**
+     * Simulates a student completing all seeded courses: enroll, finish lessons,
+     * record quiz attempts, and mark courses complete.
+     *
+     * Subclasses for supported LMS plugins (LifterLMS, LearnDash) override this.
+     *
+     * @param array<string, mixed> $options  Keys: index (student number)
+     * @return list<int>  User IDs processed
+     */
+    public function seedStudentActivity(int $count, array $options = []): array
+    {
+        return [];
+    }
+
+    /**
      * @return list<string>
      */
     public function getSeedableTypes(): array
@@ -368,6 +384,17 @@ abstract class AbstractSeeder
     }
 
     /**
+     * Builds the ordered seed queue for background processing.
+     *
+     * The queue always runs in three distinct phases:
+     *   Phase 1 — Structure: groups, courses, lessons, quizzes, course_structure
+     *   Phase 2 — Users:     students and group admins
+     *   Phase 3 — Activity:  student_activity items (only when completeCourses = true)
+     *
+     * student_activity items are appended AFTER every course and user item so that
+     * by the time a completion step runs, every course and every WP user already
+     * exists in the database.
+     *
      * @param array<string, mixed>|SeedConfig $config
      * @return list<SeedQueueItem>
      */
@@ -441,6 +468,15 @@ abstract class AbstractSeeder
             }
 
             $queue[] = new SeedQueueItem('user', $userData);
+        }
+
+        // Phase 3 — Activity: runs after ALL course and user items are queued.
+        // Each student_activity item queries seeded courses at run-time (not at
+        // queue-build time), so by the time it executes the courses are in the DB.
+        if ($seedConfig->completeCourses && $seedConfig->users > 0 && $seedConfig->courses > 0) {
+            for ($u = 1; $u <= $seedConfig->users; $u++) {
+                $queue[] = new SeedQueueItem('student_activity', array_merge($shared, ['index' => $u]));
+            }
         }
 
         return $queue;

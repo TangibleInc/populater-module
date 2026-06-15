@@ -374,6 +374,25 @@ class LearnDashSeeder extends AbstractSeeder
         }
     }
 
+    /**
+     * @param array<string, mixed> $options
+     * @return list<int>
+     */
+    public function seedStudentActivity(int $count, array $options = []): array
+    {
+        $index    = (int) ($options['index'] ?? 0);
+        $username = \Tangible\Populater\Support\SeededUsername::username($this->getSlug(), 'student', $index);
+        $user     = function_exists('get_user_by') ? get_user_by('login', $username) : false;
+
+        if (!$user instanceof \WP_User) {
+            return [];
+        }
+
+        $completed = LearnDashStudentActivity::completeAllCourses($user->ID);
+
+        return $completed !== [] ? [$user->ID] : [];
+    }
+
     private function configureFreeEnrollment(int $courseId): void
     {
         if ($courseId <= 0) {

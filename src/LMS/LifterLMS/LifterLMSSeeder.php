@@ -493,6 +493,25 @@ HTML;
         update_post_meta($groupId, '_populater_group_member_ids', array_values(array_unique(array_map('intval', $members))));
     }
 
+    /**
+     * @param array<string, mixed> $options
+     * @return list<int>
+     */
+    public function seedStudentActivity(int $count, array $options = []): array
+    {
+        $index    = (int) ($options['index'] ?? 0);
+        $username = \Tangible\Populater\Support\SeededUsername::username($this->getSlug(), 'student', $index);
+        $user     = function_exists('get_user_by') ? get_user_by('login', $username) : false;
+
+        if (!$user instanceof \WP_User) {
+            return [];
+        }
+
+        $completed = LifterLMSStudentActivity::completeAllCourses($user->ID);
+
+        return $completed !== [] ? [$user->ID] : [];
+    }
+
     /** @param array<string, mixed> $options */
     protected function afterUserCreated(int $userId, int $index, array $options = []): void
     {

@@ -92,6 +92,7 @@ class SeedController
             'users'              => (int) ($request->get_param('users')              ?? SeedConfig::DEFAULT_USERS),
             'groups'             => (int) ($request->get_param('groups')             ?? SeedConfig::DEFAULT_GROUPS),
             'user_password'      => $request->get_param('user_password'),
+            'complete_courses'   => (bool) ($request->get_param('complete_courses')  ?? false),
         ];
 
         try {
@@ -246,6 +247,10 @@ class SeedController
             'user_password' => [
                 'type'              => 'string',
                 'sanitize_callback' => 'sanitize_text_field',
+            ],
+            'complete_courses' => [
+                'type'    => 'boolean',
+                'default' => false,
             ],
         ];
     }

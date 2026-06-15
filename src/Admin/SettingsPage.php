@@ -279,6 +279,18 @@ class SettingsPage
             <td><input type="number" id="tp-users" name="users" value="<?php echo esc_attr((string) SeedConfig::DEFAULT_USERS); ?>" min="0" max="1000" class="small-text"></td>
         </tr>
         <tr class="tp-field-row tp-field-row--shared">
+            <th scope="row"><label for="tp-complete-courses"><?php esc_html_e('Complete Courses', 'tangible-populater'); ?></label></th>
+            <td>
+                <label>
+                    <input type="checkbox" id="tp-complete-courses" name="complete_courses">
+                    <?php esc_html_e('Simulate students completing all seeded courses', 'tangible-populater'); ?>
+                </label>
+                <p class="description">
+                    <?php esc_html_e('Enrolls every student in every course, marks lessons complete, records passing quiz attempts, and triggers course completion. Supported for LifterLMS and LearnDash. Use with large datasets to generate realistic report data.', 'tangible-populater'); ?>
+                </p>
+            </td>
+        </tr>
+        <tr class="tp-field-row tp-field-row--shared">
             <th scope="row"><label for="tp-user-password"><?php esc_html_e('User Password', 'tangible-populater'); ?></label></th>
             <td>
                 <div class="tp-password-field">

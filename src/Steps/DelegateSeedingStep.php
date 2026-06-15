@@ -38,11 +38,13 @@ class DelegateSeedingStep extends AbstractSeedingStep
             'group_admin'      => $this->seeder->seedGroupAdmins(1, $data),
             'certificate'      => $this->seeder->seedCertificates(1, $data),
             'course_structure' => $this->seeder->seedCourseStructure($data),
+            'student_activity' => $this->seeder->seedStudentActivity(1, $data),
             default            => [],
         };
 
         foreach ($ids as $id) {
-            $logger->info(sprintf('Created %s ID: %d', $this->label, $id));
+            $verb = $this->type === 'student_activity' ? 'Completed courses for' : 'Created';
+            $logger->info(sprintf('%s %s ID: %d', $verb, $this->label, $id));
         }
 
         return $ids;

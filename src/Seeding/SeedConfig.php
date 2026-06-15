@@ -36,6 +36,7 @@ final class SeedConfig
         public readonly int $users,
         public readonly int $groups = 0,
         public readonly ?string $userPassword = null,
+        public readonly bool $completeCourses = false,
     ) {}
 
     /**
@@ -64,6 +65,7 @@ final class SeedConfig
             users: max(0, (int) ($config['users'] ?? 0)),
             groups: max(0, (int) ($config['groups'] ?? 0)),
             userPassword: self::normalizePassword($config['user_password'] ?? null),
+            completeCourses: (bool) ($config['complete_courses'] ?? false),
         );
     }
 
@@ -149,6 +151,8 @@ final class SeedConfig
             'groups'             => $this->groups,
             'user_password'      => $this->userPassword,
         ];
+
+        $base['complete_courses'] = $this->completeCourses;
 
         return match ($this->plugin) {
             'learndash' => array_merge($base, [

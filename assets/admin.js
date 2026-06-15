@@ -158,6 +158,7 @@
                 ? intFromTabField('groups', tabDefaults.groups ?? 0)
                 : 0,
             user_password: el('tp-user-password')?.value || '',
+            complete_courses: el('tp-complete-courses')?.checked === true,
         };
 
         if (activeTab === 'learndash') {
