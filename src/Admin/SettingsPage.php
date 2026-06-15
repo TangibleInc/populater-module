@@ -77,9 +77,12 @@ class SettingsPage
             'activeProcess'   => $activeProcess?->toArray(),
             'defaultPassword' => $defaultPassword,
             'defaultTab'      => $defaultTab,
-            'groupsSupported' => array_map(
-                fn($plugin) => \Tangible\Populater\LMS\LmsRegistry::supportsGroups($plugin['slug']),
-                $plugins
+            'groupsSupported' => array_combine(
+                array_column($plugins, 'slug'),
+                array_map(
+                    fn($plugin) => \Tangible\Populater\LMS\LmsRegistry::supportsGroups($plugin['slug']),
+                    $plugins
+                )
             ),
             'inactiveTabTitle' => __(
                 'This LMS plugin is not active. Activate it in Plugins before seeding.',
