@@ -18,12 +18,13 @@ use Tangible\Populater\Seeders\AbstractSeeder;
  * Completion cascade
  * ==================
  * 1. ld_update_course_access()              → grants course enrollment
- * 2. recordQuizAttempt()                    → writes _sfwd-quizzes user meta
- *                                           → fires learndash_quiz_completed hook
- *                                           → cascade marks topic → lesson complete
- * 3. learndash_process_mark_complete($force)→ marks topics/lessons with no quiz
- * 4. Course completion cascades automatically via learndash_process_mark_complete
- *    when all steps are done.
+ * 2. For each topic: recordQuizAttempt() (if it has a quiz), then
+ *    forceMarkComplete(topic) — explicit force is required because hook-based
+ *    cascades are unreliable in a headless background context.
+ * 3. For each lesson: recordQuizAttempt() for any direct-child quizzes (quizzes
+ *    with no topic_id), then forceMarkComplete(lesson). Topic-nested quizzes are
+ *    skipped here to avoid duplicate attempts; those were already handled in step 2.
+ * 4. forceMarkComplete(course) — ensures 100% even if cascade did not fire.
  *
  * Note: $force = true bypasses video-progression and prerequisite checks that
  * would block completion in a seeding context with no real user sessions.
@@ -87,26 +88,24 @@ final class LearnDashStudentActivity
 
         // Step 2 — Complete topics (innermost — before lessons)
         foreach (self::getCourseItems($courseId, 'sfwd-topic') as $topicId) {
-            $quizIds = self::getChildQuizzes($topicId, $courseId);
-            if (!empty($quizIds)) {
-                foreach ($quizIds as $quizId) {
-                    self::recordQuizAttempt($userId, $quizId, $courseId);
-                }
-            } else {
-                self::forceMarkComplete($userId, $topicId, $courseId);
+            foreach (self::getChildQuizzes($topicId, $courseId) as $quizId) {
+                self::recordQuizAttempt($userId, $quizId, $courseId);
             }
+            // Always force-mark the topic complete; quiz-completion hooks may not
+            // cascade reliably in a background/headless context.
+            self::forceMarkComplete($userId, $topicId, $courseId);
         }
 
         // Step 3 — Complete lessons
         foreach (self::getCourseItems($courseId, 'sfwd-lessons') as $lessonId) {
-            $quizIds = self::getChildQuizzes($lessonId, $courseId);
-            if (!empty($quizIds)) {
-                foreach ($quizIds as $quizId) {
-                    self::recordQuizAttempt($userId, $quizId, $courseId);
-                }
-            } else {
-                self::forceMarkComplete($userId, $lessonId, $courseId);
+            foreach (self::getDirectLessonQuizzes($lessonId, $courseId) as $quizId) {
+                self::recordQuizAttempt($userId, $quizId, $courseId);
             }
+            // Always force-mark the lesson complete. When quizzes are nested under
+            // topics, getChildQuizzes() would find them via lesson_id and skip the
+            // forceMarkComplete call — leaving the lesson at 0% even though all
+            // topics were finished in Step 2.
+            self::forceMarkComplete($userId, $lessonId, $courseId);
         }
 
         // Step 4 — Complete standalone course-level quizzes (no parent lesson/topic)
@@ -176,12 +175,14 @@ final class LearnDashStudentActivity
 
     private static function forceMarkComplete(int $userId, int $postId, int $courseId): void
     {
-        $post = get_post($postId);
-        if (!$post instanceof \WP_Post) {
+        if (!get_post($postId) instanceof \WP_Post) {
             return;
         }
 
-        learndash_process_mark_complete($userId, $post, false, $courseId, true);
+        // Pass the integer $postId, NOT a WP_Post object. learndash_process_mark_complete's
+        // second parameter is $postid (int) — it uses it as an array key internally, so
+        // passing an object causes "Illegal offset type" in ld-course-progress.php.
+        learndash_process_mark_complete($userId, $postId, false, $courseId, true);
     }
 
     /**
@@ -230,6 +231,32 @@ final class LearnDashStudentActivity
         ]);
 
         return is_array($posts) ? array_map('intval', $posts) : [];
+    }
+
+    /**
+     * Quizzes attached directly to a lesson (no topic parent).
+     *
+     * Excludes quizzes that have a topic_id set, which belong to a topic nested
+     * inside the lesson and are already handled in the topic-completion pass.
+     *
+     * @return list<int>
+     */
+    private static function getDirectLessonQuizzes(int $lessonId, int $courseId): array
+    {
+        global $wpdb;
+
+        $ids = $wpdb->get_col($wpdb->prepare(
+            "SELECT p.ID FROM {$wpdb->posts} p
+             INNER JOIN {$wpdb->postmeta} pm_course  ON p.ID = pm_course.post_id  AND pm_course.meta_key  = 'course_id'  AND pm_course.meta_value  = %d
+             INNER JOIN {$wpdb->postmeta} pm_lesson  ON p.ID = pm_lesson.post_id  AND pm_lesson.meta_key  = 'lesson_id'  AND pm_lesson.meta_value  = %d
+             LEFT  JOIN {$wpdb->postmeta} pm_topic   ON p.ID = pm_topic.post_id   AND pm_topic.meta_key   = 'topic_id'   AND pm_topic.meta_value  != '0'
+             WHERE p.post_type = 'sfwd-quiz' AND p.post_status = 'publish'
+               AND pm_topic.post_id IS NULL",
+            $courseId,
+            $lessonId,
+        ));
+
+        return is_array($ids) ? array_map('intval', $ids) : [];
     }
 
     /**
