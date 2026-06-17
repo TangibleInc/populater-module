@@ -21,6 +21,9 @@ use Tangible\Populater\Seeders\AbstractSeeder;
  * 2. For each topic: recordQuizAttempt() (if it has a quiz), then
  *    forceMarkComplete(topic) — explicit force is required because hook-based
  *    cascades are unreliable in a headless background context.
+ *    recordQuizAttempt() calls learndash_update_user_activity() + writes
+ *    _sfwd-quizzes meta + fires learndash_quiz_completed, matching LD's own
+ *    quiz-submission pipeline in ld-quiz-pro.php.
  * 3. For each lesson: recordQuizAttempt() for any direct-child quizzes (quizzes
  *    with no topic_id), then forceMarkComplete(lesson). Topic-nested quizzes are
  *    skipped here to avoid duplicate attempts; those were already handled in step 2.
@@ -121,13 +124,21 @@ final class LearnDashStudentActivity
     }
 
     /**
-     * Write a passing quiz attempt to _sfwd-quizzes user meta and fire
-     * learndash_quiz_completed so LD's hooks update activity tables and cascade
-     * lesson/topic/course completion.
+     * Record a passing quiz attempt using LD's official APIs.
+     *
+     * Mirrors what LD does in ld-quiz-pro.php when a browser quiz submission
+     * arrives:
+     *   1. learndash_update_user_activity() → writes to learndash_user_activity table
+     *   2. update_user_meta(_sfwd-quizzes)  → canonical per-user quiz history storage
+     *   3. learndash_quiz_completed hook    → notifies certificates and other integrations
+     *
+     * The 'started'/'completed' keys (not 'started_at'/'completed_at') and the
+     * canonical quiz_key format are required; LD silently skips activity recording
+     * when they are absent or malformed.
      */
     private static function recordQuizAttempt(int $userId, int $quizId, int $courseId): void
     {
-        if (!function_exists('learndash_get_setting')) {
+        if (!function_exists('learndash_get_setting') || !function_exists('learndash_update_user_activity')) {
             return;
         }
 
@@ -135,7 +146,8 @@ final class LearnDashStudentActivity
         $proQuizId     = (int) get_post_meta($quizId, 'quiz_pro_id', true);
         $lessonId      = (int) learndash_get_setting($quizId, 'lesson');
         $topicId       = (int) learndash_get_setting($quizId, 'topic');
-        $now           = time();
+        $completed     = time();
+        $started       = $completed - 30;
 
         $attemptData = [
             'quiz'             => $quizId,
@@ -143,21 +155,37 @@ final class LearnDashStudentActivity
             'count'            => $questionCount,
             'pass'             => 1,
             'rank'             => '-',
-            'time'             => $now,
+            'time'             => $completed,
             'points'           => $questionCount,
             'total_points'     => $questionCount,
-            'percentage'       => '100.00',
+            'percentage'       => 100,
             'statistic_ref_id' => 0,
-            'started_at'       => $now,
-            'completed_at'     => $now,
+            'started'          => $started,
+            'completed'        => $completed,
+            'timespent'        => 30,
+            'has_graded'       => false,
             'course'           => $courseId,
             'lesson'           => $lessonId,
             'topic'            => $topicId,
             'pro_quizid'       => $proQuizId,
-            'quiz_key'         => 'quiz_' . $quizId . '_' . $now,
+            'quiz_key'         => $completed . '_' . $proQuizId . '_' . $quizId . '_' . $courseId,
+            'ld_version'       => defined('LEARNDASH_VERSION') ? LEARNDASH_VERSION : '',
         ];
 
-        // Write to _sfwd-quizzes meta (this is what LD reporting reads)
+        // Step 1 — record in learndash_user_activity table (LD's reporting source).
+        // Must come before the meta write, matching LD's own processing order.
+        learndash_update_user_activity([
+            'course_id'          => $courseId,
+            'user_id'            => $userId,
+            'post_id'            => $quizId,
+            'activity_type'      => 'quiz',
+            'activity_status'    => true,
+            'activity_started'   => $started,
+            'activity_completed' => $completed,
+            'activity_meta'      => $attemptData,
+        ]);
+
+        // Step 2 — append to _sfwd-quizzes user meta (canonical quiz history storage).
         $existing = get_user_meta($userId, '_sfwd-quizzes', true);
         if (!is_array($existing)) {
             $existing = [];
@@ -165,11 +193,15 @@ final class LearnDashStudentActivity
         $existing[] = $attemptData;
         update_user_meta($userId, '_sfwd-quizzes', $existing);
 
-        // Fire the completion hook — LD listeners cascade completion up the tree
-        // and write to learndash_user_activity table.
+        // Step 3 — fire learndash_quiz_completed for certificates and third-party
+        // integrations. LD passes WP_Post objects for course/lesson/topic in this hook.
         $user = get_user_by('id', $userId);
         if ($user instanceof \WP_User) {
-            do_action('learndash_quiz_completed', $attemptData, $user);
+            do_action('learndash_quiz_completed', array_merge($attemptData, [
+                'course' => get_post($courseId) ?: $courseId,
+                'lesson' => $lessonId > 0 ? (get_post($lessonId) ?: $lessonId) : 0,
+                'topic'  => $topicId > 0 ? (get_post($topicId) ?: $topicId) : 0,
+            ]), $user);
         }
     }
 

@@ -47,4 +47,3 @@ done
 rm -rf "${ROOT}/build"
 
 echo "Created ${ZIP_FILE}"
-echo "Install this zip in WordPress (Plugins → Add New → Upload). Do not copy the git repo into wp-content/plugins."
