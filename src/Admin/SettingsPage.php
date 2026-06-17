@@ -247,7 +247,7 @@ class SettingsPage
         ?>
         <tr class="tp-field-row tp-field-row--shared">
             <th scope="row"><label for="tp-courses"><?php esc_html_e('Courses', 'tangible-populater'); ?></label></th>
-            <td><input type="number" id="tp-courses" name="courses" value="<?php echo esc_attr((string) SeedConfig::DEFAULT_COURSES); ?>" min="0" max="500" class="small-text"></td>
+            <td><input type="number" id="tp-courses" name="courses" value="<?php echo esc_attr((string) SeedConfig::DEFAULT_COURSES); ?>" min="0" max="100000" class="regular-text" style="width:8em;"></td>
         </tr>
         <?php
     }

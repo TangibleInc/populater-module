@@ -182,7 +182,7 @@ class SeedController
                 'type'    => 'integer',
                 'default' => SeedConfig::DEFAULT_COURSES,
                 'minimum' => 0,
-                'maximum' => 500,
+                'maximum' => 100000,
             ],
             'lessons_per_course' => [
                 'type'    => 'integer',
@@ -236,7 +236,7 @@ class SeedController
                 'type'    => 'integer',
                 'default' => SeedConfig::DEFAULT_USERS,
                 'minimum' => 0,
-                'maximum' => 1000,
+                'maximum' => 100000,
             ],
             'groups' => [
                 'type'    => 'integer',
