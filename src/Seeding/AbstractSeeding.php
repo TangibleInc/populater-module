@@ -51,12 +51,17 @@ abstract class AbstractSeeding extends \WP_Background_Process
         ]);
         $this->repository->setActiveProcess($processId);
 
+        $chunkSize = 500;
+        $i         = 0;
         foreach ($queue as $item) {
             $this->push_to_queue([
                 'process_id' => $processId,
                 'type'       => $item->type,
                 'data'       => $item->data,
             ]);
+            if (++$i % $chunkSize === 0) {
+                $this->save();
+            }
         }
 
         $this->save()->dispatch();
