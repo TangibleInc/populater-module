@@ -145,10 +145,26 @@ function decodeHtmlEntities(value) {
 }
 
 export function parseCourseStructure(body) {
+  // The platform seeds the data, so it authoritatively knows the course
+  // structure. When it passes COURSE_STRUCTURE in the run env, trust that
+  // directly: it's robust to themes that don't render the course post_content
+  // (e.g. block/FSE themes that output only the LMS syllabus block), where the
+  // in-page structure marker never reaches the HTML. Falls back to scraping
+  // the marker for platform-agnostic seeds. Both the tbench and legacy
+  // populater marker names are accepted.
+  const envStructure = __ENV.COURSE_STRUCTURE;
+  if (envStructure && envStructure !== '') {
+    try {
+      return JSON.parse(envStructure);
+    } catch (error) {
+      must(false, `COURSE_STRUCTURE env is valid JSON: ${error.message}`);
+    }
+  }
+
   const match =
-    body.match(/<!--\s*populater:structure\s+(\{[^>]*\})\s*-->/) ||
-    body.match(/<script[^>]+id=["']populater-structure["'][^>]*>([\s\S]*?)<\/script>/) ||
-    body.match(/\[populater:structure\s+(\{[^]*?})]/);
+    body.match(/<!--\s*(?:tbench|populater):structure\s+(\{[^>]*\})\s*-->/) ||
+    body.match(/<script[^>]+id=["'](?:tbench|populater)-structure["'][^>]*>([\s\S]*?)<\/script>/) ||
+    body.match(/\[(?:tbench|populater):structure\s+(\{[^]*?})]/);
 
   must(match !== null, 'course structure present');
   const json = decodeHtmlEntities(match[1].trim());
