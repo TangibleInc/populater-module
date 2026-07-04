@@ -40,6 +40,14 @@ export const STEP_THINK_TIME = Math.max(
 );
 export const COURSE_THINK_TIME = Math.max(0, floatEnv('THINK_TIME', 0));
 
+// Captured HERE at init (module top-level), not read from __ENV inside a
+// function at runtime: in k6 Cloud, values injected via Object.assign(__ENV, …)
+// are visible during init but NOT from __ENV reads inside functions on the
+// load generators. Every other env value in this suite is captured into a
+// module var at init for exactly this reason — parseCourseStructure must read
+// this const, never __ENV.COURSE_STRUCTURE directly, or it reads back empty.
+export const COURSE_STRUCTURE_ENV = __ENV.COURSE_STRUCTURE || '';
+
 export function studentLoadOptions(lms) {
   return {
     tags: {
@@ -152,10 +160,9 @@ export function parseCourseStructure(body) {
   // in-page structure marker never reaches the HTML. Falls back to scraping
   // the marker for platform-agnostic seeds. Both the tbench and legacy
   // populater marker names are accepted.
-  const envStructure = __ENV.COURSE_STRUCTURE;
-  if (envStructure && envStructure !== '') {
+  if (COURSE_STRUCTURE_ENV && COURSE_STRUCTURE_ENV !== '') {
     try {
-      return JSON.parse(envStructure);
+      return JSON.parse(COURSE_STRUCTURE_ENV);
     } catch (error) {
       must(false, `COURSE_STRUCTURE env is valid JSON: ${error.message}`);
     }
