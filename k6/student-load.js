@@ -48,6 +48,18 @@ export const COURSE_THINK_TIME = Math.max(0, floatEnv('THINK_TIME', 0));
 // this const, never __ENV.COURSE_STRUCTURE directly, or it reads back empty.
 export const COURSE_STRUCTURE_ENV = __ENV.COURSE_STRUCTURE || '';
 
+// Dataset namespace. Seeders namespace every slug, username, and email with
+// the fixture's dataset tag (e.g. fix-4xi8d8c5-lifterlms-course-1) so that
+// coexisting fixtures never collide — without it, WordPress dedupes colliding
+// slugs with -2/-3 suffixes and a slug-addressed journey silently lands on
+// the OLDEST fixture's stale (possibly pre-enrolled) data. Unset = legacy
+// un-namespaced names.
+export const DATASET_TAG = __ENV.DATASET_TAG || '';
+
+export function tagged(name) {
+  return DATASET_TAG !== '' ? `${DATASET_TAG}-${name}` : name;
+}
+
 export function studentLoadOptions(lms) {
   return {
     tags: {

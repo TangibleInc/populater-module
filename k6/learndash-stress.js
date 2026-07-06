@@ -29,13 +29,14 @@ import {
   seededUser,
   stopIfUserPoolExhausted,
   studentLoadOptions,
+  tagged,
   thinkBetweenCourses,
 } from './student-load.js';
 
 const BASE_URL = (__ENV.BASE_URL || 'http://localhost:8888').replace(/\/$/, '');
 const USER_PASSWORD = __ENV.USER_PASSWORD || 'StressTest#2026';
 /** Must match SeededUsername::prefix('learndash', 'student') in the Populater plugin. */
-const LD_STUDENT_PREFIX = 'ldstudent';
+const LD_STUDENT_PREFIX = tagged('ldstudent');
 const MAX_USERS = intEnv('MAX_USERS', 20);
 const COURSE_INDEX = intEnv('COURSE_INDEX', 1);
 const COURSE_COUNT = intEnv('COURSE_COUNT', 5);
@@ -50,19 +51,19 @@ const QUIZ_TOPIC_INDEX = intEnv('QUIZ_TOPIC_INDEX', 0);
 export const options = studentLoadOptions('learndash');
 
 function coursePath(courseIndex) {
-  return `/courses/learndash-course-${courseIndex}/`;
+  return `/courses/${tagged(`learndash-course-${courseIndex}`)}/`;
 }
 
 function lessonPath(courseIndex, lessonIndex) {
-  return `/courses/learndash-course-${courseIndex}/lessons/learndash-lesson-c${courseIndex}-l${lessonIndex}/`;
+  return `/courses/${tagged(`learndash-course-${courseIndex}`)}/lessons/${tagged(`learndash-lesson-c${courseIndex}-l${lessonIndex}`)}/`;
 }
 
 function topicPath(courseIndex, lessonIndex, topicIndex) {
-  return `/courses/learndash-course-${courseIndex}/lessons/learndash-lesson-c${courseIndex}-l${lessonIndex}/topics/learndash-topic-c${courseIndex}-l${lessonIndex}-t${topicIndex}/`;
+  return `/courses/${tagged(`learndash-course-${courseIndex}`)}/lessons/${tagged(`learndash-lesson-c${courseIndex}-l${lessonIndex}`)}/topics/${tagged(`learndash-topic-c${courseIndex}-l${lessonIndex}-t${topicIndex}`)}/`;
 }
 
 function quizPath(courseIndex, lessonIndex, topicIndex, quizIndex) {
-  return `/courses/learndash-course-${courseIndex}/lessons/learndash-lesson-c${courseIndex}-l${lessonIndex}/topics/learndash-topic-c${courseIndex}-l${lessonIndex}-t${topicIndex}/quizzes/learndash-quiz-c${courseIndex}-l${lessonIndex}-q${quizIndex}/`;
+  return `/courses/${tagged(`learndash-course-${courseIndex}`)}/lessons/${tagged(`learndash-lesson-c${courseIndex}-l${lessonIndex}`)}/topics/${tagged(`learndash-topic-c${courseIndex}-l${lessonIndex}-t${topicIndex}`)}/quizzes/${tagged(`learndash-quiz-c${courseIndex}-l${lessonIndex}-q${quizIndex}`)}/`;
 }
 
 function fetchCourseStructure(courseIndex, jar) {
