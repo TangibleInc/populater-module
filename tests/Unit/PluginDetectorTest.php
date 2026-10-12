@@ -8,69 +8,61 @@ use Tangible\Populater\PluginDetector;
 use Tangible\Populater\Registry\LmsPlugins;
 use Brain\Monkey\Functions;
 
-class PluginDetectorTest extends \WPTestCase
-{
-    private PluginDetector $detector;
+class PluginDetectorTest extends \WPTestCase {
 
-    protected function setUp(): void
-    {
-        parent::setUp();
-        LmsPlugins::registerBuiltIn();
-        $this->detector = new PluginDetector();
-    }
+	private PluginDetector $detector;
 
-    public function test_get_supported_plugins_returns_all_three_lms(): void
-    {
-        $plugins = $this->detector->getSupportedPlugins();
+	protected function setUp(): void {
+		parent::setUp();
+		LmsPlugins::registerBuiltIn();
+		$this->detector = new PluginDetector();
+	}
 
-        $this->assertArrayHasKey('learndash', $plugins);
-        $this->assertArrayHasKey('lifterlms', $plugins);
-        $this->assertArrayHasKey('tangible-lms', $plugins);
-    }
+	public function test_get_supported_plugins_returns_all_three_lms(): void {
+		$plugins = $this->detector->getSupportedPlugins();
 
-    public function test_get_active_plugins_returns_only_active_ones(): void
-    {
-        Functions\when('is_plugin_active')
-            ->alias(fn(string $plugin) => $plugin === 'sfwd-lms/sfwd_lms.php');
+		$this->assertArrayHasKey( 'learndash', $plugins );
+		$this->assertArrayHasKey( 'lifterlms', $plugins );
+		$this->assertArrayHasKey( 'tangible-lms', $plugins );
+	}
 
-        $active = $this->detector->getActivePlugins();
+	public function test_get_active_plugins_returns_only_active_ones(): void {
+		Functions\when( 'is_plugin_active' )
+			->alias( fn( string $plugin ) => 'sfwd-lms/sfwd_lms.php' === $plugin );
 
-        $this->assertCount(1, $active);
-        $this->assertArrayHasKey('learndash', $active);
-    }
+		$active = $this->detector->getActivePlugins();
 
-    public function test_is_plugin_active_returns_true_for_active_plugin(): void
-    {
-        Functions\when('is_plugin_active')->justReturn(true);
+		$this->assertCount( 1, $active );
+		$this->assertArrayHasKey( 'learndash', $active );
+	}
 
-        $this->assertTrue($this->detector->isPluginActive('learndash'));
-    }
+	public function test_is_plugin_active_returns_true_for_active_plugin(): void {
+		Functions\when( 'is_plugin_active' )->justReturn( true );
 
-    public function test_is_plugin_active_returns_false_for_inactive_plugin(): void
-    {
-        Functions\when('is_plugin_active')->justReturn(false);
+		$this->assertTrue( $this->detector->isPluginActive( 'learndash' ) );
+	}
 
-        $this->assertFalse($this->detector->isPluginActive('learndash'));
-    }
+	public function test_is_plugin_active_returns_false_for_inactive_plugin(): void {
+		Functions\when( 'is_plugin_active' )->justReturn( false );
 
-    public function test_is_plugin_active_throws_for_unknown_plugin(): void
-    {
-        $this->expectException(\InvalidArgumentException::class);
-        $this->detector->isPluginActive('unknown-lms');
-    }
+		$this->assertFalse( $this->detector->isPluginActive( 'learndash' ) );
+	}
 
-    public function test_has_any_active_plugin_returns_true_when_at_least_one_active(): void
-    {
-        Functions\when('is_plugin_active')
-            ->alias(fn(string $plugin) => $plugin === 'sfwd-lms/sfwd_lms.php');
+	public function test_is_plugin_active_throws_for_unknown_plugin(): void {
+		$this->expectException( \InvalidArgumentException::class );
+		$this->detector->isPluginActive( 'unknown-lms' );
+	}
 
-        $this->assertTrue($this->detector->hasAnyActivePlugin());
-    }
+	public function test_has_any_active_plugin_returns_true_when_at_least_one_active(): void {
+		Functions\when( 'is_plugin_active' )
+			->alias( fn( string $plugin ) => 'sfwd-lms/sfwd_lms.php' === $plugin );
 
-    public function test_has_any_active_plugin_returns_false_when_none_active(): void
-    {
-        Functions\when('is_plugin_active')->justReturn(false);
+		$this->assertTrue( $this->detector->hasAnyActivePlugin() );
+	}
 
-        $this->assertFalse($this->detector->hasAnyActivePlugin());
-    }
+	public function test_has_any_active_plugin_returns_false_when_none_active(): void {
+		Functions\when( 'is_plugin_active' )->justReturn( false );
+
+		$this->assertFalse( $this->detector->hasAnyActivePlugin() );
+	}
 }

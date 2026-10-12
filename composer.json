@@ -8,9 +8,15 @@
     "deliciousbrains/wp-background-processing": "^1.4"
   },
   "require-dev": {
-    "phpunit/phpunit": "^10.5",
     "brain/monkey": "^2.6",
+    "dealerdirect/phpcodesniffer-composer-installer": "^1.2",
     "mockery/mockery": "^1.6",
+    "php-stubs/wp-cli-stubs": "^2.12",
+    "phpstan/extension-installer": "^1.4",
+    "phpstan/phpstan": "^2.3",
+    "phpunit/phpunit": "^10.5",
+    "szepeviktor/phpstan-wordpress": "^2.0",
+    "wp-coding-standards/wpcs": "^3.4",
     "yoast/phpunit-polyfills": "^2.0"
   },
   "autoload": {
@@ -41,11 +47,18 @@
     "k6:learndash:clean-race": "K6_PROFILE=clean-race-100 bash scripts/k6-run.sh run learndash-stress.js",
     "k6:learndash:breakpoint": "K6_PROFILE=breaking-point-arrival bash scripts/k6-run.sh run learndash-stress.js",
     "k6:learndash:knee": "K6_PROFILE=stress-knee bash scripts/k6-run.sh run learndash-stress.js",
-    "zip": "bash scripts/zip.sh"
+    "zip": "bash scripts/zip.sh",
+    "lint": "phpcs",
+    "lint:fix": "phpcbf",
+    "analyse": "phpstan analyse --memory-limit=1G"
   },
   "config": {
     "optimize-autoloader": true,
     "sort-packages": true,
-    "process-timeout":0
+    "process-timeout": 0,
+    "allow-plugins": {
+      "dealerdirect/phpcodesniffer-composer-installer": true,
+      "phpstan/extension-installer": true
+    }
   }
 }

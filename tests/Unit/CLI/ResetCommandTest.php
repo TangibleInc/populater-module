@@ -8,43 +8,39 @@ use Tangible\Populater\CLI\ResetCommand;
 use Tangible\Populater\Database\DatabaseReset;
 use Brain\Monkey\Functions;
 
-class ResetCommandTest extends \WPTestCase
-{
-    private ResetCommand $command;
+class ResetCommandTest extends \WPTestCase {
 
-    /** @var DatabaseReset&\PHPUnit\Framework\MockObject\MockObject */
-    private DatabaseReset $dbReset;
+	private ResetCommand $command;
 
-    protected function setUp(): void
-    {
-        parent::setUp();
-        $this->dbReset = $this->createMock(DatabaseReset::class);
-        $this->command = new ResetCommand($this->dbReset);
-    }
+	/** @var DatabaseReset&\PHPUnit\Framework\MockObject\MockObject */
+	private DatabaseReset $dbReset;
 
-    public function test_reset_command_requires_yes_flag_or_prompt(): void
-    {
-        $this->dbReset->method('isSafeEnvironment')->willReturn(true);
-        $this->dbReset->method('reset')->willReturn(true);
+	protected function setUp(): void {
+		parent::setUp();
+		$this->dbReset = $this->createMock( DatabaseReset::class );
+		$this->command = new ResetCommand( $this->dbReset );
+	}
 
-        $this->command->reset([], ['yes' => false]);
-        $this->assertTrue(true);
-    }
+	public function test_reset_command_requires_yes_flag_or_prompt(): void {
+		$this->dbReset->method( 'isSafeEnvironment' )->willReturn( true );
+		$this->dbReset->method( 'reset' )->willReturn( true );
 
-    public function test_reset_command_shows_error_when_not_safe_environment(): void
-    {
-        $this->dbReset->method('isSafeEnvironment')->willReturn(false);
+		$this->command->reset( array(), array( 'yes' => false ) );
+		$this->assertTrue( true );
+	}
 
-        $this->command->reset([], ['yes' => true]);
-        $this->assertTrue(true);
-    }
+	public function test_reset_command_shows_error_when_not_safe_environment(): void {
+		$this->dbReset->method( 'isSafeEnvironment' )->willReturn( false );
 
-    public function test_reset_command_reports_failure(): void
-    {
-        $this->dbReset->method('isSafeEnvironment')->willReturn(true);
-        $this->dbReset->method('reset')->willReturn(false);
+		$this->command->reset( array(), array( 'yes' => true ) );
+		$this->assertTrue( true );
+	}
 
-        $this->command->reset([], ['yes' => false]);
-        $this->assertTrue(true);
-    }
+	public function test_reset_command_reports_failure(): void {
+		$this->dbReset->method( 'isSafeEnvironment' )->willReturn( true );
+		$this->dbReset->method( 'reset' )->willReturn( false );
+
+		$this->command->reset( array(), array( 'yes' => false ) );
+		$this->assertTrue( true );
+	}
 }

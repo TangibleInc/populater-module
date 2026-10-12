@@ -7,30 +7,38 @@
  * Author:       Tangible
  * License:      GPL-2.0-or-later
  * Text Domain:  tangible-populater
+ *
+ * @package Tangible\Populater
  */
 
 declare(strict_types=1);
 
-if (!defined('ABSPATH')) {
-    exit;
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
 }
 
-define('TANGIBLE_POPULATER_VERSION', '1.4.3');
-define('TANGIBLE_POPULATER_FILE', __FILE__);
+define( 'TANGIBLE_POPULATER_VERSION', '1.4.3' );
+define( 'TANGIBLE_POPULATER_FILE', __FILE__ );
 
 // Composer autoloader — covers src/ and any vendor dependencies.
-$autoloader = __DIR__ . '/vendor/autoload.php';
-if (!file_exists($autoloader)) {
-    add_action('admin_notices', static function (): void {
-        echo '<div class="notice notice-error"><p>'
-            . esc_html__('Tangible Populator: please run `composer install` to install dependencies.', 'tangible-populater')
-            . '</p></div>';
-    });
-    return;
+$tangible_populater_autoloader = __DIR__ . '/vendor/autoload.php';
+if ( ! file_exists( $tangible_populater_autoloader ) ) {
+	add_action(
+		'admin_notices',
+		static function (): void {
+			echo '<div class="notice notice-error"><p>'
+			. esc_html__( 'Tangible Populator: please run `composer install` to install dependencies.', 'tangible-populater' )
+			. '</p></div>';
+		}
+	);
+	return;
 }
-require_once $autoloader;
+require_once $tangible_populater_autoloader;
 
 // Boot the plugin after WordPress is loaded.
-add_action('plugins_loaded', static function (): void {
-    \Tangible\Populater\Plugin::getInstance()->init();
-});
+add_action(
+	'plugins_loaded',
+	static function (): void {
+		\Tangible\Populater\Plugin::getInstance()->init();
+	}
+);

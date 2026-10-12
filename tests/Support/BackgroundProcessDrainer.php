@@ -10,42 +10,44 @@ use Tangible\Populater\Seeding\SeedingStatus;
 /**
  * Processes background seeding queues synchronously during integration tests.
  */
-final class BackgroundProcessDrainer
-{
-    public static function runSeedToCompletion(SeedingManager $manager, string $pluginSlug, string $processId): SeedingStatus
-    {
-        $process = PluginTestAccessor::processForPlugin($pluginSlug);
-        $handle  = new \ReflectionMethod($process, 'handle');
-        $handle->setAccessible(true);
+final class BackgroundProcessDrainer {
 
-        $queueEmpty = new \ReflectionMethod($process, 'is_queue_empty');
-        $queueEmpty->setAccessible(true);
+	public static function runSeedToCompletion( SeedingManager $manager, string $pluginSlug, string $processId ): SeedingStatus {
+		$process = PluginTestAccessor::processForPlugin( $pluginSlug );
+		$handle  = new \ReflectionMethod( $process, 'handle' );
+		$handle->setAccessible( true );
 
-        $guard = 0;
+		$queueEmpty = new \ReflectionMethod( $process, 'is_queue_empty' );
+		$queueEmpty->setAccessible( true );
 
-        while ($guard++ < 500) {
-            $status = $manager->getStatus($processId);
+		$guard = 0;
 
-            if (self::isTerminal($status)) {
-                return $status;
-            }
+		while ( $guard++ < 500 ) {
+			$status = $manager->getStatus( $processId );
 
-            if ($queueEmpty->invoke($process)) {
-                break;
-            }
+			if ( self::isTerminal( $status ) ) {
+				return $status;
+			}
 
-            $handle->invoke($process);
-        }
+			if ( $queueEmpty->invoke( $process ) ) {
+				break;
+			}
 
-        return $manager->getStatus($processId);
-    }
+			$handle->invoke( $process );
+		}
 
-    private static function isTerminal(SeedingStatus $status): bool
-    {
-        return in_array($status->getStatus(), [
-            SeedingStatus::STATUS_COMPLETED,
-            SeedingStatus::STATUS_FAILED,
-            SeedingStatus::STATUS_CANCELLED,
-        ], true);
-    }
+		return $manager->getStatus( $processId );
+	}
+
+	private static function isTerminal( SeedingStatus $status ): bool {
+		return in_array(
+			$status->getStatus(),
+			array(
+				SeedingStatus::STATUS_COMPLETED,
+				SeedingStatus::STATUS_FAILED,
+				SeedingStatus::STATUS_CANCELLED,
+			),
+			true
+		);
+	}
 }

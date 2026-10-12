@@ -12,41 +12,39 @@ use Tangible\Populater\Seeding\WpBackgroundSeedingRunner;
 /**
  * Access plugin internals from integration tests.
  */
-final class PluginTestAccessor
-{
-    public static function seedingManager(): SeedingManager
-    {
-        $plugin = Plugin::getInstance();
-        $ref    = new \ReflectionProperty($plugin, 'seedingManager');
-        $ref->setAccessible(true);
+final class PluginTestAccessor {
 
-        /** @var SeedingManager $manager */
-        $manager = $ref->getValue($plugin);
+	public static function seedingManager(): SeedingManager {
+		$plugin = Plugin::getInstance();
+		$ref    = new \ReflectionProperty( $plugin, 'seedingManager' );
+		$ref->setAccessible( true );
 
-        return $manager;
-    }
+		/** @var SeedingManager $manager */
+		$manager = $ref->getValue( $plugin );
 
-    public static function processForPlugin(string $slug): AbstractSeeding
-    {
-        $manager = self::seedingManager();
-        $manager->registerBackgroundProcesses();
+		return $manager;
+	}
 
-        $ref = new \ReflectionProperty(SeedingManager::class, 'runners');
-        $ref->setAccessible(true);
+	public static function processForPlugin( string $slug ): AbstractSeeding {
+		$manager = self::seedingManager();
+		$manager->registerBackgroundProcesses();
 
-        /** @var array<string, WpBackgroundSeedingRunner> $runners */
-        $runners = $ref->getValue($manager);
+		$ref = new \ReflectionProperty( SeedingManager::class, 'runners' );
+		$ref->setAccessible( true );
 
-        if (!isset($runners[$slug])) {
-            throw new \RuntimeException(sprintf('No seeding process registered for plugin "%s".', $slug));
-        }
+		/** @var array<string, WpBackgroundSeedingRunner> $runners */
+		$runners = $ref->getValue( $manager );
 
-        $runnerRef = new \ReflectionProperty(WpBackgroundSeedingRunner::class, 'process');
-        $runnerRef->setAccessible(true);
+		if ( ! isset( $runners[ $slug ] ) ) {
+			throw new \RuntimeException( sprintf( 'No seeding process registered for plugin "%s".', $slug ) );
+		}
 
-        /** @var AbstractSeeding $process */
-        $process = $runnerRef->getValue($runners[$slug]);
+		$runnerRef = new \ReflectionProperty( WpBackgroundSeedingRunner::class, 'process' );
+		$runnerRef->setAccessible( true );
 
-        return $process;
-    }
+		/** @var AbstractSeeding $process */
+		$process = $runnerRef->getValue( $runners[ $slug ] );
+
+		return $process;
+	}
 }

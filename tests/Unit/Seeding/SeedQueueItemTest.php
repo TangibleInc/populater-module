@@ -6,19 +6,30 @@ namespace Tangible\Populater\Tests\Unit\Seeding;
 
 use Tangible\Populater\Seeding\SeedQueueItem;
 
-class SeedQueueItemTest extends \WPTestCase
-{
-    public function test_round_trip_array(): void
-    {
-        $item = new SeedQueueItem('lesson', ['course_index' => 1, 'index' => 2]);
+class SeedQueueItemTest extends \WPTestCase {
 
-        $this->assertSame(
-            ['type' => 'lesson', 'data' => ['course_index' => 1, 'index' => 2]],
-            $item->toArray(),
-        );
+	public function test_round_trip_array(): void {
+		$item = new SeedQueueItem(
+			'lesson',
+			array(
+				'course_index' => 1,
+				'index'        => 2,
+			)
+		);
 
-        $restored = SeedQueueItem::fromArray($item->toArray());
-        $this->assertSame('lesson', $restored->type);
-        $this->assertSame(1, $restored->data['course_index']);
-    }
+		$this->assertSame(
+			array(
+				'type' => 'lesson',
+				'data' => array(
+					'course_index' => 1,
+					'index'        => 2,
+				),
+			),
+			$item->toArray(),
+		);
+
+		$restored = SeedQueueItem::fromArray( $item->toArray() );
+		$this->assertSame( 'lesson', $restored->type );
+		$this->assertSame( 1, $restored->data['course_index'] );
+	}
 }

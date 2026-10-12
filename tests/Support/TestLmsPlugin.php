@@ -11,28 +11,27 @@ use Tangible\Populater\Seeders\AbstractSeeder;
 /**
  * Minimal LMS plugin registration for unit tests.
  */
-final class TestLmsPlugin extends AbstractLmsPlugin
-{
-    protected string $slug = 'test-lms';
-    protected string $name = 'Test LMS';
-    protected string $pluginFile = 'test/test.php';
-    protected string $seederClass = AbstractSeeder::class;
-    protected string $backgroundAction = 'seed_test';
+final class TestLmsPlugin extends AbstractLmsPlugin {
 
-    protected function defineEntitySchema(): LmsEntitySchema
-    {
-        return new LmsEntitySchema(
-            postTypes: [
-                'courses' => 'test_course',
-                'lessons' => 'test_lesson',
-                'quizzes' => 'test_quiz',
-            ],
-            userPrefix: 'test_lms_user',
-            metaMap: [
-                'lessons'   => ['course_id' => 'courseId'],
-                'quizzes'   => ['lesson_id' => 'parentId'],
-                'questions' => ['quiz_id' => 'quizId'],
-            ],
-        );
-    }
+	protected string $slug             = 'test-lms';
+	protected string $name             = 'Test LMS';
+	protected string $pluginFile       = 'test/test.php';
+	protected string $seederClass      = AbstractSeeder::class;
+	protected string $backgroundAction = 'seed_test';
+
+	protected function defineEntitySchema(): LmsEntitySchema {
+		return new LmsEntitySchema(
+			postTypes: array(
+				'courses' => 'test_course',
+				'lessons' => 'test_lesson',
+				'quizzes' => 'test_quiz',
+			),
+			userPrefix: 'test_lms_user',
+			metaMap: array(
+				'lessons'   => array( 'course_id' => 'courseId' ),
+				'quizzes'   => array( 'lesson_id' => 'parentId' ),
+				'questions' => array( 'quiz_id' => 'quizId' ),
+			),
+		);
+	}
 }

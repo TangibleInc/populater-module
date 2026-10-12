@@ -1,4 +1,9 @@
 <?php
+/**
+ * Learn Dash Pro Quiz Helper.
+ *
+ * @package Tangible\Populater
+ */
 
 declare(strict_types=1);
 
@@ -10,189 +15,241 @@ namespace Tangible\Populater\LMS\LearnDash;
  * LearnDash quizzes require rows in wp_pro_quiz_* tables and linked post meta.
  * Without them the admin shortcode column shows "Missing ProQuiz Associated Settings."
  */
-final class LearnDashProQuizHelper
-{
-    public static function isAvailable(): bool
-    {
-        return class_exists(\WpProQuiz_Model_QuizMapper::class)
-            && function_exists('learndash_update_setting')
-            && function_exists('learndash_update_pro_question')
-            && function_exists('learndash_proquiz_sync_question_fields');
-    }
+final class LearnDashProQuizHelper {
 
-    public static function createProQuiz(int $quizPostId, string $title): int
-    {
-        if (!self::isAvailable()) {
-            return self::assignPlaceholderQuizProId($quizPostId);
-        }
+	/**
+	 * Checks whether the LearnDash ProQuiz classes and helper functions are loaded.
+	 *
+	 * @return bool True when real ProQuiz records can be created.
+	 */
+	public static function isAvailable(): bool {
+		return class_exists( \WpProQuiz_Model_QuizMapper::class )
+			&& function_exists( 'learndash_update_setting' )
+			&& function_exists( 'learndash_update_pro_question' )
+			&& function_exists( 'learndash_proquiz_sync_question_fields' );
+	}
 
-        $existing = (int) get_post_meta($quizPostId, 'quiz_pro_id', true);
+	/**
+	 * Creates a ProQuiz record for a quiz post and stores its ID, or assigns a placeholder ID when ProQuiz is unavailable.
+	 *
+	 * @param int    $quizPostId Quiz post ID.
+	 * @param string $title Quiz title.
+	 * @return int The ProQuiz ID.
+	 */
+	public static function createProQuiz( int $quizPostId, string $title ): int {
+		if ( ! self::isAvailable() ) {
+			return self::assignPlaceholderQuizProId( $quizPostId );
+		}
 
-        if ($existing > 0) {
-            $mapper = new \WpProQuiz_Model_QuizMapper();
+		$existing = (int) get_post_meta( $quizPostId, 'quiz_pro_id', true );
 
-            if ((int) $mapper->exists($existing) > 0) {
-                return $existing;
-            }
-        }
+		if ( $existing > 0 ) {
+			$mapper = new \WpProQuiz_Model_QuizMapper();
 
-        $quiz = new \WpProQuiz_Model_Quiz();
-        $quiz->setName($title);
-        $quiz->setText('AAZZAAZZ');
-        $quiz->setPostId($quizPostId);
+			if ( (int) $mapper->exists( $existing ) > 0 ) {
+				return $existing;
+			}
+		}
 
-        $mapper = new \WpProQuiz_Model_QuizMapper();
-        $mapper->save($quiz);
+		$quiz = new \WpProQuiz_Model_Quiz();
+		$quiz->setName( $title );
+		$quiz->setText( 'AAZZAAZZ' );
+		$quiz->setPostId( $quizPostId );
 
-        $proId = (int) $quiz->getId();
+		$mapper = new \WpProQuiz_Model_QuizMapper();
+		$mapper->save( $quiz );
 
-        if ($proId <= 0) {
-            return self::assignPlaceholderQuizProId($quizPostId);
-        }
+		$proId = (int) $quiz->getId();
 
-        learndash_update_setting($quizPostId, 'quiz_pro', $proId);
+		if ( $proId <= 0 ) {
+			return self::assignPlaceholderQuizProId( $quizPostId );
+		}
 
-        return $proId;
-    }
+		learndash_update_setting( $quizPostId, 'quiz_pro', $proId );
 
-    public static function attachQuestion(
-        int $quizPostId,
-        int $questionPostId,
-        string $title,
-        string $content,
-        int $index,
-    ): int {
-        if (!self::isAvailable()) {
-            return self::assignPlaceholderQuestion($quizPostId, $questionPostId);
-        }
+		return $proId;
+	}
 
-        $questionType = function_exists('learndash_get_post_type_slug')
-            ? (string) learndash_get_post_type_slug('question')
-            : 'sfwd-question';
+	/**
+	 * Creates a single-choice ProQuiz question and links it to the quiz and question posts.
+	 *
+	 * @param int    $quizPostId Quiz post ID.
+	 * @param int    $questionPostId Question post ID.
+	 * @param string $title Question title.
+	 * @param string $content Question content.
+	 * @param int    $index One-based question index.
+	 * @return int The ProQuiz question ID.
+	 */
+	public static function attachQuestion(
+		int $quizPostId,
+		int $questionPostId,
+		string $title,
+		string $content,
+		int $index,
+	): int {
+		if ( ! self::isAvailable() ) {
+			return self::assignPlaceholderQuestion( $quizPostId, $questionPostId );
+		}
 
-        $questionText = wp_strip_all_tags($content) ?: $title;
+		$questionType = function_exists( 'learndash_get_post_type_slug' )
+			? (string) learndash_get_post_type_slug( 'question' )
+			: 'sfwd-question';
 
-        $questionProId = learndash_update_pro_question(
-            0,
-            [
-                'action'       => 'new_step',
-                'post_type'    => $questionType,
-                'post_status'  => 'publish',
-                'post_title'   => $title,
-                'post_content' => $questionText,
-            ],
-        );
+		$questionText = '' !== wp_strip_all_tags( $content ) ? wp_strip_all_tags( $content ) : $title;
 
-        if (empty($questionProId)) {
-            return self::assignPlaceholderQuestion($quizPostId, $questionPostId);
-        }
+		$questionProId = learndash_update_pro_question(
+			0,
+			array(
+				'action'       => 'new_step',
+				'post_type'    => $questionType,
+				'post_status'  => 'publish',
+				'post_title'   => $title,
+				'post_content' => $questionText,
+			),
+		);
 
-        $questionProId = (int) $questionProId;
-        $quizProId     = (int) learndash_get_setting($quizPostId, 'quiz_pro');
+		if ( empty( $questionProId ) ) {
+			return self::assignPlaceholderQuestion( $quizPostId, $questionPostId );
+		}
 
-        $questionMapper = new \WpProQuiz_Model_QuestionMapper();
-        $questionModel  = $questionMapper->fetch($questionProId);
+		$questionProId = (int) $questionProId;
+		$quizProId     = (int) learndash_get_setting( $quizPostId, 'quiz_pro' );
 
-        $questionModel->set_array_to_object([
-            '_answerData' => self::singleChoiceAnswers($index),
-            '_answerType' => 'single',
-            '_question'   => $questionText,
-        ]);
+		$questionMapper = new \WpProQuiz_Model_QuestionMapper();
+		$questionModel  = $questionMapper->fetch( $questionProId );
 
-        if ($quizProId > 0) {
-            $questionModel->setQuizId($quizProId);
-        }
+		$questionModel->set_array_to_object(
+			array(
+				'_answerData' => self::singleChoiceAnswers( $index ),
+				'_answerType' => 'single',
+				'_question'   => $questionText,
+			)
+		);
 
-        $questionMapper->save($questionModel);
-        $questionProId = (int) $questionModel->getId();
+		if ( $quizProId > 0 ) {
+			$questionModel->setQuizId( $quizProId );
+		}
 
-        self::linkQuestionToQuiz($quizPostId, $questionPostId, $questionProId);
+		$questionMapper->save( $questionModel );
+		$questionProId = (int) $questionModel->getId();
 
-        return $questionProId;
-    }
+		self::linkQuestionToQuiz( $quizPostId, $questionPostId, $questionProId );
 
-    /**
-     * @return list<array<string, mixed>>
-     */
-    private static function singleChoiceAnswers(int $index): array
-    {
-        $default = [
-            '_html'               => false,
-            '_graded'             => '1',
-            '_gradedType'         => 'text',
-            '_gradingProgression' => 'not-graded-none',
-            '_points'             => 1,
-            '_sortString'         => '',
-            '_sortStringHtml'     => false,
-            '_type'               => 'answer',
-        ];
+		return $questionProId;
+	}
 
-        return [
-            array_merge($default, [
-                '_answer'  => sprintf('Correct answer for question %d', $index),
-                '_correct' => true,
-            ]),
-            array_merge($default, [
-                '_answer'  => sprintf('Incorrect option A for question %d', $index),
-                '_correct' => false,
-                '_points'  => 0,
-            ]),
-            array_merge($default, [
-                '_answer'  => sprintf('Incorrect option B for question %d', $index),
-                '_correct' => false,
-                '_points'  => 0,
-            ]),
-        ];
-    }
+	/**
+	 * Builds one correct and two incorrect answers for a single-choice question.
+	 *
+	 * @param int $index One-based question index.
+	 * @return list<array<string, mixed>> Answer data in ProQuiz answer format.
+	 */
+	private static function singleChoiceAnswers( int $index ): array {
+		$default = array(
+			'_html'               => false,
+			'_graded'             => '1',
+			'_gradedType'         => 'text',
+			'_gradingProgression' => 'not-graded-none',
+			'_points'             => 1,
+			'_sortString'         => '',
+			'_sortStringHtml'     => false,
+			'_type'               => 'answer',
+		);
 
-    private static function linkQuestionToQuiz(
-        int $quizPostId,
-        int $questionPostId,
-        int $questionProId,
-    ): void {
-        $questions = get_post_meta($quizPostId, 'ld_quiz_questions', true);
-        $questions = is_array($questions) ? $questions : [];
-        $questions[$questionPostId] = $questionProId;
+		return array(
+			array_merge(
+				$default,
+				array(
+					'_answer'  => sprintf( 'Correct answer for question %d', $index ),
+					'_correct' => true,
+				)
+			),
+			array_merge(
+				$default,
+				array(
+					'_answer'  => sprintf( 'Incorrect option A for question %d', $index ),
+					'_correct' => false,
+					'_points'  => 0,
+				)
+			),
+			array_merge(
+				$default,
+				array(
+					'_answer'  => sprintf( 'Incorrect option B for question %d', $index ),
+					'_correct' => false,
+					'_points'  => 0,
+				)
+			),
+		);
+	}
 
-        update_post_meta($quizPostId, 'ld_quiz_questions', $questions);
-        update_post_meta($questionPostId, 'question_pro_id', $questionProId);
-        learndash_proquiz_sync_question_fields($questionPostId, $questionProId);
-        learndash_update_setting($questionPostId, 'quiz', $quizPostId);
-        update_post_meta($questionPostId, 'quiz_id', $quizPostId);
-    }
+	/**
+	 * Stores the post meta that ties a question to its quiz and ProQuiz question.
+	 *
+	 * @param int $quizPostId Quiz post ID.
+	 * @param int $questionPostId Question post ID.
+	 * @param int $questionProId ProQuiz question ID.
+	 * @return void
+	 */
+	private static function linkQuestionToQuiz(
+		int $quizPostId,
+		int $questionPostId,
+		int $questionProId,
+	): void {
+		$questions                    = get_post_meta( $quizPostId, 'ld_quiz_questions', true );
+		$questions                    = is_array( $questions ) ? $questions : array();
+		$questions[ $questionPostId ] = $questionProId;
 
-    private static function assignPlaceholderQuizProId(int $quizPostId): int
-    {
-        $proId = (int) get_post_meta($quizPostId, 'quiz_pro_id', true);
+		update_post_meta( $quizPostId, 'ld_quiz_questions', $questions );
+		update_post_meta( $questionPostId, 'question_pro_id', $questionProId );
+		learndash_proquiz_sync_question_fields( $questionPostId, $questionProId );
+		learndash_update_setting( $questionPostId, 'quiz', $quizPostId );
+		update_post_meta( $questionPostId, 'quiz_id', $quizPostId );
+	}
 
-        if ($proId <= 0) {
-            $proId = $quizPostId;
-            update_post_meta($quizPostId, 'quiz_pro_id', $proId);
-        }
+	/**
+	 * Uses the quiz post ID as the ProQuiz ID when ProQuiz cannot be used.
+	 *
+	 * @param int $quizPostId Quiz post ID.
+	 * @return int The stored ProQuiz ID.
+	 */
+	private static function assignPlaceholderQuizProId( int $quizPostId ): int {
+		$proId = (int) get_post_meta( $quizPostId, 'quiz_pro_id', true );
 
-        return $proId;
-    }
+		if ( $proId <= 0 ) {
+			$proId = $quizPostId;
+			update_post_meta( $quizPostId, 'quiz_pro_id', $proId );
+		}
 
-    private static function assignPlaceholderQuestion(int $quizPostId, int $questionPostId): int
-    {
-        $proId = (int) get_post_meta($questionPostId, 'question_pro_id', true);
+		return $proId;
+	}
 
-        if ($proId <= 0) {
-            $proId = $questionPostId;
-            update_post_meta($questionPostId, 'question_pro_id', $proId);
-        }
+	/**
+	 * Registers a question on a quiz using the question post ID as the ProQuiz question ID.
+	 *
+	 * @param int $quizPostId Quiz post ID.
+	 * @param int $questionPostId Question post ID.
+	 * @return int The stored ProQuiz question ID.
+	 */
+	private static function assignPlaceholderQuestion( int $quizPostId, int $questionPostId ): int {
+		$proId = (int) get_post_meta( $questionPostId, 'question_pro_id', true );
 
-        update_post_meta($questionPostId, 'question_type', 'single');
+		if ( $proId <= 0 ) {
+			$proId = $questionPostId;
+			update_post_meta( $questionPostId, 'question_pro_id', $proId );
+		}
 
-        $questions = get_post_meta($quizPostId, 'ld_quiz_questions', true);
+		update_post_meta( $questionPostId, 'question_type', 'single' );
 
-        if (!is_array($questions)) {
-            $questions = [];
-        }
+		$questions = get_post_meta( $quizPostId, 'ld_quiz_questions', true );
 
-        $questions[$questionPostId] = $questionPostId;
-        update_post_meta($quizPostId, 'ld_quiz_questions', $questions);
+		if ( ! is_array( $questions ) ) {
+			$questions = array();
+		}
 
-        return $proId;
-    }
+		$questions[ $questionPostId ] = $questionPostId;
+		update_post_meta( $quizPostId, 'ld_quiz_questions', $questions );
+
+		return $proId;
+	}
 }

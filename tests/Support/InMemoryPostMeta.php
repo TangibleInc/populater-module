@@ -9,49 +9,44 @@ use Brain\Monkey\Functions;
 /**
  * In-memory post meta store for seeder unit tests.
  */
-final class InMemoryPostMeta
-{
-    /** @var array<int, array<string, mixed>> */
-    private array $store = [];
+final class InMemoryPostMeta {
 
-    public function install(): self
-    {
-        Functions\when('get_post_meta')->alias(
-            fn(int $postId, string $key = '', bool $single = false) => $this->get($postId, $key, $single),
-        );
-        Functions\when('update_post_meta')->alias(
-            fn(int $postId, string $key, mixed $value) => $this->set($postId, $key, $value),
-        );
+	/** @var array<int, array<string, mixed>> */
+	private array $store = array();
 
-        return $this;
-    }
+	public function install(): self {
+		Functions\when( 'get_post_meta' )->alias(
+			fn( int $postId, string $key = '', bool $single = false ) => $this->get( $postId, $key, $single ),
+		);
+		Functions\when( 'update_post_meta' )->alias(
+			fn( int $postId, string $key, mixed $value ) => $this->set( $postId, $key, $value ),
+		);
 
-    public function set(int $postId, string $key, mixed $value): bool
-    {
-        $this->store[$postId][$key] = $value;
+		return $this;
+	}
 
-        return true;
-    }
+	public function set( int $postId, string $key, mixed $value ): bool {
+		$this->store[ $postId ][ $key ] = $value;
 
-    public function getValue(int $postId, string $key): mixed
-    {
-        return $this->store[$postId][$key] ?? null;
-    }
+		return true;
+	}
 
-    /** @return array<string, mixed> */
-    public function allForPost(int $postId): array
-    {
-        return $this->store[$postId] ?? [];
-    }
+	public function getValue( int $postId, string $key ): mixed {
+		return $this->store[ $postId ][ $key ] ?? null;
+	}
 
-    private function get(int $postId, string $key, bool $single): mixed
-    {
-        if ($key === '') {
-            return $this->store[$postId] ?? [];
-        }
+	/** @return array<string, mixed> */
+	public function allForPost( int $postId ): array {
+		return $this->store[ $postId ] ?? array();
+	}
 
-        $value = $this->store[$postId][$key] ?? '';
+	private function get( int $postId, string $key, bool $single ): mixed {
+		if ( '' === $key ) {
+			return $this->store[ $postId ] ?? array();
+		}
 
-        return $single ? $value : [$value];
-    }
+		$value = $this->store[ $postId ][ $key ] ?? '';
+
+		return $single ? $value : array( $value );
+	}
 }

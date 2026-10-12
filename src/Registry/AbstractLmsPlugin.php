@@ -1,4 +1,9 @@
 <?php
+/**
+ * Base LMS plugin registration.
+ *
+ * @package Tangible\Populater
+ */
 
 declare(strict_types=1);
 
@@ -13,96 +18,181 @@ use Tangible\Populater\Seeding\ProcessRepository;
  * Base LMS registration: subclasses set properties and hook into
  * {@see AbstractLmsPlugin::FILTER} on construction.
  */
-abstract class AbstractLmsPlugin
-{
-    public const FILTER = 'tangible-populator-lms-plugins';
+abstract class AbstractLmsPlugin {
 
-    /** @var array<string, AbstractLmsPlugin> */
-    private static array $registered = [];
+	/**
+	 * Filter used to collect registered LMS plugins.
+	 */
+	public const FILTER = 'tangible-populator-lms-plugins';
 
-    protected string $slug;
-    protected string $name;
-    protected string $pluginFile;
-    /** @var class-string<AbstractSeeder> */
-    protected string $seederClass;
-    protected string $backgroundAction;
+	/**
+	 * Plugins registered in this request.
+	 *
+	 * @var array<string, AbstractLmsPlugin>
+	 */
+	private static array $registered = array();
 
-    private ?LmsEntitySchema $entitySchema = null;
+	/**
+	 * Plugin slug.
+	 *
+	 * @var string
+	 */
+	protected string $slug;
 
-    public function __construct()
-    {
-        $this->register([]);
-        add_filter(self::FILTER, [$this, 'register'], 10, 1);
-    }
+	/**
+	 * Plugin display name.
+	 *
+	 * @var string
+	 */
+	protected string $name;
 
-    /**
-     * @param array<string, AbstractLmsPlugin> $plugins
-     * @return array<string, AbstractLmsPlugin>
-     */
-    public function register(array $plugins): array
-    {
-        $plugins[$this->getSlug()] = $this;
-        self::$registered[$this->getSlug()] = $this;
+	/**
+	 * Plugin main file relative to the plugins directory.
+	 *
+	 * @var string
+	 */
+	protected string $pluginFile;
 
-        return $plugins;
-    }
+	/**
+	 * Seeder class name.
+	 *
+	 * @var class-string<AbstractSeeder>
+	 */
+	protected string $seederClass;
 
-    /**
-     * Plugins registered via {@see register()} (used when filter callbacks are not executed, e.g. unit tests).
-     *
-     * @return array<string, AbstractLmsPlugin>
-     */
-    public static function getRegistered(): array
-    {
-        return self::$registered;
-    }
+	/**
+	 * Background action name.
+	 *
+	 * @var string
+	 */
+	protected string $backgroundAction;
 
-    public static function clearRegistered(): void
-    {
-        self::$registered = [];
-    }
+	/**
+	 * Cached entity schema.
+	 *
+	 * @var LmsEntitySchema|null
+	 */
+	private ?LmsEntitySchema $entitySchema = null;
 
-    public function getSlug(): string
-    {
-        return $this->slug;
-    }
+	/**
+	 * Constructor.
+	 */
+	public function __construct() {
+		$this->register( array() );
+		add_filter( self::FILTER, array( $this, 'register' ), 10, 1 );
+	}
 
-    public function getName(): string
-    {
-        return $this->name;
-    }
+	/**
+	 * Add this plugin to the registered plugins list.
+	 *
+	 * @param array<string, AbstractLmsPlugin> $plugins Registered plugins.
+	 * @return array<string, AbstractLmsPlugin> The plugins list including this plugin.
+	 */
+	public function register( array $plugins ): array {
+		$plugins[ $this->getSlug() ]          = $this;
+		self::$registered[ $this->getSlug() ] = $this;
 
-    public function getPluginFile(): string
-    {
-        return $this->pluginFile;
-    }
+		return $plugins;
+	}
 
-    public function getBackgroundAction(): string
-    {
-        return $this->backgroundAction;
-    }
+	/**
+	 * Plugins registered via {@see register()} (used when filter callbacks are not executed, e.g. unit tests).
+	 *
+	 * @return array<string, AbstractLmsPlugin>
+	 */
+	public static function getRegistered(): array {
+		return self::$registered;
+	}
 
-    public function isActive(): bool
-    {
-        return is_plugin_active($this->pluginFile);
-    }
+	/**
+	 * Clear the static registry.
+	 *
+	 * @return void
+	 */
+	public static function clearRegistered(): void {
+		self::$registered = array();
+	}
 
-    public function createSeeder(): AbstractSeeder
-    {
-        $class = $this->seederClass;
+	/**
+	 * Get the plugin slug.
+	 *
+	 * @return string
+	 */
+	public function getSlug(): string {
+		return $this->slug;
+	}
 
-        return new $class($this);
-    }
+	/**
+	 * Get the plugin name.
+	 *
+	 * @return string
+	 */
+	public function getName(): string {
+		return $this->name;
+	}
 
-    public function createProcess(AbstractSeeder $seeder, ?ProcessRepository $repository = null): AbstractSeeding
-    {
-        return new LmsSeedingProcess($seeder, $this->backgroundAction, $repository);
-    }
+	/**
+	 * Get the plugin main file.
+	 *
+	 * @return string
+	 */
+	public function getPluginFile(): string {
+		return $this->pluginFile;
+	}
 
-    abstract protected function defineEntitySchema(): LmsEntitySchema;
+	/**
+	 * Get the background action name.
+	 *
+	 * @return string
+	 */
+	public function getBackgroundAction(): string {
+		return $this->backgroundAction;
+	}
 
-    public function getEntitySchema(): LmsEntitySchema
-    {
-        return $this->entitySchema ??= $this->defineEntitySchema();
-    }
+	/**
+	 * Whether the LMS plugin is active.
+	 *
+	 * @return bool
+	 */
+	public function isActive(): bool {
+		return is_plugin_active( $this->pluginFile );
+	}
+
+	/**
+	 * Create the seeder for this plugin.
+	 *
+	 * @return AbstractSeeder
+	 */
+	public function createSeeder(): AbstractSeeder {
+		$class = $this->seederClass;
+
+		return new $class( $this );
+	}
+
+	/**
+	 * Create the seeding process for this plugin.
+	 *
+	 * @param AbstractSeeder         $seeder     Seeder.
+	 * @param ProcessRepository|null $repository Process repository.
+	 * @return AbstractSeeding
+	 */
+	public function createProcess( AbstractSeeder $seeder, ?ProcessRepository $repository = null ): AbstractSeeding {
+		return new LmsSeedingProcess( $seeder, $this->backgroundAction, $repository );
+	}
+
+	/**
+	 * Define the entity schema for this plugin.
+	 *
+	 * @return LmsEntitySchema
+	 */
+	abstract protected function defineEntitySchema(): LmsEntitySchema;
+
+	/**
+	 * Get the (cached) entity schema.
+	 *
+	 * @return LmsEntitySchema
+	 */
+	public function getEntitySchema(): LmsEntitySchema {
+		return $this->entitySchema ??= $this->defineEntitySchema();
+	}
 }

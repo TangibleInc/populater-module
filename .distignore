@@ -16,6 +16,8 @@ docs
 node_modules
 package.json
 package-lock.json
+phpcs.xml.dist
+phpstan.neon.dist
 phpunit.xml
 phpunit.integration.xml
 scripts

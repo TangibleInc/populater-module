@@ -7,158 +7,251 @@ namespace Tangible\Populater\Tests\Unit\Seeding;
 use Tangible\Populater\Seeding\ProcessRepository;
 use Brain\Monkey\Functions;
 
-class ProcessRepositoryTest extends \WPTestCase
-{
-    private ProcessRepository $repository;
+class ProcessRepositoryTest extends \WPTestCase {
 
-    /** @var array<string, mixed> */
-    private array $options = [];
+	private ProcessRepository $repository;
 
-    protected function setUp(): void
-    {
-        parent::setUp();
-        $this->repository = new ProcessRepository();
-        $this->options    = [];
+	/** @var array<string, mixed> */
+	private array $options = array();
 
-        if (!defined('ARRAY_A')) {
-            define('ARRAY_A', 'ARRAY_A');
-        }
+	protected function setUp(): void {
+		parent::setUp();
+		$this->repository = new ProcessRepository();
+		$this->options    = array();
 
-        Functions\when('maybe_unserialize')->alias(static fn(mixed $value) => @unserialize((string) $value) ?: $value);
-        Functions\when('get_option')->alias(function (string $key) {
-            return $this->options[$key] ?? null;
-        });
-        Functions\when('update_option')->alias(function (string $key, mixed $value): bool {
-            $this->options[$key] = $value;
+		if ( ! defined( 'ARRAY_A' ) ) {
+			define( 'ARRAY_A', 'ARRAY_A' ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- Test stub for a WordPress core symbol.
+		}
 
-            return true;
-        });
-        Functions\when('delete_option')->alias(function (string $key): bool {
-            unset($this->options[$key]);
+		Functions\when( 'maybe_unserialize' )->alias(
+			static function ( mixed $value ) {
+				$result = @unserialize( (string) $value ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged,WordPress.PHP.DiscouragedPHPFunctions.serialize_unserialize -- Mirrors WordPress maybe_unserialize() in unit tests.
+				return $result ? $result : $value;
+			}
+		);
+		Functions\when( 'get_option' )->alias(
+			function ( string $key ) {
+				return $this->options[ $key ] ?? null;
+			}
+		);
+		Functions\when( 'update_option' )->alias(
+			function ( string $key, mixed $value ): bool {
+				$this->options[ $key ] = $value;
 
-            return true;
-        });
-    }
+				return true;
+			}
+		);
+		Functions\when( 'delete_option' )->alias(
+			function ( string $key ): bool {
+				unset( $this->options[ $key ] );
 
-    public function test_save_and_get_status(): void
-    {
-        $this->repository->saveStatus('proc-1', ['status' => 'running', 'plugin' => 'learndash']);
+				return true;
+			}
+		);
+	}
 
-        $this->assertSame('running', $this->repository->getStatus('proc-1')['status']);
-        $this->assertSame('learndash', $this->repository->getStatus('proc-1')['plugin']);
-    }
+	public function test_save_and_get_status(): void {
+		$this->repository->saveStatus(
+			'proc-1',
+			array(
+				'status' => 'running',
+				'plugin' => 'learndash',
+			)
+		);
 
-    public function test_delete_process_clears_status_and_id_map(): void
-    {
-        $this->repository->saveStatus('proc-1', ['status' => 'completed']);
-        $this->repository->saveIdMap('proc-1', ['courses' => [], 'lessons' => []]);
-        $this->repository->appendLog('proc-1', 'done');
+		$this->assertSame( 'running', $this->repository->getStatus( 'proc-1' )['status'] );
+		$this->assertSame( 'learndash', $this->repository->getStatus( 'proc-1' )['plugin'] );
+	}
 
-        $this->repository->deleteProcess('proc-1');
+	public function test_delete_process_clears_status_and_id_map(): void {
+		$this->repository->saveStatus( 'proc-1', array( 'status' => 'completed' ) );
+		$this->repository->saveIdMap(
+			'proc-1',
+			array(
+				'courses' => array(),
+				'lessons' => array(),
+			)
+		);
+		$this->repository->appendLog( 'proc-1', 'done' );
 
-        $this->assertSame([], $this->repository->getStatus('proc-1'));
-        $this->assertSame(['courses' => [], 'lessons' => []], $this->repository->getIdMap('proc-1'));
-    }
+		$this->repository->deleteProcess( 'proc-1' );
 
-    public function test_active_process_tracking(): void
-    {
-        $this->repository->setActiveProcess('proc-1');
+		$this->assertSame( array(), $this->repository->getStatus( 'proc-1' ) );
+		$this->assertSame(
+			array(
+				'courses' => array(),
+				'lessons' => array(),
+			),
+			$this->repository->getIdMap( 'proc-1' )
+		);
+	}
 
-        $this->assertSame('proc-1', $this->repository->getStoredActiveProcessId());
+	public function test_active_process_tracking(): void {
+		$this->repository->setActiveProcess( 'proc-1' );
 
-        $this->repository->clearActiveProcessIfMatches('proc-2');
-        $this->assertSame('proc-1', $this->repository->getStoredActiveProcessId());
+		$this->assertSame( 'proc-1', $this->repository->getStoredActiveProcessId() );
 
-        $this->repository->clearActiveProcessIfMatches('proc-1');
-        $this->assertNull($this->repository->getStoredActiveProcessId());
-    }
+		$this->repository->clearActiveProcessIfMatches( 'proc-2' );
+		$this->assertSame( 'proc-1', $this->repository->getStoredActiveProcessId() );
 
-    public function test_find_active_process_uses_stored_pointer_when_running(): void
-    {
-        $this->repository->saveStatus('proc-1', ['status' => 'running', 'processed' => 5]);
-        $this->repository->setActiveProcess('proc-1');
+		$this->repository->clearActiveProcessIfMatches( 'proc-1' );
+		$this->assertNull( $this->repository->getStoredActiveProcessId() );
+	}
 
-        $this->assertSame('proc-1', $this->repository->findActiveProcessId());
-    }
+	public function test_find_active_process_uses_stored_pointer_when_running(): void {
+		$this->repository->saveStatus(
+			'proc-1',
+			array(
+				'status'    => 'running',
+				'processed' => 5,
+			)
+		);
+		$this->repository->setActiveProcess( 'proc-1' );
 
-    public function test_find_active_process_scans_status_options_when_pointer_missing(): void
-    {
-        global $wpdb;
+		$this->assertSame( 'proc-1', $this->repository->findActiveProcessId() );
+	}
 
-        $this->repository->saveStatus('proc-1', ['status' => 'running', 'processed' => 12]);
+	public function test_find_active_process_scans_status_options_when_pointer_missing(): void {
+		global $wpdb;
 
-        $wpdb = \Mockery::mock('wpdb');
-        $wpdb->options = 'wp_options';
-        $wpdb->shouldReceive('esc_like')->andReturnUsing(static fn(string $text) => $text);
-        $wpdb->shouldReceive('prepare')->andReturnUsing(static fn(string $query) => $query);
-        $wpdb->shouldReceive('get_results')->andReturn([
-            [
-                'option_name'  => ProcessRepository::PREFIX_STATUS . 'proc-1',
-                'option_value' => serialize(['status' => 'running', 'processed' => 12]),
-            ],
-        ]);
+		$this->repository->saveStatus(
+			'proc-1',
+			array(
+				'status'    => 'running',
+				'processed' => 12,
+			)
+		);
 
-        $this->assertSame('proc-1', $this->repository->findActiveProcessId());
-        $this->assertSame('proc-1', $this->repository->getStoredActiveProcessId());
-    }
+		$wpdb          = \Mockery::mock( 'wpdb' );
+		$wpdb->options = 'wp_options';
+		$wpdb->shouldReceive( 'esc_like' )->andReturnUsing( static fn( string $text ) => $text );
+		$wpdb->shouldReceive( 'prepare' )->andReturnUsing( static fn( string $query ) => $query );
+		$wpdb->shouldReceive( 'get_results' )->andReturn(
+			array(
+				array(
+					'option_name'  => ProcessRepository::PREFIX_STATUS . 'proc-1',
+					'option_value' => serialize( // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.serialize_serialize -- Fixture mirrors WordPress option storage.
+						array(
+							'status'    => 'running',
+							'processed' => 12,
+						)
+					),
+				),
+			)
+		);
 
-    public function test_delete_process_clears_active_process_pointer(): void
-    {
-        $this->repository->setActiveProcess('proc-1');
-        $this->repository->deleteProcess('proc-1');
+		$this->assertSame( 'proc-1', $this->repository->findActiveProcessId() );
+		$this->assertSame( 'proc-1', $this->repository->getStoredActiveProcessId() );
+	}
 
-        $this->assertNull($this->repository->getStoredActiveProcessId());
-    }
+	public function test_delete_process_clears_active_process_pointer(): void {
+		$this->repository->setActiveProcess( 'proc-1' );
+		$this->repository->deleteProcess( 'proc-1' );
 
-    public function test_find_active_process_with_multiple_active_seedings_prefers_newer_by_timestamp(): void
-    {
-        global $wpdb;
+		$this->assertNull( $this->repository->getStoredActiveProcessId() );
+	}
 
-        $this->repository->saveStatus('proc-old', ['status' => 'running', 'processed' => 15, 'timestamp' => 1000]);
-        $this->repository->saveStatus('proc-new', ['status' => 'pending', 'processed' => 0, 'timestamp' => 2000]);
+	public function test_find_active_process_with_multiple_active_seedings_prefers_newer_by_timestamp(): void {
+		global $wpdb;
 
-        $wpdb = \Mockery::mock('wpdb');
-        $wpdb->options = 'wp_options';
-        $wpdb->shouldReceive('esc_like')->andReturnUsing(static fn(string $text) => $text);
-        $wpdb->shouldReceive('prepare')->andReturnUsing(static fn(string $query) => $query);
-        $wpdb->shouldReceive('get_results')->andReturn([
-            [
-                'option_name'  => ProcessRepository::PREFIX_STATUS . 'proc-old',
-                'option_value' => serialize(['status' => 'running', 'processed' => 15, 'timestamp' => 1000]),
-            ],
-            [
-                'option_name'  => ProcessRepository::PREFIX_STATUS . 'proc-new',
-                'option_value' => serialize(['status' => 'pending', 'processed' => 0, 'timestamp' => 2000]),
-            ],
-        ]);
+		$this->repository->saveStatus(
+			'proc-old',
+			array(
+				'status'    => 'running',
+				'processed' => 15,
+				'timestamp' => 1000,
+			)
+		);
+		$this->repository->saveStatus(
+			'proc-new',
+			array(
+				'status'    => 'pending',
+				'processed' => 0,
+				'timestamp' => 2000,
+			)
+		);
 
-        $this->assertSame('proc-new', $this->repository->findActiveProcessId());
-        $this->assertSame('proc-new', $this->repository->getStoredActiveProcessId());
-    }
+		$wpdb          = \Mockery::mock( 'wpdb' );
+		$wpdb->options = 'wp_options';
+		$wpdb->shouldReceive( 'esc_like' )->andReturnUsing( static fn( string $text ) => $text );
+		$wpdb->shouldReceive( 'prepare' )->andReturnUsing( static fn( string $query ) => $query );
+		$wpdb->shouldReceive( 'get_results' )->andReturn(
+			array(
+				array(
+					'option_name'  => ProcessRepository::PREFIX_STATUS . 'proc-old',
+					'option_value' => serialize( // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.serialize_serialize -- Fixture mirrors WordPress option storage.
+						array(
+							'status'    => 'running',
+							'processed' => 15,
+							'timestamp' => 1000,
+						)
+					),
+				),
+				array(
+					'option_name'  => ProcessRepository::PREFIX_STATUS . 'proc-new',
+					'option_value' => serialize( // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.serialize_serialize -- Fixture mirrors WordPress option storage.
+						array(
+							'status'    => 'pending',
+							'processed' => 0,
+							'timestamp' => 2000,
+						)
+					),
+				),
+			)
+		);
 
-    public function test_find_active_process_prefers_newer_with_timestamp_over_older_no_timestamp(): void
-    {
-        global $wpdb;
+		$this->assertSame( 'proc-new', $this->repository->findActiveProcessId() );
+		$this->assertSame( 'proc-new', $this->repository->getStoredActiveProcessId() );
+	}
 
-        $this->repository->saveStatus('proc-legacy', ['status' => 'running', 'processed' => 12]);
-        $this->repository->saveStatus('proc-modern', ['status' => 'pending', 'processed' => 0, 'timestamp' => 1000]);
+	public function test_find_active_process_prefers_newer_with_timestamp_over_older_no_timestamp(): void {
+		global $wpdb;
 
-        $wpdb = \Mockery::mock('wpdb');
-        $wpdb->options = 'wp_options';
-        $wpdb->shouldReceive('esc_like')->andReturnUsing(static fn(string $text) => $text);
-        $wpdb->shouldReceive('prepare')->andReturnUsing(static fn(string $query) => $query);
-        $wpdb->shouldReceive('get_results')->andReturn([
-            [
-                'option_name'  => ProcessRepository::PREFIX_STATUS . 'proc-legacy',
-                'option_value' => serialize(['status' => 'running', 'processed' => 12]),
-            ],
-            [
-                'option_name'  => ProcessRepository::PREFIX_STATUS . 'proc-modern',
-                'option_value' => serialize(['status' => 'pending', 'processed' => 0, 'timestamp' => 1000]),
-            ],
-        ]);
+		$this->repository->saveStatus(
+			'proc-legacy',
+			array(
+				'status'    => 'running',
+				'processed' => 12,
+			)
+		);
+		$this->repository->saveStatus(
+			'proc-modern',
+			array(
+				'status'    => 'pending',
+				'processed' => 0,
+				'timestamp' => 1000,
+			)
+		);
 
-        $this->assertSame('proc-modern', $this->repository->findActiveProcessId());
-        $this->assertSame('proc-modern', $this->repository->getStoredActiveProcessId());
-    }
+		$wpdb          = \Mockery::mock( 'wpdb' );
+		$wpdb->options = 'wp_options';
+		$wpdb->shouldReceive( 'esc_like' )->andReturnUsing( static fn( string $text ) => $text );
+		$wpdb->shouldReceive( 'prepare' )->andReturnUsing( static fn( string $query ) => $query );
+		$wpdb->shouldReceive( 'get_results' )->andReturn(
+			array(
+				array(
+					'option_name'  => ProcessRepository::PREFIX_STATUS . 'proc-legacy',
+					'option_value' => serialize( // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.serialize_serialize -- Fixture mirrors WordPress option storage.
+						array(
+							'status'    => 'running',
+							'processed' => 12,
+						)
+					),
+				),
+				array(
+					'option_name'  => ProcessRepository::PREFIX_STATUS . 'proc-modern',
+					'option_value' => serialize( // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.serialize_serialize -- Fixture mirrors WordPress option storage.
+						array(
+							'status'    => 'pending',
+							'processed' => 0,
+							'timestamp' => 1000,
+						)
+					),
+				),
+			)
+		);
+
+		$this->assertSame( 'proc-modern', $this->repository->findActiveProcessId() );
+		$this->assertSame( 'proc-modern', $this->repository->getStoredActiveProcessId() );
+	}
 }

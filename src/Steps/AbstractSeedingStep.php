@@ -1,4 +1,9 @@
 <?php
+/**
+ * Base contract for a single content-type seeding step.
+ *
+ * @package Tangible\Populater
+ */
 
 declare(strict_types=1);
 
@@ -18,68 +23,78 @@ use Tangible\Populater\Support\Logger;
  * concerns — start/finish logging, exception catching, and error logging —
  * are handled here in execute().
  */
-abstract class AbstractSeedingStep
-{
-    public function __construct(
-        protected readonly ProcessRepository $repository,
-    ) {}
+abstract class AbstractSeedingStep {
 
-    // -------------------------------------------------------------------------
-    // Contract
-    // -------------------------------------------------------------------------
+	/**
+	 * Constructor.
+	 *
+	 * @param ProcessRepository $repository Process repository.
+	 */
+	public function __construct(
+		protected readonly ProcessRepository $repository,
+	) {}
 
-    /**
-     * The queue item type this step handles (e.g. 'course', 'lesson', 'user').
-     */
-    abstract public function getType(): string;
+	// -------------------------------------------------------------------------
+	// Contract
+	// -------------------------------------------------------------------------
 
-    /**
-     * Core seeding logic.
-     *
-     * Implement all content-creation work here. Any uncaught exception will be
-     * caught by execute() and recorded as an error log entry.
-     *
-     * @param array<string, mixed> $data    Item payload from the seed queue.
-     * @param Logger               $logger  Process-scoped logger.
-     * @return list<int>  Created post/user IDs.
-     */
-    abstract protected function run(array $data, Logger $logger): array;
+	/**
+	 * The queue item type this step handles (e.g. 'course', 'lesson', 'user').
+	 *
+	 * @return string
+	 */
+	abstract public function getType(): string;
 
-    // -------------------------------------------------------------------------
-    // Execution shell (logging + error handling)
-    // -------------------------------------------------------------------------
+	/**
+	 * Core seeding logic.
+	 *
+	 * Implement all content-creation work here. Any uncaught exception will be
+	 * caught by execute() and recorded as an error log entry.
+	 *
+	 * @param array<string, mixed> $data   Item payload from the seed queue.
+	 * @param Logger               $logger Process-scoped logger.
+	 * @return list<int> Created post/user IDs.
+	 */
+	abstract protected function run( array $data, Logger $logger ): array;
 
-    /**
-     * Runs the step with automatic logging and error handling.
-     *
-     * On success the step is silent apart from the start/end log lines.
-     * On failure the exception message is recorded at error level and execution
-     * continues (the background process can move on to the next item).
-     *
-     * @param array<string, mixed> $data
-     */
-    final public function execute(array $data, Logger $logger): void
-    {
-        $type = $this->getType();
+	// -------------------------------------------------------------------------
+	// Execution shell (logging + error handling)
+	// -------------------------------------------------------------------------
 
-        $logger->info(sprintf('Starting step: %s', $type));
+	/**
+	 * Runs the step with automatic logging and error handling.
+	 *
+	 * On success the step is silent apart from the start/end log lines.
+	 * On failure the exception message is recorded at error level and execution
+	 * continues (the background process can move on to the next item).
+	 *
+	 * @param array<string, mixed> $data   Item payload from the seed queue.
+	 * @param Logger               $logger Process-scoped logger.
+	 * @return void
+	 */
+	final public function execute( array $data, Logger $logger ): void {
+		$type = $this->getType();
 
-        try {
-            $ids = $this->run($data, $logger);
+		$logger->info( sprintf( 'Starting step: %s', $type ) );
 
-            if (isset($data['process_id']) && is_string($data['process_id'])) {
-                SeedingIdMap::record($data['process_id'], $type, $data, $ids, $this->repository);
-            }
+		try {
+			$ids = $this->run( $data, $logger );
 
-            $logger->info(sprintf('Completed step: %s', $type));
-        } catch (\Throwable $e) {
-            $logger->error(sprintf(
-                '[%s] %s in %s:%d',
-                $type,
-                $e->getMessage(),
-                $e->getFile(),
-                $e->getLine(),
-            ));
-        }
-    }
+			if ( isset( $data['process_id'] ) && is_string( $data['process_id'] ) ) {
+				SeedingIdMap::record( $data['process_id'], $type, $data, $ids, $this->repository );
+			}
+
+			$logger->info( sprintf( 'Completed step: %s', $type ) );
+		} catch ( \Throwable $e ) {
+			$logger->error(
+				sprintf(
+					'[%s] %s in %s:%d',
+					$type,
+					$e->getMessage(),
+					$e->getFile(),
+					$e->getLine(),
+				)
+			);
+		}
+	}
 }

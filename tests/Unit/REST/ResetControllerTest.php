@@ -8,86 +8,80 @@ use Tangible\Populater\REST\ResetController;
 use Tangible\Populater\Database\DatabaseReset;
 use Brain\Monkey\Functions;
 
-class ResetControllerTest extends \WPTestCase
-{
-    private ResetController $controller;
+class ResetControllerTest extends \WPTestCase {
 
-    /** @var DatabaseReset&\PHPUnit\Framework\MockObject\MockObject */
-    private DatabaseReset $dbReset;
+	private ResetController $controller;
 
-    protected function setUp(): void
-    {
-        parent::setUp();
-        $this->dbReset = $this->createMock(DatabaseReset::class);
-        $this->dbReset->method('isSafeEnvironment')->willReturn(true);
-        $this->controller = new ResetController($this->dbReset);
-    }
+	/** @var DatabaseReset&\PHPUnit\Framework\MockObject\MockObject */
+	private DatabaseReset $dbReset;
 
-    public function test_register_routes_defines_reset_endpoint(): void
-    {
-        Functions\expect('register_rest_route')
-            ->once()
-            ->with('tangible-populater/v1', '/reset', \Mockery::any());
+	protected function setUp(): void {
+		parent::setUp();
+		$this->dbReset = $this->createMock( DatabaseReset::class );
+		$this->dbReset->method( 'isSafeEnvironment' )->willReturn( true );
+		$this->controller = new ResetController( $this->dbReset );
+	}
 
-        $this->controller->registerRoutes();
-        $this->addToAssertionCount(1);
-    }
+	public function test_register_routes_defines_reset_endpoint(): void {
+		Functions\expect( 'register_rest_route' )
+			->once()
+			->with( 'tangible-populater/v1', '/reset', \Mockery::any() );
 
-    public function test_permission_callback_requires_admin(): void
-    {
-        Functions\when('current_user_can')->justReturn(false);
+		$this->controller->registerRoutes();
+		$this->addToAssertionCount( 1 );
+	}
 
-        $this->assertFalse($this->controller->checkAdminPermission());
-    }
+	public function test_permission_callback_requires_admin(): void {
+		Functions\when( 'current_user_can' )->justReturn( false );
 
-    public function test_reset_database_returns_success_when_confirmed(): void
-    {
-        $this->dbReset->method('reset')->willReturn(true);
+		$this->assertFalse( $this->controller->checkAdminPermission() );
+	}
 
-        $request = new \WP_REST_Request(['confirmed' => true]);
+	public function test_reset_database_returns_success_when_confirmed(): void {
+		$this->dbReset->method( 'reset' )->willReturn( true );
 
-        Functions\expect('rest_ensure_response')
-            ->once()
-            ->andReturnUsing(static fn (mixed $data): \WP_REST_Response => new \WP_REST_Response($data));
+		$request = new \WP_REST_Request( array( 'confirmed' => true ) );
 
-        $response = $this->controller->resetDatabase($request);
-        $data     = $response instanceof \WP_REST_Response ? $response->get_data() : [];
+		Functions\expect( 'rest_ensure_response' )
+			->once()
+			->andReturnUsing( static fn ( mixed $data ): \WP_REST_Response => new \WP_REST_Response( $data ) );
 
-        $this->assertArrayHasKey('success', $data);
-        $this->assertTrue($data['success']);
-    }
+		$response = $this->controller->resetDatabase( $request );
+		$data     = $response instanceof \WP_REST_Response ? $response->get_data() : array();
 
-    public function test_reset_database_returns_error_when_not_confirmed(): void
-    {
-        $request = new \WP_REST_Request(['confirmed' => false]);
+		$this->assertArrayHasKey( 'success', $data );
+		$this->assertTrue( $data['success'] );
+	}
 
-        Functions\expect('rest_ensure_response')
-            ->once()
-            ->andReturnUsing(static fn (mixed $data): \WP_REST_Response => new \WP_REST_Response($data));
+	public function test_reset_database_returns_error_when_not_confirmed(): void {
+		$request = new \WP_REST_Request( array( 'confirmed' => false ) );
 
-        $this->dbReset->method('reset')->willReturn(false);
+		Functions\expect( 'rest_ensure_response' )
+			->once()
+			->andReturnUsing( static fn ( mixed $data ): \WP_REST_Response => new \WP_REST_Response( $data ) );
 
-        $response = $this->controller->resetDatabase($request);
-        $data     = $response instanceof \WP_REST_Response ? $response->get_data() : [];
+		$this->dbReset->method( 'reset' )->willReturn( false );
 
-        $this->assertArrayHasKey('success', $data);
-        $this->assertFalse($data['success']);
-    }
+		$response = $this->controller->resetDatabase( $request );
+		$data     = $response instanceof \WP_REST_Response ? $response->get_data() : array();
 
-    public function test_reset_database_returns_error_when_not_safe_environment(): void
-    {
-        $this->dbReset->method('isSafeEnvironment')->willReturn(false);
+		$this->assertArrayHasKey( 'success', $data );
+		$this->assertFalse( $data['success'] );
+	}
 
-        $request = new \WP_REST_Request(['confirmed' => true]);
+	public function test_reset_database_returns_error_when_not_safe_environment(): void {
+		$this->dbReset->method( 'isSafeEnvironment' )->willReturn( false );
 
-        Functions\expect('rest_ensure_response')
-            ->once()
-            ->andReturnUsing(static fn (mixed $data): \WP_REST_Response => new \WP_REST_Response($data));
+		$request = new \WP_REST_Request( array( 'confirmed' => true ) );
 
-        $response = $this->controller->resetDatabase($request);
-        $data     = $response instanceof \WP_REST_Response ? $response->get_data() : [];
+		Functions\expect( 'rest_ensure_response' )
+			->once()
+			->andReturnUsing( static fn ( mixed $data ): \WP_REST_Response => new \WP_REST_Response( $data ) );
 
-        $this->assertArrayHasKey('success', $data);
-        $this->assertFalse($data['success']);
-    }
+		$response = $this->controller->resetDatabase( $request );
+		$data     = $response instanceof \WP_REST_Response ? $response->get_data() : array();
+
+		$this->assertArrayHasKey( 'success', $data );
+		$this->assertFalse( $data['success'] );
+	}
 }

@@ -12,70 +12,67 @@ use PHPUnit\Framework\TestCase;
 /**
  * Base case for tests that require a loaded WordPress environment.
  */
-abstract class WordPressIntegrationTestCase extends TestCase
-{
-    protected function setUp(): void
-    {
-        parent::setUp();
-        wp_set_current_user(self::adminUserId());
+abstract class WordPressIntegrationTestCase extends TestCase {
 
-        $reset = new DatabaseReset();
-        $this->assertTrue($reset->reset(confirmed: true), 'Failed to reset database before integration test.');
+	protected function setUp(): void {
+		parent::setUp();
+		wp_set_current_user( self::adminUserId() );
 
-        IntegrationTestSupport::clearBackgroundSeedingState();
-        LifterLmsEnrollmentSetup::resetCheckoutState();
+		$reset = new DatabaseReset();
+		$this->assertTrue( $reset->reset( confirmed: true ), 'Failed to reset database before integration test.' );
 
-        rest_get_server();
-        do_action('rest_api_init');
-    }
+		IntegrationTestSupport::clearBackgroundSeedingState();
 
-    protected static function adminUserId(): int
-    {
-        static $adminId = null;
+		rest_get_server();
+		do_action( 'rest_api_init' ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Test stub for a WordPress core symbol.
+	}
 
-        if ($adminId !== null) {
-            return $adminId;
-        }
+	protected static function adminUserId(): int {
+		static $adminId = null;
 
-        $admins = get_users([
-            'role'   => 'administrator',
-            'number' => 1,
-            'fields' => 'ID',
-        ]);
+		if ( null !== $adminId ) {
+			return $adminId;
+		}
 
-        $adminId = (int) ($admins[0] ?? 1);
+		$admins = get_users(
+			array(
+				'role'   => 'administrator',
+				'number' => 1,
+				'fields' => 'ID',
+			)
+		);
 
-        return $adminId;
-    }
+		$adminId = (int) ( $admins[0] ?? 1 );
 
-    /**
-     * @param array<string, mixed> $params
-     * @param array<string, mixed> $urlParams
-     */
-    protected function restRequest(string $method, string $route, array $params = [], array $urlParams = []): \WP_REST_Response
-    {
-        $request = new \WP_REST_Request($method, $route);
+		return $adminId;
+	}
 
-        foreach ($params as $key => $value) {
-            $request->set_param($key, $value);
-        }
+	/**
+	 * @param array<string, mixed> $params
+	 * @param array<string, mixed> $urlParams
+	 */
+	protected function restRequest( string $method, string $route, array $params = array(), array $urlParams = array() ): \WP_REST_Response {
+		$request = new \WP_REST_Request( $method, $route );
 
-        foreach ($urlParams as $key => $value) {
-            $request->set_param($key, $value);
-        }
+		foreach ( $params as $key => $value ) {
+			$request->set_param( $key, $value );
+		}
 
-        $response = rest_do_request($request);
+		foreach ( $urlParams as $key => $value ) {
+			$request->set_param( $key, $value );
+		}
 
-        $this->assertInstanceOf(\WP_REST_Response::class, $response, (string) wp_json_encode($response));
+		$response = rest_do_request( $request );
 
-        return $response;
-    }
+		$this->assertInstanceOf( \WP_REST_Response::class, $response, (string) wp_json_encode( $response ) );
 
-    /** @return array<string, mixed> */
-    protected function restData(\WP_REST_Response $response): array
-    {
-        $data = $response->get_data();
+		return $response;
+	}
 
-        return is_array($data) ? $data : [];
-    }
+	/** @return array<string, mixed> */
+	protected function restData( \WP_REST_Response $response ): array {
+		$data = $response->get_data();
+
+		return is_array( $data ) ? $data : array();
+	}
 }

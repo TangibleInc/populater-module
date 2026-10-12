@@ -11,6 +11,14 @@ composer install
 composer docker:test
 ```
 
+Code quality (PHPCS with WordPress standards, PHPCBF auto-fix, PHPStan):
+
+```bash
+composer lint       # phpcs
+composer lint:fix   # phpcbf
+composer analyse    # phpstan
+```
+
 | Service | Port | Purpose |
 |---------|------|---------|
 | `wp` | 8888 | Dev — admin UI, Playwright, manual testing |

@@ -1,4 +1,9 @@
 <?php
+/**
+ * Reset command.
+ *
+ * @package Tangible\Populater
+ */
 
 declare(strict_types=1);
 
@@ -12,46 +17,51 @@ use Tangible\Populater\Database\DatabaseReset;
  * Usage:
  *   wp tangible-populater reset [--yes]
  */
-class ResetCommand
-{
-    public function __construct(private readonly DatabaseReset $dbReset) {}
+class ResetCommand {
 
-    /**
-     * Removes seeded LMS content while preserving site configuration.
-     *
-     * ## OPTIONS
-     *
-     * [--yes]
-     * : Skip the confirmation prompt.
-     *
-     * ## EXAMPLES
-     *
-     *   wp tangible-populater reset --yes
-     *
-     * @param list<string>         $args
-     * @param array<string, mixed> $assocArgs
-     */
-    public function reset(array $args, array $assocArgs): void
-    {
-        if (!$this->dbReset->isSafeEnvironment()) {
-            \WP_CLI::error('Database reset is disabled on this site. Set TANGIBLE_POPULATER_ALLOW_DB_RESET to true in wp-config.php to enable it.');
-            return;
-        }
+	/**
+	 * Creates the command with its seeding or reset service.
+	 *
+	 * @param DatabaseReset $dbReset Service that performs the database reset.
+	 */
+	public function __construct( private readonly DatabaseReset $dbReset ) {}
 
-        $skipConfirmation = isset($assocArgs['yes']) && $assocArgs['yes'] !== false;
+	/**
+	 * Removes seeded LMS content while preserving site configuration.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--yes]
+	 * : Skip the confirmation prompt.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *   wp tangible-populater reset --yes
+	 *
+	 * @param array<int, string>   $args      Positional command arguments.
+	 * @param array<string, mixed> $assocArgs Associative command arguments.
+	 * @return void
+	 */
+	public function reset( array $args, array $assocArgs ): void {
+		if ( ! $this->dbReset->isSafeEnvironment() ) {
+			\WP_CLI::error( 'Database reset is disabled on this site. Set TANGIBLE_POPULATER_ALLOW_DB_RESET to true in wp-config.php to enable it.' );
+			return;
+		}
 
-        if (!$skipConfirmation) {
-            \WP_CLI::confirm('⚠  This will delete posts, non-admin users, plugin/LMS data, custom site roles, and non-core options. Administrators, active plugins, and the active theme will be kept. Continue?');
-        }
+		$skipConfirmation = isset( $assocArgs['yes'] ) && false !== $assocArgs['yes'];
 
-        \WP_CLI::line('Resetting database…');
+		if ( ! $skipConfirmation ) {
+			\WP_CLI::confirm( '⚠  This will delete posts, non-admin users, plugin/LMS data, custom site roles, and non-core options. Administrators, active plugins, and the active theme will be kept. Continue?' );
+		}
 
-        $success = $this->dbReset->reset(confirmed: true);
+		\WP_CLI::line( 'Resetting database…' );
 
-        if ($success) {
-            \WP_CLI::success('Seeded content has been removed. Administrators, plugins, and theme were preserved.');
-        } else {
-            \WP_CLI::warning('Database reset did not complete successfully.');
-        }
-    }
+		$success = $this->dbReset->reset( confirmed: true );
+
+		if ( $success ) {
+			\WP_CLI::success( 'Seeded content has been removed. Administrators, plugins, and theme were preserved.' );
+		} else {
+			\WP_CLI::warning( 'Database reset did not complete successfully.' );
+		}
+	}
 }

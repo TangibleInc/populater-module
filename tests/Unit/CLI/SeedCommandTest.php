@@ -9,78 +9,85 @@ use Tangible\Populater\Seeding\SeedingManager;
 use Tangible\Populater\Seeding\SeedingStatus;
 use Brain\Monkey\Functions;
 
-class SeedCommandTest extends \WPTestCase
-{
-    private SeedCommand $command;
+class SeedCommandTest extends \WPTestCase {
 
-    /** @var SeedingManager&\PHPUnit\Framework\MockObject\MockObject */
-    private SeedingManager $manager;
+	private SeedCommand $command;
 
-    protected function setUp(): void
-    {
-        parent::setUp();
-        $this->manager = $this->createMock(SeedingManager::class);
-        $this->command = new SeedCommand($this->manager);
-    }
+	/** @var SeedingManager&\PHPUnit\Framework\MockObject\MockObject */
+	private SeedingManager $manager;
 
-    public function test_seed_command_starts_process_and_outputs_id(): void
-    {
-        $this->manager->method('start')->willReturn('process-abc');
+	protected function setUp(): void {
+		parent::setUp();
+		$this->manager = $this->createMock( SeedingManager::class );
+		$this->command = new SeedCommand( $this->manager );
+	}
 
-        $status = new SeedingStatus('process-abc', SeedingStatus::STATUS_RUNNING, total: 5, processed: 0);
-        $completedStatus = new SeedingStatus('process-abc', SeedingStatus::STATUS_COMPLETED, total: 5, processed: 5);
+	public function test_seed_command_starts_process_and_outputs_id(): void {
+		$this->manager->method( 'start' )->willReturn( 'process-abc' );
 
-        $this->manager->method('getStatus')
-            ->willReturnOnConsecutiveCalls($status, $completedStatus);
+		$status          = new SeedingStatus( 'process-abc', SeedingStatus::STATUS_RUNNING, total: 5, processed: 0 );
+		$completedStatus = new SeedingStatus( 'process-abc', SeedingStatus::STATUS_COMPLETED, total: 5, processed: 5 );
 
-        Functions\when('WP_CLI\Utils\make_progress_bar')
-            ->justReturn(new class {
-                public function tick(): void {}
-                public function finish(): void {}
-            });
+		$this->manager->method( 'getStatus' )
+			->willReturnOnConsecutiveCalls( $status, $completedStatus );
 
-        // Should not throw
-        $this->command->seed(['learndash'], ['courses' => '3', 'users' => '2', 'wait' => false]);
-        $this->assertTrue(true); // If we get here, no exception was thrown
-    }
+		Functions\when( 'WP_CLI\Utils\make_progress_bar' )
+			->justReturn(
+				new class() {
+					public function tick(): void {}
+					public function finish(): void {}
+				}
+			);
 
-    public function test_cancel_command_cancels_process(): void
-    {
-        $this->manager->method('cancel')->willReturn(true);
+		// Should not throw
+		$this->command->seed(
+			array( 'learndash' ),
+			array(
+				'courses' => '3',
+				'users'   => '2',
+				'wait'    => false,
+			)
+		);
+		$this->assertTrue( true ); // If we get here, no exception was thrown
+	}
 
-        $this->command->cancel(['process-abc'], []);
-        $this->assertTrue(true);
-    }
+	public function test_cancel_command_cancels_process(): void {
+		$this->manager->method( 'cancel' )->willReturn( true );
 
-    public function test_cancel_command_shows_error_when_process_not_found(): void
-    {
-        $this->manager->method('cancel')->willReturn(false);
+		$this->command->cancel( array( 'process-abc' ), array() );
+		$this->assertTrue( true );
+	}
 
-        $this->command->cancel(['process-abc'], []);
-        $this->assertTrue(true);
-    }
+	public function test_cancel_command_shows_error_when_process_not_found(): void {
+		$this->manager->method( 'cancel' )->willReturn( false );
 
-    public function test_status_command_outputs_status(): void
-    {
-        $status = new SeedingStatus('process-abc', SeedingStatus::STATUS_RUNNING, total: 10, processed: 5);
-        $this->manager->method('getStatus')->willReturn($status);
+		$this->command->cancel( array( 'process-abc' ), array() );
+		$this->assertTrue( true );
+	}
 
-        Functions\when('WP_CLI\Utils\format_items')->justReturn(null);
+	public function test_status_command_outputs_status(): void {
+		$status = new SeedingStatus( 'process-abc', SeedingStatus::STATUS_RUNNING, total: 10, processed: 5 );
+		$this->manager->method( 'getStatus' )->willReturn( $status );
 
-        $this->command->status(['process-abc'], ['format' => 'table']);
-        $this->assertTrue(true);
-    }
+		Functions\when( 'WP_CLI\Utils\format_items' )->justReturn( null );
 
-    public function test_logs_command_outputs_logs(): void
-    {
-        $logs = [
-            ['level' => 'info', 'message' => 'Started seeding', 'timestamp' => time()],
-        ];
-        $this->manager->method('getLogs')->willReturn($logs);
+		$this->command->status( array( 'process-abc' ), array( 'format' => 'table' ) );
+		$this->assertTrue( true );
+	}
 
-        Functions\when('WP_CLI\Utils\format_items')->justReturn(null);
+	public function test_logs_command_outputs_logs(): void {
+		$logs = array(
+			array(
+				'level'     => 'info',
+				'message'   => 'Started seeding',
+				'timestamp' => time(),
+			),
+		);
+		$this->manager->method( 'getLogs' )->willReturn( $logs );
 
-        $this->command->logs(['process-abc'], ['format' => 'table']);
-        $this->assertTrue(true);
-    }
+		Functions\when( 'WP_CLI\Utils\format_items' )->justReturn( null );
+
+		$this->command->logs( array( 'process-abc' ), array( 'format' => 'table' ) );
+		$this->assertTrue( true );
+	}
 }

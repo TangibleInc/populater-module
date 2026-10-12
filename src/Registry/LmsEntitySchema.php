@@ -1,4 +1,9 @@
 <?php
+/**
+ * Post types, title prefixes, relationship meta, and optional container entities for an LMS integration.
+ *
+ * @package Tangible\Populater
+ */
 
 declare(strict_types=1);
 
@@ -8,85 +13,90 @@ namespace Tangible\Populater\Registry;
  * Post types, title prefixes, relationship meta, and optional container entities
  * for an LMS integration.
  */
-final class LmsEntitySchema
-{
-    /**
-     * @param array<string, string> $postTypes Entity key => WordPress post type slug
-     * @param array<string, string> $titlePrefixes Entity key => generated content title prefix
-     * @param array<string, array<string, string>> $metaMap Entity key => [meta key => context key]
-     */
-    public function __construct(
-        public readonly array $postTypes,
-        public readonly array $titlePrefixes = [],
-        public readonly string $userPrefix = '',
-        public readonly array $metaMap = [],
-        public readonly ?LmsContainerEntity $container = null,
-        /** Entity key quizzes attach to: topics, sections, modules, etc. */
-        public readonly ?string $quizParentEntity = null,
-    ) {}
+final class LmsEntitySchema {
 
-    public function getPostType(string $entity): string
-    {
-        return $this->postTypes[$entity] ?? 'post';
-    }
+	/**
+	 * Constructor.
+	 *
+	 * @param array<string, string>                $postTypes        Entity key => WordPress post type slug.
+	 * @param array<string, string>                $titlePrefixes    Entity key => generated content title prefix.
+	 * @param string                               $userPrefix       Username prefix.
+	 * @param array<string, array<string, string>> $metaMap          Entity key => [meta key => context key].
+	 * @param LmsContainerEntity|null              $container        Optional container entity.
+	 * @param string|null                          $quizParentEntity Entity key quizzes attach to: topics, sections, modules, etc.
+	 */
+	public function __construct(
+		public readonly array $postTypes,
+		public readonly array $titlePrefixes = array(),
+		public readonly string $userPrefix = '',
+		public readonly array $metaMap = array(),
+		public readonly ?LmsContainerEntity $container = null,
+		public readonly ?string $quizParentEntity = null,
+	) {}
 
-    public function getTitlePrefix(string $entity, string $pluginName): string
-    {
-        if (isset($this->titlePrefixes[$entity])) {
-            return $this->titlePrefixes[$entity];
-        }
+	/**
+	 * Get the post type for an entity key.
+	 *
+	 * @param string $entity Entity key.
+	 * @return string
+	 */
+	public function getPostType( string $entity ): string {
+		return $this->postTypes[ $entity ] ?? 'post';
+	}
 
-        return $pluginName . ' ' . ucfirst(rtrim($entity, 's'));
-    }
+	/**
+	 * Get the title prefix for an entity key.
+	 *
+	 * @param string $entity     Entity key.
+	 * @param string $pluginName Plugin display name.
+	 * @return string
+	 */
+	public function getTitlePrefix( string $entity, string $pluginName ): string {
+		if ( isset( $this->titlePrefixes[ $entity ] ) ) {
+			return $this->titlePrefixes[ $entity ];
+		}
 
-    /**
-     * @param array<string, mixed> $context
-     * @return array<string, int>
-     */
-    public function resolveMeta(string $entity, array $context): array
-    {
-        $map  = $this->metaMap[$entity] ?? [];
-        $meta = [];
+		return $pluginName . ' ' . ucfirst( rtrim( $entity, 's' ) );
+	}
 
-        foreach ($map as $metaKey => $contextKey) {
-            $meta[$metaKey] = (int) ($context[$contextKey] ?? 0);
-        }
+	/**
+	 * Resolve meta values for an entity from a context.
+	 *
+	 * @param string               $entity  Entity key.
+	 * @param array<string, mixed> $context Context values.
+	 * @return array<string, int>
+	 */
+	public function resolveMeta( string $entity, array $context ): array {
+		$map  = $this->metaMap[ $entity ] ?? array();
+		$meta = array();
 
-        return $meta;
-    }
+		foreach ( $map as $metaKey => $contextKey ) {
+			$meta[ $metaKey ] = (int) ( $context[ $contextKey ] ?? 0 );
+		}
 
-    /**
-     * @return array{courses: string, lessons: string, quizzes: string, questions: string, user_prefix: string, topics?: string, sections?: string, modules?: string}
-     */
-    public function postTypesForSnapshot(): array
-    {
-        $snapshot = [
-            'courses'     => $this->getPostType('courses'),
-            'lessons'     => $this->getPostType('lessons'),
-            'quizzes'     => $this->getPostType('quizzes'),
-            'questions'   => $this->getPostType('questions'),
-            'user_prefix' => $this->userPrefix,
-        ];
+		return $meta;
+	}
 
-        foreach (['topics', 'sections', 'modules'] as $optional) {
-            if (isset($this->postTypes[$optional])) {
-                $snapshot[$optional] = $this->postTypes[$optional];
-            }
-        }
+	/**
+	 * Get the post types and username prefix recorded in a seeding snapshot.
+	 *
+	 * @return array{courses: string, lessons: string, quizzes: string, questions: string, user_prefix: string, topics?: string, sections?: string, modules?: string}
+	 */
+	public function postTypesForSnapshot(): array {
+		$snapshot = array(
+			'courses'     => $this->getPostType( 'courses' ),
+			'lessons'     => $this->getPostType( 'lessons' ),
+			'quizzes'     => $this->getPostType( 'quizzes' ),
+			'questions'   => $this->getPostType( 'questions' ),
+			'user_prefix' => $this->userPrefix,
+		);
 
-        return $snapshot;
-    }
-}
+		foreach ( array( 'topics', 'sections', 'modules' ) as $optional ) {
+			if ( isset( $this->postTypes[ $optional ] ) ) {
+				$snapshot[ $optional ] = $this->postTypes[ $optional ];
+			}
+		}
 
-/**
- * Intermediate entity between course and lesson (section, module, etc.).
- */
-final class LmsContainerEntity
-{
-    public function __construct(
-        public readonly string $entity,
-        public readonly string $cacheMetaKey,
-        public readonly string $parentMetaKey,
-        public readonly string $lessonParentMetaKey = '',
-    ) {}
+		return $snapshot;
+	}
 }

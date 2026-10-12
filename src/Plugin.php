@@ -1,4 +1,9 @@
 <?php
+/**
+ * Main plugin bootstrap class.
+ *
+ * @package Tangible\Populater
+ */
 
 declare(strict_types=1);
 
@@ -16,58 +21,100 @@ use Tangible\Populater\Seeding\SeedingManager;
 /**
  * Main plugin bootstrap class.
  */
-class Plugin
-{
-    private static ?self $instance = null;
+class Plugin {
 
-    private SeedingManager $seedingManager;
-    private DatabaseReset $databaseReset;
-    private PluginDetector $pluginDetector;
+	/**
+	 * Singleton instance.
+	 *
+	 * @var self|null
+	 */
+	private static ?self $instance = null;
 
-    private function __construct()
-    {
-        LmsPlugins::registerBuiltIn();
+	/**
+	 * Seeding manager.
+	 *
+	 * @var SeedingManager
+	 */
+	private SeedingManager $seedingManager;
+	/**
+	 * Database reset service.
+	 *
+	 * @var DatabaseReset
+	 */
+	private DatabaseReset $databaseReset;
+	/**
+	 * Plugin detector.
+	 *
+	 * @var PluginDetector
+	 */
+	private PluginDetector $pluginDetector;
 
-        $this->pluginDetector = new PluginDetector();
-        $this->seedingManager  = new SeedingManager($this->pluginDetector);
-        $this->databaseReset   = new DatabaseReset();
-    }
+	/**
+	 * Constructor.
+	 */
+	private function __construct() {
+		LmsPlugins::registerBuiltIn();
 
-    public static function getInstance(): self
-    {
-        if (self::$instance === null) {
-            self::$instance = new self();
-        }
-        return self::$instance;
-    }
+		$this->pluginDetector = new PluginDetector();
+		$this->seedingManager = new SeedingManager();
+		$this->databaseReset  = new DatabaseReset();
+	}
 
-    public function init(): void
-    {
-        $this->seedingManager->registerBackgroundProcesses();
+	/**
+	 * Get the singleton instance.
+	 *
+	 * @return self
+	 */
+	public static function getInstance(): self {
+		if ( null === self::$instance ) {
+			self::$instance = new self();
+		}
+		return self::$instance;
+	}
 
-        add_action('admin_menu', [$this, 'registerAdminMenu']);
-        add_action('rest_api_init', [$this, 'registerRestRoutes']);
+	/**
+	 * Register hooks.
+	 *
+	 * @return void
+	 */
+	public function init(): void {
+		$this->seedingManager->registerBackgroundProcesses();
 
-        if (defined('WP_CLI') && WP_CLI) {
-            $this->registerCliCommands();
-        }
-    }
+		add_action( 'admin_menu', array( $this, 'registerAdminMenu' ) );
+		add_action( 'rest_api_init', array( $this, 'registerRestRoutes' ) );
 
-    public function registerAdminMenu(): void
-    {
-        $page = new SettingsPage($this->seedingManager, $this->databaseReset, $this->pluginDetector);
-        $page->register();
-    }
+		if ( defined( 'WP_CLI' ) && WP_CLI ) {
+			$this->registerCliCommands();
+		}
+	}
 
-    public function registerRestRoutes(): void
-    {
-        (new SeedController($this->seedingManager))->registerRoutes();
-        (new ResetController($this->databaseReset))->registerRoutes();
-    }
+	/**
+	 * Register the admin menu page.
+	 *
+	 * @return void
+	 */
+	public function registerAdminMenu(): void {
+		$page = new SettingsPage( $this->seedingManager, $this->databaseReset, $this->pluginDetector );
+		$page->register();
+	}
 
-    private function registerCliCommands(): void
-    {
-        \WP_CLI::add_command('tangible-populater', new SeedCommand($this->seedingManager));
-        \WP_CLI::add_command('tangible-populater reset',  new ResetCommand($this->databaseReset));
-    }
+	/**
+	 * Register REST routes.
+	 *
+	 * @return void
+	 */
+	public function registerRestRoutes(): void {
+		( new SeedController( $this->seedingManager ) )->registerRoutes();
+		( new ResetController( $this->databaseReset ) )->registerRoutes();
+	}
+
+	/**
+	 * Register WP-CLI commands.
+	 *
+	 * @return void
+	 */
+	private function registerCliCommands(): void {
+		\WP_CLI::add_command( 'tangible-populater', new SeedCommand( $this->seedingManager ) );
+		\WP_CLI::add_command( 'tangible-populater reset', new ResetCommand( $this->databaseReset ) );
+	}
 }

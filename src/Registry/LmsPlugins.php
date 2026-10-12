@@ -1,4 +1,9 @@
 <?php
+/**
+ * Boots built-in LMS plugin registrations.
+ *
+ * @package Tangible\Populater
+ */
 
 declare(strict_types=1);
 
@@ -14,16 +19,20 @@ use Tangible\Populater\LMS\TangibleLMS\TangibleLmsPlugin;
 /**
  * Boots built-in LMS plugin registrations.
  */
-final class LmsPlugins
-{
-    public static function registerBuiltIn(): void
-    {
-        new LearnDashLmsPlugin();
-        new LifterLmsPlugin();
-        new TangibleLmsPlugin();
+final class LmsPlugins {
 
-        LearnDashIntegration::register();
-        LifterLMSIntegration::register();
-        TangibleLMSIntegration::register();
-    }
+	/**
+	 * Register all built-in LMS plugins and integrations.
+	 *
+	 * @return void
+	 */
+	public static function registerBuiltIn(): void {
+		new LearnDashLmsPlugin();
+		new LifterLmsPlugin();
+		new TangibleLmsPlugin();
+
+		LearnDashIntegration::register();
+		LifterLMSIntegration::register();
+		TangibleLMSIntegration::register();
+	}
 }

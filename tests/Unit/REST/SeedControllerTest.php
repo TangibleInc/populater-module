@@ -9,157 +9,154 @@ use Tangible\Populater\Seeding\SeedingManager;
 use Tangible\Populater\Seeding\SeedingStatus;
 use Brain\Monkey\Functions;
 
-class SeedControllerTest extends \WPTestCase
-{
-    private SeedController $controller;
+class SeedControllerTest extends \WPTestCase {
 
-    /** @var SeedingManager&\PHPUnit\Framework\MockObject\MockObject */
-    private SeedingManager $manager;
+	private SeedController $controller;
 
-    protected function setUp(): void
-    {
-        parent::setUp();
-        $this->manager = $this->createMock(SeedingManager::class);
-        $this->controller = new SeedController($this->manager);
-    }
+	/** @var SeedingManager&\PHPUnit\Framework\MockObject\MockObject */
+	private SeedingManager $manager;
 
-    public function test_register_routes_defines_seed_endpoint(): void
-    {
-        Functions\expect('register_rest_route')
-            ->atLeast()
-            ->once()
-            ->with('tangible-populater/v1', '/seed', \Mockery::any());
+	protected function setUp(): void {
+		parent::setUp();
+		$this->manager    = $this->createMock( SeedingManager::class );
+		$this->controller = new SeedController( $this->manager );
+	}
 
-        $this->controller->registerRoutes();
-        $this->addToAssertionCount(1);
-    }
+	public function test_register_routes_defines_seed_endpoint(): void {
+		Functions\expect( 'register_rest_route' )
+			->atLeast()
+			->once()
+			->with( 'tangible-populater/v1', '/seed', \Mockery::any() );
 
-    public function test_register_routes_defines_cancel_endpoint(): void
-    {
-        Functions\expect('register_rest_route')
-            ->atLeast()
-            ->once()
-            ->with('tangible-populater/v1', '/seed/(?P<id>[\\w-]+)/cancel', \Mockery::any());
+		$this->controller->registerRoutes();
+		$this->addToAssertionCount( 1 );
+	}
 
-        $this->controller->registerRoutes();
-        $this->addToAssertionCount(1);
-    }
+	public function test_register_routes_defines_cancel_endpoint(): void {
+		Functions\expect( 'register_rest_route' )
+			->atLeast()
+			->once()
+			->with( 'tangible-populater/v1', '/seed/(?P<id>[\\w-]+)/cancel', \Mockery::any() );
 
-    public function test_register_routes_defines_status_endpoint(): void
-    {
-        Functions\expect('register_rest_route')
-            ->atLeast()
-            ->once()
-            ->with('tangible-populater/v1', '/seed/(?P<id>[\\w-]+)/status', \Mockery::any());
+		$this->controller->registerRoutes();
+		$this->addToAssertionCount( 1 );
+	}
 
-        $this->controller->registerRoutes();
-        $this->addToAssertionCount(1);
-    }
+	public function test_register_routes_defines_status_endpoint(): void {
+		Functions\expect( 'register_rest_route' )
+			->atLeast()
+			->once()
+			->with( 'tangible-populater/v1', '/seed/(?P<id>[\\w-]+)/status', \Mockery::any() );
 
-    public function test_register_routes_defines_logs_endpoint(): void
-    {
-        Functions\expect('register_rest_route')
-            ->atLeast()
-            ->once()
-            ->with('tangible-populater/v1', '/seed/(?P<id>[\\w-]+)/logs', \Mockery::any());
+		$this->controller->registerRoutes();
+		$this->addToAssertionCount( 1 );
+	}
 
-        $this->controller->registerRoutes();
-        $this->addToAssertionCount(1);
-    }
+	public function test_register_routes_defines_logs_endpoint(): void {
+		Functions\expect( 'register_rest_route' )
+			->atLeast()
+			->once()
+			->with( 'tangible-populater/v1', '/seed/(?P<id>[\\w-]+)/logs', \Mockery::any() );
 
-    public function test_permission_callback_requires_admin(): void
-    {
-        Functions\when('current_user_can')->justReturn(false);
+		$this->controller->registerRoutes();
+		$this->addToAssertionCount( 1 );
+	}
 
-        $this->assertFalse($this->controller->checkAdminPermission());
-    }
+	public function test_permission_callback_requires_admin(): void {
+		Functions\when( 'current_user_can' )->justReturn( false );
 
-    public function test_permission_callback_allows_admin(): void
-    {
-        Functions\when('current_user_can')->justReturn(true);
+		$this->assertFalse( $this->controller->checkAdminPermission() );
+	}
 
-        $this->assertTrue($this->controller->checkAdminPermission());
-    }
+	public function test_permission_callback_allows_admin(): void {
+		Functions\when( 'current_user_can' )->justReturn( true );
 
-    public function test_start_seed_returns_process_id(): void
-    {
-        $this->manager
-            ->method('start')
-            ->willReturn('process-123');
+		$this->assertTrue( $this->controller->checkAdminPermission() );
+	}
 
-        $request = $this->createMockRequest(['plugin' => 'learndash', 'courses' => 5]);
+	public function test_start_seed_returns_process_id(): void {
+		$this->manager
+			->method( 'start' )
+			->willReturn( 'process-123' );
 
-        Functions\expect('rest_ensure_response')
-            ->once()
-            ->andReturnUsing(static fn (mixed $data): \WP_REST_Response => new \WP_REST_Response($data));
+		$request = $this->createMockRequest(
+			array(
+				'plugin'  => 'learndash',
+				'courses' => 5,
+			)
+		);
 
-        $response = $this->controller->startSeed($request);
-        $data     = $response instanceof \WP_REST_Response ? $response->get_data() : [];
+		Functions\expect( 'rest_ensure_response' )
+			->once()
+			->andReturnUsing( static fn ( mixed $data ): \WP_REST_Response => new \WP_REST_Response( $data ) );
 
-        $this->assertArrayHasKey('process_id', $data);
-        $this->assertSame('process-123', $data['process_id']);
-    }
+		$response = $this->controller->startSeed( $request );
+		$data     = $response instanceof \WP_REST_Response ? $response->get_data() : array();
 
-    public function test_get_status_returns_seeding_status(): void
-    {
-        $status = new SeedingStatus('process-123', SeedingStatus::STATUS_RUNNING, total: 10, processed: 3);
-        $this->manager->method('getStatus')->willReturn($status);
+		$this->assertArrayHasKey( 'process_id', $data );
+		$this->assertSame( 'process-123', $data['process_id'] );
+	}
 
-        $request = $this->createMockRequest([], ['id' => 'process-123']);
+	public function test_get_status_returns_seeding_status(): void {
+		$status = new SeedingStatus( 'process-123', SeedingStatus::STATUS_RUNNING, total: 10, processed: 3 );
+		$this->manager->method( 'getStatus' )->willReturn( $status );
 
-        Functions\expect('rest_ensure_response')
-            ->once()
-            ->andReturnUsing(static fn (mixed $data): \WP_REST_Response => new \WP_REST_Response($data));
+		$request = $this->createMockRequest( array(), array( 'id' => 'process-123' ) );
 
-        $response = $this->controller->getStatus($request);
-        $data     = $response instanceof \WP_REST_Response ? $response->get_data() : [];
+		Functions\expect( 'rest_ensure_response' )
+			->once()
+			->andReturnUsing( static fn ( mixed $data ): \WP_REST_Response => new \WP_REST_Response( $data ) );
 
-        $this->assertArrayHasKey('status', $data);
-        $this->assertArrayHasKey('progress', $data);
-    }
+		$response = $this->controller->getStatus( $request );
+		$data     = $response instanceof \WP_REST_Response ? $response->get_data() : array();
 
-    public function test_cancel_seed_returns_success(): void
-    {
-        $this->manager->method('cancel')->willReturn(true);
+		$this->assertArrayHasKey( 'status', $data );
+		$this->assertArrayHasKey( 'progress', $data );
+	}
 
-        $request = $this->createMockRequest([], ['id' => 'process-123']);
+	public function test_cancel_seed_returns_success(): void {
+		$this->manager->method( 'cancel' )->willReturn( true );
 
-        Functions\expect('rest_ensure_response')
-            ->once()
-            ->andReturnUsing(static fn (mixed $data): \WP_REST_Response => new \WP_REST_Response($data));
+		$request = $this->createMockRequest( array(), array( 'id' => 'process-123' ) );
 
-        $response = $this->controller->cancelSeed($request);
-        $data     = $response instanceof \WP_REST_Response ? $response->get_data() : [];
+		Functions\expect( 'rest_ensure_response' )
+			->once()
+			->andReturnUsing( static fn ( mixed $data ): \WP_REST_Response => new \WP_REST_Response( $data ) );
 
-        $this->assertArrayHasKey('cancelled', $data);
-        $this->assertTrue($data['cancelled']);
-    }
+		$response = $this->controller->cancelSeed( $request );
+		$data     = $response instanceof \WP_REST_Response ? $response->get_data() : array();
 
-    public function test_get_logs_returns_log_array(): void
-    {
-        $logs = [
-            ['level' => 'info', 'message' => 'Started', 'timestamp' => time()],
-        ];
-        $this->manager->method('getLogs')->willReturn($logs);
+		$this->assertArrayHasKey( 'cancelled', $data );
+		$this->assertTrue( $data['cancelled'] );
+	}
 
-        $request = $this->createMockRequest([], ['id' => 'process-123']);
+	public function test_get_logs_returns_log_array(): void {
+		$logs = array(
+			array(
+				'level'     => 'info',
+				'message'   => 'Started',
+				'timestamp' => time(),
+			),
+		);
+		$this->manager->method( 'getLogs' )->willReturn( $logs );
 
-        Functions\expect('rest_ensure_response')
-            ->once()
-            ->andReturnUsing(static fn (mixed $data): \WP_REST_Response => new \WP_REST_Response($data));
+		$request = $this->createMockRequest( array(), array( 'id' => 'process-123' ) );
 
-        $response = $this->controller->getLogs($request);
-        $data     = $response instanceof \WP_REST_Response ? $response->get_data() : [];
+		Functions\expect( 'rest_ensure_response' )
+			->once()
+			->andReturnUsing( static fn ( mixed $data ): \WP_REST_Response => new \WP_REST_Response( $data ) );
 
-        $this->assertArrayHasKey('logs', $data);
-        $this->assertIsArray($data['logs']);
-    }
+		$response = $this->controller->getLogs( $request );
+		$data     = $response instanceof \WP_REST_Response ? $response->get_data() : array();
 
-    /**
-     * Create a mock WP_REST_Request.
-     */
-    private function createMockRequest(array $params = [], array $urlParams = []): object
-    {
-        return new \WP_REST_Request($params, $urlParams);
-    }
+		$this->assertArrayHasKey( 'logs', $data );
+		$this->assertIsArray( $data['logs'] );
+	}
+
+	/**
+	 * Create a mock WP_REST_Request.
+	 */
+	private function createMockRequest( array $params = array(), array $urlParams = array() ): object {
+		return new \WP_REST_Request( $params, $urlParams );
+	}
 }

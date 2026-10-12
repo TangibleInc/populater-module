@@ -13,63 +13,72 @@ use Tangible\Populater\Tests\Support\PluginTestAccessor;
  * @group integration
  * @group rest
  */
-class ResetRestIntegrationTest extends WordPressIntegrationTestCase
-{
-    public function test_post_reset_removes_seeded_content(): void
-    {
-        if (!$this->isTangibleLmsActive()) {
-            $this->markTestSkipped('Tangible LMS is not active in this environment.');
-        }
+class ResetRestIntegrationTest extends WordPressIntegrationTestCase {
 
-        $manager = PluginTestAccessor::seedingManager();
-        $plugin  = 'tangible-lms';
+	public function test_post_reset_removes_seeded_content(): void {
+		if ( ! $this->isTangibleLmsActive() ) {
+			$this->markTestSkipped( 'Tangible LMS is not active in this environment.' );
+		}
 
-        $start = $this->restRequest('POST', '/tangible-populater/v1/seed', [
-            'plugin'             => $plugin,
-            'courses'            => 1,
-            'lessons_per_course' => 1,
-            'quizzes_per_section' => 1,
-            'users'              => 1,
-        ]);
+		$manager = PluginTestAccessor::seedingManager();
+		$plugin  = 'tangible-lms';
 
-        $processId = (string) $this->restData($start)['process_id'];
-        BackgroundProcessDrainer::runSeedToCompletion($manager, $plugin, $processId);
+		$start = $this->restRequest(
+			'POST',
+			'/tangible-populater/v1/seed',
+			array(
+				'plugin'              => $plugin,
+				'courses'             => 1,
+				'lessons_per_course'  => 1,
+				'quizzes_per_section' => 1,
+				'users'               => 1,
+			)
+		);
 
-        $afterSeed = LmsContentInspector::snapshot($plugin);
-        $this->assertGreaterThan(0, $afterSeed['courses'] + $afterSeed['lessons'] + $afterSeed['quizzes'] + $afterSeed['users']);
+		$processId = (string) $this->restData( $start )['process_id'];
+		BackgroundProcessDrainer::runSeedToCompletion( $manager, $plugin, $processId );
 
-        $reset = $this->restRequest('POST', '/tangible-populater/v1/reset', [
-            'confirmed' => true,
-        ]);
+		$afterSeed = LmsContentInspector::snapshot( $plugin );
+		$this->assertGreaterThan( 0, $afterSeed['courses'] + $afterSeed['lessons'] + $afterSeed['quizzes'] + $afterSeed['users'] );
 
-        $resetData = $this->restData($reset);
-        $this->assertTrue($resetData['success']);
+		$reset = $this->restRequest(
+			'POST',
+			'/tangible-populater/v1/reset',
+			array(
+				'confirmed' => true,
+			)
+		);
 
-        $afterReset = LmsContentInspector::snapshot($plugin);
-        $this->assertSame(0, $afterReset['courses']);
-        $this->assertSame(0, $afterReset['lessons']);
-        $this->assertSame(0, $afterReset['quizzes']);
-        $this->assertSame(0, $afterReset['users']);
-    }
+		$resetData = $this->restData( $reset );
+		$this->assertTrue( $resetData['success'] );
 
-    public function test_post_reset_without_confirmation_is_aborted(): void
-    {
-        $response = $this->restRequest('POST', '/tangible-populater/v1/reset', [
-            'confirmed' => false,
-        ]);
+		$afterReset = LmsContentInspector::snapshot( $plugin );
+		$this->assertSame( 0, $afterReset['courses'] );
+		$this->assertSame( 0, $afterReset['lessons'] );
+		$this->assertSame( 0, $afterReset['quizzes'] );
+		$this->assertSame( 0, $afterReset['users'] );
+	}
 
-        $data = $this->restData($response);
-        $this->assertFalse($data['success']);
-    }
+	public function test_post_reset_without_confirmation_is_aborted(): void {
+		$response = $this->restRequest(
+			'POST',
+			'/tangible-populater/v1/reset',
+			array(
+				'confirmed' => false,
+			)
+		);
 
-    private function isTangibleLmsActive(): bool
-    {
-        foreach (PluginTestAccessor::seedingManager()->getSupportedPlugins() as $plugin) {
-            if ($plugin['slug'] === 'tangible-lms' && $plugin['active']) {
-                return true;
-            }
-        }
+		$data = $this->restData( $response );
+		$this->assertFalse( $data['success'] );
+	}
 
-        return false;
-    }
+	private function isTangibleLmsActive(): bool {
+		foreach ( PluginTestAccessor::seedingManager()->getSupportedPlugins() as $plugin ) {
+			if ( 'tangible-lms' === $plugin['slug'] && $plugin['active'] ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
 }

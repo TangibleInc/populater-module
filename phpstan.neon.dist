@@ -1,0 +1,23 @@
+parameters:
+    level: 8
+    paths:
+        - tangible-populater.php
+        - src
+    scanFiles:
+        - vendor/php-stubs/wp-cli-stubs/wp-cli-stubs.php
+        - vendor/php-stubs/wp-cli-stubs/wp-cli-commands-stubs.php
+        - vendor/php-stubs/wp-cli-stubs/wp-cli-i18n-stubs.php
+    excludePaths:
+        - vendor
+    treatPhpDocTypesAsCertain: false
+    ignoreErrors:
+        # Third-party LMS plugins are not installed during analysis.
+        -
+            identifier: class.notFound
+            path: src/LMS/*
+        -
+            identifier: function.notFound
+            path: src/LMS/*
+        -
+            identifier: class.notFound
+            path: src/CLI/*
