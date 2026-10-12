@@ -29,13 +29,14 @@ import {
   seededUser,
   stopIfUserPoolExhausted,
   studentLoadOptions,
+  tagged,
   thinkBetweenCourses,
 } from './student-load.js';
 
 const BASE_URL = (__ENV.BASE_URL || 'http://localhost:8888').replace(/\/$/, '');
 const USER_PASSWORD = __ENV.LIFTER_USER_PASSWORD || __ENV.USER_PASSWORD || 'StressTest#2026';
 /** Must match SeededUsername::prefix('lifterlms', 'student') in the Populater plugin. */
-const LIFTER_STUDENT_PREFIX = 'lifterstudent';
+const LIFTER_STUDENT_PREFIX = tagged('lifterstudent');
 const LIFTER_USERNAME = __ENV.LIFTER_USERNAME || '';
 const MAX_USERS = intEnv('MAX_USERS', 20);
 const COURSE_INDEX = intEnv('COURSE_INDEX', 1);
@@ -49,15 +50,15 @@ const CF_BYPASS_VALUE = __ENV.CF_BYPASS_VALUE ?? '1';
 export const options = studentLoadOptions('lifterlms');
 
 function coursePath(courseIndex) {
-  return `/course/lifterlms-course-${courseIndex}/`;
+  return `/course/${tagged(`lifterlms-course-${courseIndex}`)}/`;
 }
 
 function lessonPath(courseIndex, lessonIndex) {
-  return `/lesson/lifterlms-lesson-c${courseIndex}-l${lessonIndex}/`;
+  return `/lesson/${tagged(`lifterlms-lesson-c${courseIndex}-l${lessonIndex}`)}/`;
 }
 
 function quizPath(courseIndex, sectionIndex, quizIndex) {
-  return `/quiz/lifterlms-quiz-c${courseIndex}-s${sectionIndex}-q${quizIndex}/`;
+  return `/quiz/${tagged(`lifterlms-quiz-c${courseIndex}-s${sectionIndex}-q${quizIndex}`)}/`;
 }
 
 function fetchCourseStructure(courseIndex, jar) {

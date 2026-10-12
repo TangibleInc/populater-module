@@ -40,6 +40,26 @@ export const STEP_THINK_TIME = Math.max(
 );
 export const COURSE_THINK_TIME = Math.max(0, floatEnv('THINK_TIME', 0));
 
+// Captured HERE at init (module top-level), not read from __ENV inside a
+// function at runtime: in k6 Cloud, values injected via Object.assign(__ENV, …)
+// are visible during init but NOT from __ENV reads inside functions on the
+// load generators. Every other env value in this suite is captured into a
+// module var at init for exactly this reason — parseCourseStructure must read
+// this const, never __ENV.COURSE_STRUCTURE directly, or it reads back empty.
+export const COURSE_STRUCTURE_ENV = __ENV.COURSE_STRUCTURE || '';
+
+// Dataset namespace. Seeders namespace every slug, username, and email with
+// the fixture's dataset tag (e.g. fix-4xi8d8c5-lifterlms-course-1) so that
+// coexisting fixtures never collide — without it, WordPress dedupes colliding
+// slugs with -2/-3 suffixes and a slug-addressed journey silently lands on
+// the OLDEST fixture's stale (possibly pre-enrolled) data. Unset = legacy
+// un-namespaced names.
+export const DATASET_TAG = __ENV.DATASET_TAG || '';
+
+export function tagged(name) {
+  return DATASET_TAG !== '' ? `${DATASET_TAG}-${name}` : name;
+}
+
 export function studentLoadOptions(lms) {
   return {
     tags: {
@@ -145,10 +165,25 @@ function decodeHtmlEntities(value) {
 }
 
 export function parseCourseStructure(body) {
+  // The platform seeds the data, so it authoritatively knows the course
+  // structure. When it passes COURSE_STRUCTURE in the run env, trust that
+  // directly: it's robust to themes that don't render the course post_content
+  // (e.g. block/FSE themes that output only the LMS syllabus block), where the
+  // in-page structure marker never reaches the HTML. Falls back to scraping
+  // the marker for platform-agnostic seeds. Both the tbench and legacy
+  // populater marker names are accepted.
+  if (COURSE_STRUCTURE_ENV && COURSE_STRUCTURE_ENV !== '') {
+    try {
+      return JSON.parse(COURSE_STRUCTURE_ENV);
+    } catch (error) {
+      must(false, `COURSE_STRUCTURE env is valid JSON: ${error.message}`);
+    }
+  }
+
   const match =
-    body.match(/<!--\s*populater:structure\s+(\{[^>]*\})\s*-->/) ||
-    body.match(/<script[^>]+id=["']populater-structure["'][^>]*>([\s\S]*?)<\/script>/) ||
-    body.match(/\[populater:structure\s+(\{[^]*?})]/);
+    body.match(/<!--\s*(?:tbench|populater):structure\s+(\{[^>]*\})\s*-->/) ||
+    body.match(/<script[^>]+id=["'](?:tbench|populater)-structure["'][^>]*>([\s\S]*?)<\/script>/) ||
+    body.match(/\[(?:tbench|populater):structure\s+(\{[^]*?})]/);
 
   must(match !== null, 'course structure present');
   const json = decodeHtmlEntities(match[1].trim());
